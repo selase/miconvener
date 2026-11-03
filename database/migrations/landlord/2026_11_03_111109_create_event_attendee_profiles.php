@@ -171,6 +171,9 @@ BEGIN
    RAISE EXCEPTION 'Attendee image ownership and storage cannot be rewritten';
   END IF;
  END IF;
+ IF TG_OP = 'UPDATE' AND OLD.profile_id IS NOT NULL AND NEW.profile_id IS NULL AND NEW.retired_at IS NULL THEN
+  NEW.retired_at := clock_timestamp();
+ END IF;
  IF NEW.profile_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM event_attendee_profiles p
    WHERE p.id=NEW.profile_id AND p.tenant_id=NEW.tenant_id AND p.event_id=NEW.event_id AND p.registration_id=NEW.registration_id AND p.owner_hash=NEW.owner_hash) THEN
   RAISE EXCEPTION 'Invalid attendee image profile context';

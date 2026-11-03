@@ -21,9 +21,9 @@ final class EventAttendeeProfileController extends Controller
     {
         $current = $this->event($event);
         abort_unless($rollout->generation($current->tenant_id) !== null, 404);
-        $profiles = EventAttendeeProfile::withoutGlobalScopes()->where('event_id', $current->id)->where('tenant_id', $current->tenant_id)->whereIn('state', ['published', 'hidden'])->orderByDesc('created_at')->limit(100)->get();
+        $profiles = EventAttendeeProfile::withoutGlobalScopes()->where('event_id', $current->id)->where('tenant_id', $current->tenant_id)->whereIn('state', ['published', 'hidden'])->orderByDesc('created_at')->orderByDesc('id')->paginate(25);
 
-        return response()->json(['enabled' => $current->public_attendee_profiles, 'profiles' => $profiles->map(fn ($profile) => ['id' => $profile->id, 'display_name' => $profile->display_name, 'state' => $profile->state])])->header('Cache-Control', 'private, no-store');
+        return response()->json(['enabled' => $current->public_attendee_profiles, 'page' => $profiles->currentPage(), 'next_page' => $profiles->hasMorePages() ? $profiles->currentPage() + 1 : null, 'previous_page' => $profiles->currentPage() > 1 ? $profiles->currentPage() - 1 : null, 'profiles' => $profiles->getCollection()->map(fn ($profile) => ['id' => $profile->id, 'display_name' => $profile->display_name, 'state' => $profile->state])])->header('Cache-Control', 'private, no-store');
     }
 
     public function toggle(ToggleAttendeeProfilesRequest $request, string $subdomain, string $event, ProfileRollout $rollout): JsonResponse

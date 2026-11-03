@@ -14,16 +14,25 @@ use Symfony\Component\Process\Process;
 
 require_once __DIR__.'/../../Support/PublicAttendeeProfileScenario.php';
 uses(DatabaseTruncation::class);
-afterEach(function (): void { $this->truncateDatabaseTables(); });
+afterEach(function (): void {
+    $this->truncateDatabaseTables();
+});
 
 /** @return list<string> */
 function attendeeProfileRace(array $context, array $actions): array
 {
-    expect(config('database.connections.landlord.database'))->toBe('miconvener_s2b_codex_testing');
+    $database = config('database.connections.landlord.database');
+    if (getenv('GITHUB_ACTIONS') === 'true') {
+        expect($database)->toMatch('/^testing(?:_test_\d+)?$/');
+    } else {
+        expect($database)->toBe('miconvener_s2b_codex_testing');
+    }
     $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => config('database.connections.landlord.database'), 'DB_HOST' => config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $start = microtime(true) + 2;
     $workers = array_map(fn (string $action): Process => (new Process([PHP_BINARY, base_path('tests/Fixtures/events/attendee-profile-worker.php')], base_path(), $environment))->setTimeout(60)->setInput(json_encode($context + ['action' => $action, 'start_at' => $start], JSON_THROW_ON_ERROR)), $actions);
-    foreach ($workers as $worker) { $worker->start(); }
+    foreach ($workers as $worker) {
+        $worker->start();
+    }
     $results = [];
     foreach ($workers as $worker) {
         $worker->wait();
@@ -31,6 +40,7 @@ function attendeeProfileRace(array $context, array $actions): array
         expect($result)->toBeArray($worker->getErrorOutput())->and($result)->not->toHaveKey('error');
         $results[] = $result['result'];
     }
+
     return $results;
 }
 

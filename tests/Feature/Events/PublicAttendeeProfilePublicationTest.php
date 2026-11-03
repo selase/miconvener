@@ -198,3 +198,22 @@ it('uses the series end rather than the first service date for ongoing gathering
     $profile = app(ProfilePublication::class)->publish($registration, $session, attendeeProfileInput());
     expect($profile->expires_at->equalTo(now()->addDays(90)))->toBeTrue();
 });
+
+it('accepts fresh explicit consent immediately after event invalidation without waiting for cleanup', function (): void {
+    [, $event, $registration, $session] = attendeeProfileScenario();
+    $service = app(ProfilePublication::class);
+    $profile = $service->publish($registration, $session, attendeeProfileInput());
+    $event->forceFill(['starts_at' => $event->starts_at->addDay(), 'ends_at' => $event->ends_at->addDay()])->save();
+    $editor = $service->current($registration, $session);
+    expect($editor['state'])->toBe('private');
+    $renewed = $service->publish($registration, $session, attendeeProfileInput(['revision' => $editor['revision']]));
+    expect($renewed->revision)->not->toBe($profile->revision)->and($service->current($registration, $session)['state'])->toBe('published');
+});
+
+it('hides disabled profile reads before advertising email verification to checkout-only holders', function (): void {
+    [$tenant, $event, $registration, $session] = attendeeProfileScenario();
+    $event->forceFill(['public_attendee_profiles' => false])->save();
+    $session->forget(PlatformAttendeeVerification::SESSION_KEY);
+    app(PlatformAttendeeWorkspaceAuthorizer::class)->grantCheckoutAccess($session, $registration->id);
+    $this->withSession($session->all())->getJson('/my/events/'.$registration->id.'/public-profile')->assertNotFound();
+});

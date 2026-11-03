@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Event;
 use App\Models\EventAttendeeProfileConsent;
+use App\Models\EventAttendeeProfileImage;
 use App\Models\EventRegistration;
 use App\Services\Events\Profiles\ProfileImages;
 use App\Services\Events\Profiles\ProfilePublication;
@@ -112,4 +113,35 @@ it('supplies only the enabled directory address to the existing public event pag
     $this->withServerVariables(['HTTP_HOST' => eventSubdomainHost($tenant->slug)])
         ->get(route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $event->slug]))
         ->assertOk()->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->where('event.public_attendee_profiles_url', '/attendee-profiles/events/'.$event->id)->where('event.going_count', 1)->missing('event.profiles')->missing('event.attendees'));
+});
+
+it('cleans a formerly published photograph after its registration is deleted', function (): void {
+    Storage::fake('attendee-profiles-local');
+    [, , $registration, $session] = attendeeProfileScenario();
+    $image = app(ProfileImages::class)->upload($registration, $session, UploadedFile::fake()->image('photo.png', 60, 60));
+    app(ProfilePublication::class)->publish($registration, $session, attendeeProfileInput(['image_id' => $image->id]));
+    $registration->delete();
+    app(ProfileRetention::class)->sweep();
+    Storage::disk($image->disk)->assertMissing($image->path);
+});
+
+it('does not let successful tombstones block later retired image deletions', function (): void {
+    $disk = Storage::fake('attendee-profiles-local');
+    [$tenant, $event, $registration, $session] = attendeeProfileScenario();
+    $rows = [];
+    for ($index = 0; $index < 1001; $index++) {
+        $id = (string) Illuminate\Support\Str::uuid();
+        $path = 'attendee-profiles/'.$tenant->id.'/'.$id.'.webp';
+        $disk->put($path, 'x');
+        $rows[] = ['id' => $id, 'tenant_id' => $tenant->id, 'event_id' => $event->id, 'registration_id' => $registration->id,
+            'owner_hash' => app(App\Services\Events\Profiles\ProfileEligibility::class)->ownerHash($event->id, $registration->email),
+            'disk' => 'attendee-profiles-local', 'path' => $path, 'byte_size' => 1, 'expires_at' => now()->addDay(), 'retired_at' => now(), 'created_at' => now(), 'updated_at' => now()];
+    }
+    foreach (array_chunk($rows, 200) as $chunk) {
+        EventAttendeeProfileImage::withoutGlobalScopes()->insert($chunk);
+    }
+    app(ProfileRetention::class)->sweep();
+    expect(EventAttendeeProfileImage::withoutGlobalScopes()->whereNull('deleted_at')->count())->toBe(1);
+    app(ProfileRetention::class)->sweep();
+    expect(EventAttendeeProfileImage::withoutGlobalScopes()->whereNull('deleted_at')->count())->toBe(0);
 });

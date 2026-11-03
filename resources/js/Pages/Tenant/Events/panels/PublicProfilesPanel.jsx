@@ -6,8 +6,8 @@ export default function PublicProfilesPanel({ eventId }) {
     const [busy, setBusy] = useState(false);
     const [reasons, setReasons] = useState({});
     const endpoint = `/events/${eventId}/public-profiles`;
-    const refresh = async () => {
-        const response = await csrfFetch(endpoint, { cache: 'no-store' });
+    const refresh = async (page = data?.page || 1) => {
+        const response = await csrfFetch(`${endpoint}?page=${page}`, { cache: 'no-store' });
         if (response.ok) setData(await response.json());
     };
     useEffect(() => {
@@ -21,6 +21,17 @@ export default function PublicProfilesPanel({ eventId }) {
             active = false;
         };
     }, [endpoint]);
+    const turnPage = async (page) => {
+        setBusy(true);
+        setError('');
+        try {
+            await refresh(page);
+        } catch {
+            setError('Could not load this page.');
+        } finally {
+            setBusy(false);
+        }
+    };
     const change = async (url, method, body) => {
         setBusy(true);
         setError('');
@@ -106,6 +117,28 @@ export default function PublicProfilesPanel({ eventId }) {
                     )}
                 </div>
             ))}
+            <div className="mt-4 flex flex-wrap gap-3">
+                {data.previous_page && (
+                    <button
+                        disabled={busy}
+                        type="button"
+                        onClick={() => turnPage(data.previous_page)}
+                        className="min-h-control border border-border px-4 py-2"
+                    >
+                        Previous profiles
+                    </button>
+                )}
+                {data.next_page && (
+                    <button
+                        disabled={busy}
+                        type="button"
+                        onClick={() => turnPage(data.next_page)}
+                        className="min-h-control border border-border px-4 py-2"
+                    >
+                        Next profiles
+                    </button>
+                )}
+            </div>
             {error && (
                 <p role="alert" className="mt-3 text-danger">
                     {error}

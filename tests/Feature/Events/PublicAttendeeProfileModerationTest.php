@@ -76,3 +76,16 @@ it('releases a hold only through platform moderation without republishing old co
     expect($profile->fresh()->state)->toBe('private')->and($profile->fresh()->moderated_at)->toBeNull()
         ->and(app(ProfileEligibility::class)->visible($profile))->toBeFalse();
 });
+
+it('paginates moderation so older profiles remain reachable', function (): void {
+    [$tenant, $event] = attendeeProfileScenario();
+    for ($index = 0; $index < 101; $index++) {
+        $registration = App\Models\EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+        App\Models\EventAttendeeProfile::factory()->forRegistration($registration)->create(['state' => 'hidden', 'moderated_at' => now()]);
+    }
+    $this->seed(PermissionsSeeder::class);
+    $user = attendeeProfileStaff($tenant);
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($tenant->slug)])
+        ->getJson(route('tenant.events.public-profiles.index', ['subdomain' => $tenant->slug, 'event' => $event->id]).'?page=5')
+        ->assertOk()->assertJsonPath('page', 5)->assertJsonCount(1, 'profiles')->assertJsonPath('previous_page', 4);
+});

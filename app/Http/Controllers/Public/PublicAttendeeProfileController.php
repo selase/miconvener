@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendee\PublishPublicAttendeeProfileRequest;
 use App\Http\Requests\Attendee\UploadPublicAttendeePhotoRequest;
+use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Services\Events\Profiles\ProfileImages;
 use App\Services\Events\Profiles\ProfilePublication;
+use App\Services\Events\Profiles\ProfileRollout;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,9 +24,13 @@ final class PublicAttendeeProfileController extends Controller
         return response()->json(['image' => ['id' => $image->id]])->header('Cache-Control', 'private, no-store');
     }
 
-    public function current(Request $request, string $registration, ProfilePublication $profiles): JsonResponse
+    public function current(Request $request, string $registration, ProfilePublication $profiles, ProfileRollout $rollout): JsonResponse
     {
-        return $this->response($profiles->current($this->registration($registration), $request->session()));
+        $ticket = $this->registration($registration);
+        $event = Event::withoutGlobalScopes()->findOrFail($ticket->event_id);
+        abort_unless($rollout->allows($event), 404);
+
+        return $this->response($profiles->current($ticket, $request->session()));
     }
 
     public function publish(PublishPublicAttendeeProfileRequest $request, string $registration, ProfilePublication $profiles): JsonResponse

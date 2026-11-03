@@ -35,7 +35,7 @@ it('decodes supported photos and retains only a private square derivative', func
     $details = getimagesizefromstring($bytes);
     expect($details[0])->toBe(512)->and($details[1])->toBe(512)->and($details['mime'])->toBe('image/webp')
         ->and($image->stored_at)->not->toBeNull()->and($image->profile_id)->toBeNull()
-        ->and($image->byte_size)->toBe(mb_strlen($bytes));
+        ->and($image->byte_size)->toBe(Storage::disk($image->disk)->size($image->path));
     $profile = app(ProfilePublication::class)->publish($registration, $session, attendeeProfileInput(['image_id' => $image->id]));
     expect($profile->image_id)->toBe($image->id);
 })->with(['png', 'jpeg', 'webp']);
@@ -81,7 +81,7 @@ it('rejects excessive pixels before decoding and animated PNG containers', funct
     $file = profilePhoto();
     $original = file_get_contents($file->getRealPath());
     $huge = substr_replace($original, pack('NN', 6000, 6000), 16, 8);
-    $animated = mb_substr($original, 0, 33).pack('N', 8).'acTL'.pack('NN', 2, 0).pack('N', 0).mb_substr($original, 33);
+    $animated = mb_substr($original, 0, 33, '8bit').pack('N', 8).'acTL'.pack('NN', 2, 0).pack('N', 0).mb_substr($original, 33, null, '8bit');
     foreach ([$huge, $animated] as $bytes) {
         expect(fn () => app(ProfileImages::class)->upload($registration, $session, UploadedFile::fake()->createWithContent('photo.png', $bytes)))->toThrow(ValidationException::class);
     }
@@ -128,4 +128,28 @@ it('fails closed when existing storage usage cannot be measured under a finite c
     Storage::partialMock()->shouldReceive('disk')->with('tenant')->andReturn($disk);
     expect(fn () => app(ProfileImages::class)->upload($registration, $session, profilePhoto()))->toThrow(ValidationException::class);
     expect(EventAttendeeProfileImage::withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('accounts for the actual binary object length and rejects a genuine PNG animation chunk', function (): void {
+    Storage::fake('attendee-profiles-local');
+    [, , $registration, $session] = attendeeProfileScenario();
+    $file = profilePhoto();
+    $image = app(ProfileImages::class)->upload($registration, $session, $file);
+    expect($image->byte_size)->toBe(Storage::disk($image->disk)->size($image->path));
+    $bytes = file_get_contents($file->getRealPath());
+    $chunk = 'acTL'.pack('NN', 2, 0);
+    $animated = mb_substr($bytes, 0, 33, '8bit').pack('N', 8).$chunk.pack('N', crc32($chunk)).mb_substr($bytes, 33, null, '8bit');
+    expect(getimagesizefromstring($animated)['mime'])->toBe('image/png');
+    expect(fn () => app(ProfileImages::class)->upload($registration, $session, UploadedFile::fake()->createWithContent('animated.png', $animated)))->toThrow(ValidationException::class);
+});
+
+it('keeps a currently attached photo when the same owner re-verifies in a different session', function (): void {
+    Storage::fake('attendee-profiles-local');
+    [, , $registration, $session] = attendeeProfileScenario();
+    $image = app(ProfileImages::class)->upload($registration, $session, profilePhoto());
+    $service = app(ProfilePublication::class);
+    $profile = $service->publish($registration, $session, attendeeProfileInput(['image_id' => $image->id]));
+    $session->migrate();
+    $updated = $service->publish($registration, $session, attendeeProfileInput(['image_id' => $image->id, 'revision' => $profile->revision, 'display_name' => 'Updated chosen name']));
+    expect($updated->image_id)->toBe($image->id)->and($updated->display_name)->toBe('Updated chosen name');
 });

@@ -1,3 +1,4 @@
+import PublicProfilesPanel from '@/Pages/Tenant/Events/panels/PublicProfilesPanel';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PublicProfileEditor from '@/Pages/Public/Events/AttendeePortal/panels/PublicProfileEditor';
@@ -114,4 +115,42 @@ it('clears the previous event profiles while a different event loads', async () 
     await screen.findByText('Previous event attendee');
     rerender(<PublicAttendeeStrip eventId="second" />);
     expect(screen.queryByText('Previous event attendee')).toBeNull();
+});
+
+it('warns beside consent that others can copy public profiles and removal cannot recall copies', async () => {
+    csrfFetch.mockResolvedValue(reply({ eligible: true, state: 'private', display_name: '' }));
+    render(<PublicProfileEditor registrationId="ticket" isOnline />);
+    await screen.findByLabelText('Public display name');
+    expect(screen.getByText(/Anyone can view or copy/)).not.toBeNull();
+    expect(screen.getByText(/cannot recall copies/)).not.toBeNull();
+});
+
+it('lets organisers reach the next bounded page of profiles', async () => {
+    csrfFetch
+        .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                enabled: true,
+                profiles: [],
+                page: 1,
+                next_page: 2,
+                previous_page: null,
+            }),
+        })
+        .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                enabled: true,
+                profiles: [
+                    { id: 'older', display_name: 'Older public profile', state: 'published' },
+                ],
+                page: 2,
+                next_page: null,
+                previous_page: 1,
+            }),
+        });
+    render(<PublicProfilesPanel eventId="event" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Next profiles' }));
+    expect(await screen.findByText(/Older public profile/)).not.toBeNull();
+    expect(csrfFetch.mock.calls[1][0]).toBe('/events/event/public-profiles?page=2');
 });

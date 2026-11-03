@@ -72,7 +72,7 @@ final readonly class ProfilePublication
                 }
                 throw ValidationException::withMessages(['profile' => 'This choice has changed. Reload and choose again before publishing.']);
             }
-            if ($profile?->state === 'published' && $profile->registration_id === $current->id && ($data['revision'] ?? null) !== $profile->revision) {
+            if ($profile?->state === 'published' && $this->eligibility->visible($profile) && $profile->registration_id === $current->id && ($data['revision'] ?? null) !== $profile->revision) {
                 throw ValidationException::withMessages(['revision' => 'This profile changed in another tab. Reload before publishing.']);
             }
             $image = $this->image($data['image_id'] ?? null, $current, $hash, $profile, $session);
@@ -157,9 +157,9 @@ final readonly class ProfilePublication
         }
         $image = EventAttendeeProfileImage::withoutGlobalScopes()->whereKey($id)->where('tenant_id', $registration->tenant_id)
             ->where('event_id', $registration->event_id)->where('registration_id', $registration->id)->where('owner_hash', $hash)->lockForUpdate()->first();
-        if ($image === null || $image->stored_at === null || $image->proof_hash !== ProfileImages::proofHash($session)
+        if ($image === null || $image->stored_at === null || ($image->profile_id === null && $image->proof_hash !== ProfileImages::proofHash($session))
             || $image->registration_generation !== $registration->attendee_profile_generation || $image->retired_at !== null || $image->deleted_at !== null || ! $image->expires_at->isFuture()
-            || ($image->profile_id !== null && $image->profile_id !== $profile?->id)) {
+            || ($image->profile_id !== null && ($image->profile_id !== $profile?->id || $profile->image_id !== $image->id))) {
             throw ValidationException::withMessages(['image_id' => 'Choose a fresh photo uploaded for this ticket.']);
         }
 

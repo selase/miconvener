@@ -41,7 +41,7 @@ final readonly class ProfileImages
                 $current->refresh();
             }
             $limit = $this->allowances->limit($tenant);
-            if ($limit !== null && $this->meter->calculateUsage($tenant, strict: true) + mb_strlen($bytes) > $limit) {
+            if ($limit !== null && $this->meter->calculateUsage($tenant, strict: true) + mb_strlen($bytes, '8bit') > $limit) {
                 throw ValidationException::withMessages(['photo' => 'Your organisation storage allowance is full. You can still publish without a photo.']);
             }
             if (EventAttendeeProfileImage::withoutGlobalScopes()->where('registration_id', $current->id)->whereNull('profile_id')->whereNull('retired_at')->whereNull('deleted_at')->where('expires_at', '>', now())->count() >= 3) {
@@ -54,7 +54,7 @@ final readonly class ProfileImages
                 'proof_hash' => self::proofHash($session), 'registration_generation' => $current->attendee_profile_generation,
                 'disk' => app()->environment('production') ? 's3' : 'attendee-profiles-local',
                 'path' => 'attendee-profiles/'.$tenant->id.'/'.Str::uuid().'.webp',
-                'byte_size' => mb_strlen($bytes), 'expires_at' => now()->addMinutes(15),
+                'byte_size' => mb_strlen($bytes, '8bit'), 'expires_at' => now()->addMinutes(15),
             ]);
         }, 3);
         try {
@@ -142,13 +142,13 @@ final readonly class ProfileImages
     {
         if ($type === IMAGETYPE_PNG) {
             $offset = 8;
-            while ($offset + 12 <= mb_strlen($bytes)) {
-                $size = unpack('Nsize', mb_substr($bytes, $offset, 4))['size'];
-                $chunk = mb_substr($bytes, $offset + 4, 4);
+            while ($offset + 12 <= mb_strlen($bytes, '8bit')) {
+                $size = unpack('Nsize', mb_substr($bytes, $offset, 4, '8bit'))['size'];
+                $chunk = mb_substr($bytes, $offset + 4, 4, '8bit');
                 if ($chunk === 'acTL') {
                     return true;
                 }
-                if ($chunk === 'IEND' || $size > mb_strlen($bytes) - $offset - 12) {
+                if ($chunk === 'IEND' || $size > mb_strlen($bytes, '8bit') - $offset - 12) {
                     break;
                 }
                 $offset += 12 + $size;
@@ -156,16 +156,16 @@ final readonly class ProfileImages
         }
         if ($type === IMAGETYPE_WEBP) {
             $offset = 12;
-            while ($offset + 8 <= mb_strlen($bytes)) {
-                $chunk = mb_substr($bytes, $offset, 4);
-                $size = unpack('Vsize', mb_substr($bytes, $offset + 4, 4))['size'];
-                if ($size > mb_strlen($bytes) - $offset - 8) {
+            while ($offset + 8 <= mb_strlen($bytes, '8bit')) {
+                $chunk = mb_substr($bytes, $offset, 4, '8bit');
+                $size = unpack('Vsize', mb_substr($bytes, $offset + 4, 4, '8bit'))['size'];
+                if ($size > mb_strlen($bytes, '8bit') - $offset - 8) {
                     return true;
                 }
                 if (in_array($chunk, ['ANIM', 'ANMF'], true) || ($chunk === 'VP8X' && $size > 0 && (ord($bytes[$offset + 8]) & 2) !== 0)) {
                     return true;
                 }
-                if ($size > mb_strlen($bytes) - $offset - 8) {
+                if ($size > mb_strlen($bytes, '8bit') - $offset - 8) {
                     break;
                 }
                 $offset += 8 + $size + ($size % 2);

@@ -248,6 +248,10 @@ export default function PublicProfileEditor({ registrationId, isOnline = true })
                     Removal hides your profile immediately. Images are queued for deletion within 24
                     hours; minimal consent evidence is retained for 90 days after removal.
                 </p>
+                <p className="text-xs text-ink-secondary">
+                    Anyone can view or copy your public name and photo. Removing your profile cannot
+                    recall copies that others have saved.
+                </p>
                 {error && (
                     <p role="alert" className="text-sm text-danger">
                         {error}

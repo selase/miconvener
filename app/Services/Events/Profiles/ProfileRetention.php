@@ -10,6 +10,7 @@ use App\Models\EventAttendeeProfileImage;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -46,11 +47,9 @@ final readonly class ProfileRetention
                 EventAttendeeProfileImage::withoutGlobalScopes()->where('profile_id', $profile->id)->whereNull('deleted_at')->update(['profile_id' => null, 'retired_at' => now()]);
             }, 3);
         }
-        foreach (EventAttendeeProfileImage::withoutGlobalScopes()->where(function ($query): void {
-            $query->whereNotNull('retired_at')->orWhere('expires_at', '<=', now());
-        })->where(function ($query): void {
-            $query->whereNull('deleted_at')->orWhere('deleted_at', '>', now()->subDay());
-        })->orderBy('id')->limit(1000)->get() as $candidate) {
+        $pending = $this->cleanupBatch(false);
+        $tombstones = $this->cleanupBatch(true);
+        foreach ($pending->concat($tombstones) as $candidate) {
             try {
                 $candidate->getConnection()->transaction(function () use ($candidate): void {
                     $image = EventAttendeeProfileImage::withoutGlobalScopes()->lockForUpdate()->find($candidate->id);
@@ -73,5 +72,24 @@ final readonly class ProfileRetention
         EventAttendeeProfileConsent::withoutGlobalScopes()->where('retain_until', '<=', now())->limit(1000)->get()->each->delete();
         EventAttendeeProfileImage::withoutGlobalScopes()->where('deleted_at', '<=', now()->subDay())->limit(1000)->get()->each->delete();
         EventAttendeeProfile::withoutGlobalScopes()->whereIn('state', ['withdrawn', 'expired', 'private'])->whereNotNull('withdrawn_at')->where('withdrawn_at', '<=', now()->subDays(90))->whereNull('moderated_at')->whereNotExists(fn ($query) => $query->selectRaw('1')->from('event_attendee_profile_consents')->whereColumn('event_attendee_profile_consents.profile_id', 'event_attendee_profiles.id'))->limit(1000)->get()->each->delete();
+    }
+
+    /** @return Collection<int,EventAttendeeProfileImage> */
+    private function cleanupBatch(bool $tombstones): Collection
+    {
+        $key = $tombstones ? 'attendee_photo_tombstone_cursor' : 'attendee_photo_pending_cursor';
+        $after = Cache::get($key);
+        $query = EventAttendeeProfileImage::withoutGlobalScopes()->where(function ($query): void {
+            $query->whereNotNull('retired_at')->orWhere('expires_at', '<=', now());
+        });
+        if ($tombstones) {
+            $query->whereNotNull('deleted_at')->where('deleted_at', '>', now()->subDay());
+        } else {
+            $query->whereNull('deleted_at');
+        }
+        $batch = $query->when(is_string($after), fn ($query) => $query->where('id', '>', $after))->orderBy('id')->limit(1000)->get();
+        Cache::put($key, $batch->count() === 1000 ? $batch->last()?->id : null, 86400);
+
+        return $batch;
     }
 }
