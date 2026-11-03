@@ -134,6 +134,7 @@ final class EventRegistration extends Model
     ];
 
     protected $hidden = [
+        'attendee_profile_generation',
         'qr_token',
         'member_benefit_identity',
         'member_benefit_access_version',

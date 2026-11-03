@@ -1,6 +1,6 @@
 # Event attendee profiles: explicit public opt-in
 
-**Status:** owner approved the proposed visual/privacy design on2November2026. Native implementation plan is being prepared for review; this approval does not publish any attendee or enable a production pilot. No public identities, schema or endpoints are added by this document.
+**Status:** owner approved the proposed visual/privacy design on2November2026. Owner requested completion3November2026; native implementation is authorised; this approval does not publish any attendee or enable a production pilot. No public identities, schema or endpoints are added by this document.
 **Parent:** project completionPhase 6; Community follow-ups §6.
 
 ## Intent and existing behaviour
@@ -39,10 +39,10 @@ The public event page currently shows only an anonymous Going count (`PublicEven
 
 ## Owner review calls
 
-Recommend: event-specific explicit self-consent, adult-only first release, optional photo, no external profile links, and 30-days-after-event visibility capped at 90 days from consent, immediate withdrawal, and 90-day minimal consent-audit retention. These are proposed product/privacy decisions, not previous owner approvals. Review the visual before implementation. No real attendee data is used in the preview.
+Recommend: event-specific explicit self-consent, adult-only first release, optional photo, no external profile links, and 30-days-after-event visibility capped at 90 days from consent, immediate withdrawal, and 90-day minimal consent-audit retention. The owner approved these proposed choices on2November2026. Review the visual before implementation. No real attendee data is used in the preview.
 
 ## Planning/acceptance requirements after design approval
 
 Native implementation plan must name persistence/migrations, original-email proof guards, event/registration eligibility hooks, moderation permission/seeders/navigation, image pipeline/cleanup, and the exact public cache bypass. Tests fail first for missing consent, wrong/phone-only/representative ownership, cancellation/transfer/private conversion, stale cached image revocation, duplicate submissions, unsafe images, retained offline data and tenant isolation. One independent code review and final CI before merge; Purpledot-only activation remains a separate owner decision.
 
-Builder-check resolved group-payer ambiguity with exact registration-email ownership and one self-profile/email/event; recurring/open-ended visibility is bounded at 90 days; moderation actors/hold release are explicit. The proposed privacy/retention choices still await owner approval, not implementation.
+Builder-check resolved group-payer ambiguity with exact registration-email ownership and one self-profile/email/event; recurring/open-ended visibility is bounded at 90 days; moderation actors/hold release are explicit. Owner design approval is recorded; implementation follows the native plan, with production pilot activation separate.

@@ -42,7 +42,7 @@ final class Tenant extends Model
 
     protected $attributes = ['storage_limit_snapshot' => null];
 
-    protected $hidden = ['storage_limit_snapshot'];
+    protected $hidden = ['storage_limit_snapshot', 'attendee_profile_generation'];
 
     protected $fillable = [
         'id',
