@@ -154,3 +154,21 @@ it('lets organisers reach the next bounded page of profiles', async () => {
     expect(await screen.findByText(/Older public profile/)).not.toBeNull();
     expect(csrfFetch.mock.calls[1][0]).toBe('/events/event/public-profiles?page=2');
 });
+
+it('reports a failed moderation page load without losing the current list', async () => {
+    csrfFetch
+        .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                enabled: true,
+                profiles: [],
+                page: 1,
+                next_page: 2,
+                previous_page: null,
+            }),
+        })
+        .mockResolvedValueOnce({ ok: false, json: async () => ({ message: 'Unavailable' }) });
+    render(<PublicProfilesPanel eventId="event" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Next profiles' }));
+    expect(await screen.findByRole('alert')).not.toBeNull();
+});

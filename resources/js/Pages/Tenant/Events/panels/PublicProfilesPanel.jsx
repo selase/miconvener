@@ -8,7 +8,8 @@ export default function PublicProfilesPanel({ eventId }) {
     const endpoint = `/events/${eventId}/public-profiles`;
     const refresh = async (page = data?.page || 1) => {
         const response = await csrfFetch(`${endpoint}?page=${page}`, { cache: 'no-store' });
-        if (response.ok) setData(await response.json());
+        if (!response.ok) throw new Error('Could not load this page. Try again.');
+        setData(await response.json());
     };
     useEffect(() => {
         let active = true;
