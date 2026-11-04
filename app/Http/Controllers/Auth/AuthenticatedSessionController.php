@@ -12,8 +12,9 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 final class AuthenticatedSessionController extends Controller
 {
@@ -46,6 +47,11 @@ final class AuthenticatedSessionController extends Controller
         // Superadmins should generally stay on the landlord domain unless they specifically logged in via a tenant domain
         $isSuperAdmin = $user && \Illuminate\Support\Facades\Gate::allows('access-superadmin-dashboard');
 
+        if ($isSuperAdmin && $request->getHost() === parse_url((string) config('app.url'), PHP_URL_HOST)) {
+            $request->session()->forget('active_tenant_id');
+            $tenantId = null;
+        }
+
         if (! $tenantId && ! $isSuperAdmin) {
             $tenantId = $user?->tenants()->value('tenants.id');
         }
@@ -71,10 +77,8 @@ final class AuthenticatedSessionController extends Controller
 
     /**
      * Destroy an authenticated session.
-     *
-     * @return RedirectResponse
      */
-    public function destroy(Request $request): Redirector|RedirectResponse
+    public function destroy(Request $request): Response
     {
         Auth::guard('web')->logout();
 
@@ -82,6 +86,6 @@ final class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/login');
+        return Inertia::location(url('/login'));
     }
 }

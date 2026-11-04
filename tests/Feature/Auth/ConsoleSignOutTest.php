@@ -50,3 +50,17 @@ test('the console offers a way out on every page', function (): void {
         ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
         ->assertOk();
 });
+
+test('inertia sign out navigates to the standalone login page', function (): void {
+    [, $user] = eventHost('sign-out-inertia');
+    $host = eventSubdomainHost('sign-out-inertia');
+
+    $this->actingAs($user)
+        ->withSession(['private_portal_proof' => 'test-proof'])
+        ->post("http://{$host}/logout", [], ['HTTP_HOST' => $host, 'X-Inertia' => 'true'])
+        ->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', "http://{$host}/login")
+        ->assertSessionMissing('private_portal_proof');
+
+    $this->assertGuest();
+});

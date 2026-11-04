@@ -52,3 +52,56 @@ test('users can not authenticate with invalid password', function () {
 
     $this->assertGuest();
 });
+
+test('central superadmin login clears a previously selected tenant', function () {
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $this->seed(Database\Seeders\RoleSeeder::class);
+    setPermissionsTeamId(null);
+    $user->assignRole('Superadmin');
+
+    $this->withSession(['active_tenant_id' => $tenant->id])
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
+        ->post('http://miconvener.test/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ])
+        ->assertRedirect('http://miconvener.test/dashboard')
+        ->assertSessionMissing('active_tenant_id');
+});
+
+test('superadmin login on a tenant domain preserves the tenant destination', function () {
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $this->seed(Database\Seeders\RoleSeeder::class);
+    setPermissionsTeamId(null);
+    $user->assignRole('Superadmin');
+
+    $this->withSession(['active_tenant_id' => $tenant->id])
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
+        ->post('http://'.$tenant->slug.'.miconvener.test/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ])
+        ->assertRedirect('http://'.$tenant->slug.'.miconvener.test/dashboard');
+});
+
+test('central superadmin login preserves the requested management page', function () {
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $this->seed(Database\Seeders\RoleSeeder::class);
+    setPermissionsTeamId(null);
+    $user->assignRole('Superadmin');
+
+    $this->withSession([
+        'active_tenant_id' => $tenant->id,
+        'url.intended' => 'http://miconvener.test/tenants',
+    ])
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
+        ->post('http://miconvener.test/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ])
+        ->assertRedirect('http://miconvener.test/tenants')
+        ->assertSessionMissing('active_tenant_id');
+});
