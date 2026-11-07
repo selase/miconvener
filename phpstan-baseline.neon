@@ -511,12 +511,6 @@ parameters:
 			path: app/Http/Controllers/Admin/UsersController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Auth\AuthenticatedSessionController::destroy() never returns Illuminate\Routing\Redirector so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: app/Http/Controllers/Auth/AuthenticatedSessionController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Auth\RegisteredUserController::store() never returns Illuminate\Routing\Redirector so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
