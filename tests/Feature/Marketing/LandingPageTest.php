@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Marketing;
 
 use DOMDocument;
+use DOMElement;
 use DOMXPath;
 
 /**
@@ -195,3 +196,19 @@ test('the community cards keep their card styling after the feature grid moved',
         ->and((bool) preg_match('/\.cap\s*\{[^}]*display:\s*grid/', $html))->toBeTrue()
         ->and((bool) preg_match('/\.cap\s*>\s*div\s*\{[^}]*padding/', $html))->toBeTrue();
 });
+
+test('public navigation keeps sign in available on phones', function (string $path): void {
+    $response = $this->get($path)->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $links = $xpath->query('//header//a[@href="'.config('product-page.nav.cta_secondary.href').'"]');
+
+    expect($links->length)->toBe(1);
+    $link = $links->item(0);
+    expect(mb_trim($link->textContent))->toBe(config('product-page.nav.cta_secondary.label'));
+    for ($element = $link; $element instanceof DOMElement; $element = $element->parentNode) {
+        $classes = preg_split('/\\s+/', mb_trim($element->getAttribute('class')));
+        expect($classes)->not->toContain('hidden')->not->toContain('max-md:hidden')->not->toContain('max-sm:hidden');
+    }
+})->with(['homepage' => '/', 'features' => '/features', 'use cases' => '/use-cases']);
