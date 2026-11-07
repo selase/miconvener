@@ -232,3 +232,35 @@ test('the final active org superadmin cannot be demoted or removed', function ()
 
     expect($owner->fresh()->hasRole('Org Superadmin'))->toBeTrue();
 });
+
+test('a team member can be added with an international phone number typed with 00 or a plus, and a bad number is refused with a message', function (string $typed, ?string $stored) {
+    Mail::fake();
+
+    $tenant = Tenant::factory()->create(['name' => 'Acme Corp', 'slug' => 'acme', 'isolation_mode' => 'shared']);
+    $admin = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $admin->assignRole('Org Admin');
+    $tenant->users()->attach($admin->id);
+    $role = Role::where('name', 'Org Admin')->whereNull('tenant_id')->firstOrFail();
+    $host = 'acme.'.mb_ltrim((string) config('session.domain'), '.');
+
+    $response = $this->actingAs($admin)->post("http://{$host}/users", [
+        'first_name' => 'Richard', 'last_name' => 'Kwawu', 'email' => 'richard@example.com',
+        'phone_no' => $typed, 'role' => $role->id, 'status' => 'active',
+    ], ['HTTP_HOST' => $host]);
+
+    if ($stored === null) {
+        $response->assertSessionHasErrors('phone_no');
+        expect(User::where('email', 'richard@example.com')->exists())->toBeFalse();
+
+        return;
+    }
+    $response->assertSessionHasNoErrors();
+    expect((string) User::where('email', 'richard@example.com')->firstOrFail()->phone_no)->toBe($stored);
+})->with([
+    'US with 00 prefix' => ['0013018201664', '+13018201664'],
+    'US with plus and spaces' => ['+1 301 820 1664', '+13018201664'],
+    'UK' => ['+44 7911 123456', '+447911123456'],
+    'Ghana local' => ['0201234567', '+233201234567'],
+    'not a number' => ['hello', null],
+]);

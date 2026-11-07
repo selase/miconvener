@@ -154,6 +154,10 @@ final class VenueInquiryController extends Controller
             ->firstOrFail();
 
         return Inertia::render('Tenant/Venue/Inquiries/Show', [
+            'can' => [
+                'complete' => Gate::forUser($request->user())->allows(\App\Services\Marketplace\VenueMoneyPermissions::SETTLEMENTS),
+                'refund' => Gate::forUser($request->user())->allows(\App\Services\Marketplace\VenueMoneyPermissions::REFUNDS),
+            ],
             'shop' => [
                 'id' => $shop->id,
                 'name' => $shop->name,
@@ -191,6 +195,7 @@ final class VenueInquiryController extends Controller
                 'contract_agreed_at' => $inquiry->contract_agreed_at?->toIso8601String(),
                 'host_notes' => $inquiry->host_notes,
                 'approval' => $this->approvalPayload($inquiry),
+                'financial' => $inquiry->usesApprovalFlow() ? app(\App\Services\Marketplace\VenueFinancialJourney::class)->forHost($inquiry) : null,
                 'listing' => $inquiry->listing ? [
                     'id' => $inquiry->listing->id,
                     'title' => $inquiry->listing->title,

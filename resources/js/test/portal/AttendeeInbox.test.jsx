@@ -427,6 +427,11 @@ it('shows one community card with messages prominent and management collapsed', 
     expect(
         await screen.findByRole('button', { name: 'View messages for Volunteer group' })
     ).toBeTruthy();
+    expect(
+        screen
+            .getByRole('button', { name: 'View messages for Volunteer group' })
+            .classList.contains('text-accent-ink')
+    ).toBe(true);
     expect(screen.getAllByText('1 unread')).toHaveLength(1);
     expect(await screen.findByRole('link', { name: 'Library' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Browse store' }).getAttribute('href')).toBe(

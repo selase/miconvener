@@ -43,8 +43,19 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     const [endDate, setEndDate] = useState(tomorrowStr());
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('17:00');
-    const [guestCount, setGuestCount] = useState(50);
-    const [layoutStyle, setLayoutStyle] = useState('banquet');
+    const initialLayout = ['banquet', 'theater', 'cocktail', 'classroom', 'boardroom'].find(
+        (layout) => {
+            const capacity = Number(venue.capacity_breakdown?.[layout]);
+            return Number.isSafeInteger(capacity) && capacity > 0;
+        }
+    ) || 'banquet';
+    const initialCapacity = Number(venue.capacity_breakdown?.[initialLayout]);
+    const [guestCount, setGuestCount] = useState(() =>
+        Number.isSafeInteger(initialCapacity) && initialCapacity > 0
+            ? Math.min(50, initialCapacity)
+            : 50
+    );
+    const [layoutStyle, setLayoutStyle] = useState(initialLayout);
     const [eventType, setEventType] = useState('Corporate Event');
     const [plannerName, setPlannerName] = useState('');
     const [plannerEmail, setPlannerEmail] = useState('');
@@ -475,7 +486,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                         'h-7 w-full flex items-center justify-center rounded-md text-[11px] transition-colors ';
 
                                     if (isSelected) {
-                                        cellClasses += 'bg-accent text-white font-bold shadow-2xs';
+                                        cellClasses += 'bg-accent text-accent-ink font-bold shadow-2xs';
                                     } else if (isBlocked) {
                                         cellClasses +=
                                             'bg-rose-500/10 text-rose-500 line-through cursor-not-allowed opacity-70';
@@ -951,7 +962,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}
-                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-accent-ink shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <Sparkles className="h-4 w-4" />
                                 <span>{submitting ? 'Sending...' : 'Send request'}</span>
@@ -960,7 +971,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}
-                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-accent-ink shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <Sparkles className="h-4 w-4" />
                                 <span>{submitting ? 'Submitting...' : 'Submit Quote Request'}</span>
@@ -969,7 +980,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}
-                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-accent-ink shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <CreditCard className="h-4 w-4" />
                                 <span>

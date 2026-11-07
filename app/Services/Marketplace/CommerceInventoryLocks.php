@@ -12,11 +12,16 @@ use LogicException;
 
 final class CommerceInventoryLocks
 {
+    /**
+     * Money serialises on the tenant row with FOR NO KEY UPDATE, which excludes every
+     * other money lock but not the FOR KEY SHARE that a foreign key insert (a
+     * blackout or booking row) takes while it holds a listing lock.
+     */
     public function tenant(string $tenantId): Tenant
     {
         $this->requireTransaction();
 
-        return Tenant::query()->lockForUpdate()->findOrFail($tenantId);
+        return Tenant::query()->lock('for no key update')->findOrFail($tenantId);
     }
 
     public function order(StoreOrder $order): StoreOrder

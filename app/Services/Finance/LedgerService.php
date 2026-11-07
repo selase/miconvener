@@ -59,6 +59,7 @@ final class LedgerService
 
         if ($category === LedgerCategoryEnum::Commerce) {
             $definitions[LedgerAccount::CODE_BUYER_REFUNDS] = ['name' => 'Buyer Refund Liability', 'type' => LedgerAccount::TYPE_LIABILITY];
+            $definitions[LedgerAccount::CODE_SECURITY_DEPOSITS] = ['name' => 'Refundable Security Deposits', 'type' => LedgerAccount::TYPE_LIABILITY];
         }
 
         $accounts = [];
@@ -552,6 +553,28 @@ final class LedgerService
         return $transaction;
     }
 
+    /**
+     * A venue security deposit is the buyer's money, not earnings: the whole
+     * principal is a refundable liability and the gateway fee waits in expense
+     * until the refund recovers it from the venue.
+     */
+    public function recordVenueSecurityCapture(\App\Models\StoreOrder $order, \App\Models\StorePaymentAttempt $attempt, \App\Models\StorePaymentObservation $capture): LedgerTransaction
+    {
+        if ($capture->integrity_errors !== [] || ! $capture->account_matches || ! $capture->reference_matches || $attempt->order_id !== $order->id
+            || $capture->amount_pesewas !== $order->charged_pesewas || $order->platform_fee_pesewas !== 0
+            || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas >= $order->charged_pesewas) {
+            throw new InvalidArgumentException('A security deposit requires matching original-account captured money and no commission.');
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->amount_pesewas - $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_SECURITY_DEPOSITS, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $capture->amount_pesewas],
+        ];
+
+        return $this->postTransaction($order->tenant, null, 'venue_security_capture', 'Venue security deposit '.$order->id, $attempt->reference,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, $order->currency, LedgerCategoryEnum::Commerce);
+    }
+
     public function recordStoreRefund(\App\Models\StoreRefund $refund): LedgerTransaction
     {
         $capture = $refund->observation;
@@ -563,7 +586,7 @@ final class LedgerService
         $entries = [
             ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->seller_debit_pesewas],
             ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->commission_return_pesewas],
-            ['code' => LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->review_liability_pesewas],
+            ['code' => $this->isSecurityCapture($capture) ? LedgerAccount::CODE_SECURITY_DEPOSITS : LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->review_liability_pesewas],
             ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->amount_pesewas],
         ];
         if ($refund->review_liability_pesewas === 0 && $refund->fee_bearer === 'platform') {
@@ -1287,6 +1310,11 @@ final class LedgerService
             'total_credits' => $totalCredits,
             'accounts' => $rows,
         ];
+    }
+
+    private function isSecurityCapture(\App\Models\StorePaymentObservation $capture): bool
+    {
+        return LedgerTransaction::withoutGlobalScopes()->whereKey($capture->ledger_transaction_id)->value('transaction_type') === 'venue_security_capture';
     }
 
     /**

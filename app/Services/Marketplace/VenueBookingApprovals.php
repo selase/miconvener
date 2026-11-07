@@ -6,9 +6,11 @@ namespace App\Services\Marketplace;
 
 use App\Jobs\DeliverVenueApprovalNotice;
 use App\Models\StoreListing;
+use App\Models\StorePaymentObservation;
 use App\Models\User;
 use App\Models\VenueBooking;
 use App\Models\VenueBookingAction;
+use App\Models\VenueBookingCharge;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Venue\VenueCalendarLocks;
@@ -238,6 +240,7 @@ final class VenueBookingApprovals
 
         return $this->hostTransition($booking, $actor, $operationKey, $hash, function (StoreListing $listing, VenueBooking $locked) use ($actor, $reason, $operationKey, $hash): VenueBooking {
             $this->assertState($locked, [VenueBooking::STATUS_APPROVED_HOLD]);
+            $this->assertNoCapturedMoneyPending($locked);
 
             return $this->close($locked, $actor, VenueBooking::STATUS_CANCELLED, VenueBookingAction::ACTION_RELEASED, $reason, $operationKey, $hash);
         });
@@ -263,6 +266,7 @@ final class VenueBookingApprovals
 
             $this->assertApprovalFlow($locked);
             $this->assertState($locked, [VenueBooking::STATUS_PENDING_HOST_APPROVAL, VenueBooking::STATUS_APPROVED_HOLD]);
+            $this->assertNoCapturedMoneyPending($locked);
 
             $previous = $locked->status;
             $locked->update(['status' => VenueBooking::STATUS_CANCELLED]);
@@ -358,6 +362,19 @@ final class VenueBookingApprovals
     {
         if (! in_array($locked->status, $allowed, true)) {
             throw ValidationException::withMessages(['booking' => 'This request has already been decided or closed.']);
+        }
+    }
+
+    /**
+     * Money already captured for this booking and still being confirmed must
+     * finish first; closing the dates now would strand a paying buyer.
+     */
+    private function assertNoCapturedMoneyPending(VenueBooking $locked): void
+    {
+        $pending = StorePaymentObservation::query()->where('processing_state', 'pending')
+            ->whereIn('order_id', VenueBookingCharge::query()->where('booking_id', $locked->id)->select('order_id'))->exists();
+        if ($pending) {
+            throw ValidationException::withMessages(['booking' => 'A payment for this request is being confirmed. Try again shortly.']);
         }
     }
 

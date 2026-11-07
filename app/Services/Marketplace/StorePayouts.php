@@ -7,6 +7,7 @@ namespace App\Services\Marketplace;
 use App\Contracts\SettlementGateway;
 use App\Enum\LedgerCategoryEnum;
 use App\Models\EventPayout;
+use App\Models\StoreCommercialAgreement;
 use App\Models\Tenant;
 use App\Models\TenantPayoutAccount;
 use App\Models\User;
@@ -47,7 +48,11 @@ final class StorePayouts
 
                 return $prior;
             }
-            $agreement = $this->terms->resolve($seller);
+            $hasPurchaseTerms = StoreCommercialAgreement::query()->where('tenant_id', $seller->id)
+                ->where('offering_scope', StoreCommercialAgreement::SCOPE_PURCHASE)->exists();
+            $agreement = $this->terms->resolve($seller, $hasPurchaseTerms
+                ? StoreCommercialAgreement::SCOPE_PURCHASE
+                : StoreCommercialAgreement::SCOPE_RESERVATION);
             $account = $this->account($seller, (string) ($validated['payout_account_id'] ?? ''), true);
             if ($amount <= $this->fees->feeFor($account->type) || $amount > $this->balance->available($seller)) {
                 $this->refuse('The payout exceeds available commerce funds after holds, or cannot cover its transfer fee.');

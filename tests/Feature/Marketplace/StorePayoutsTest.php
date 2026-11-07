@@ -168,3 +168,22 @@ it('authorizes the unsent cancellation endpoint and keeps it usable with checkou
     $actor->revokePermissionTo('manage store finance');
     $this->postJson($url, [], ['HTTP_HOST' => $host])->assertForbidden();
 });
+
+it('does not bypass invalid merchandise terms through a valid venue agreement', function (): void {
+    [$tenant, , $actor] = StoreCheckoutScenario::paid();
+    setPermissionsTeamId($tenant->id);
+    App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+    $actor->givePermissionTo('manage store finance');
+    App\Models\StoreCommercialAgreement::factory()->reservation()->create([
+        'tenant_id' => $tenant->id, 'shop_id' => $tenant->shop->id, 'version' => 2,
+        'account_fingerprint' => hash('sha256', app(App\Services\Giving\GivingGateways::class)->platformIdentity()),
+    ]);
+    App\Models\StoreCommercialAgreement::factory()->create([
+        'tenant_id' => $tenant->id, 'shop_id' => $tenant->shop->id, 'version' => 3, 'account_fingerprint' => str_repeat('x', 64),
+    ]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
+    expect(fn () => app(StorePayouts::class)->reserve($tenant, $actor, [
+        'amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid(),
+    ]))->toThrow(Illuminate\Validation\ValidationException::class);
+    expect(App\Models\EventPayout::withoutGlobalScopes()->count())->toBe(0);
+});

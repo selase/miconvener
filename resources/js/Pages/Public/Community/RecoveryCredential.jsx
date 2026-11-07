@@ -81,7 +81,7 @@ export default function RecoveryCredential({ credential, onClear }) {
                 it, ask the organisation for an independent access review.
             </p>
             <button
-                className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-white print:hidden"
+                className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink print:hidden"
                 type="button"
                 onClick={() => {
                     setKey(null);

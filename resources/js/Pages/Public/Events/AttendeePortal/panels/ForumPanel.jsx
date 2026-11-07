@@ -165,7 +165,7 @@ export default function ForumPanel({ registration, isOnline = true }) {
                     <button
                         type="button"
                         onClick={() => setShowNewThreadForm(true)}
-                        className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 cursor-pointer shrink-0"
+                        className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink hover:opacity-90 cursor-pointer shrink-0"
                     >
                         <Plus className="h-4 w-4" />
                         Ask a question
@@ -246,7 +246,7 @@ export default function ForumPanel({ registration, isOnline = true }) {
                         <button
                             type="submit"
                             disabled={posting || !title.trim() || !body.trim()}
-                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-accent px-5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-accent px-5 text-xs font-semibold text-accent-ink hover:opacity-90 disabled:opacity-50 cursor-pointer"
                         >
                             {posting ? (
                                 <>
@@ -322,7 +322,7 @@ export default function ForumPanel({ registration, isOnline = true }) {
                                         onClick={() => handleToggleVote(thread)}
                                         className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold min-h-[44px] cursor-pointer transition-colors shrink-0 ${
                                             thread.has_upvoted
-                                                ? 'border-accent bg-accent text-white'
+                                                ? 'border-accent bg-accent text-accent-ink'
                                                 : 'border-border bg-surface text-ink-secondary hover:border-accent hover:text-ink'
                                         }`}
                                         aria-label={`Upvote question, ${thread.upvotes_count} upvotes`}

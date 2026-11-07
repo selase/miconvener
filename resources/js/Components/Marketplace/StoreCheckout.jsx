@@ -96,6 +96,8 @@ export default function StoreCheckout({ shop, variant }) {
             } else if (data.checkout_url) window.location.assign(data.checkout_url);
             else if (data.status === 'confirmed')
                 window.location.assign(`/my/store-orders/${quote.id}`);
+            else if (data.status === 'failed')
+                setError('The payment provider could not start this payment. Check your details and try again.');
             else setUnknown(true);
         } catch (failure) {
             if (controller.signal.aborted) return;

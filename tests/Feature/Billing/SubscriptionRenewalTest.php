@@ -189,3 +189,54 @@ test('a plan cancelled for the end of its period has nothing to renew', function
 
     expect(app(SubscriptionRenewalService::class)->packageToRenew($subscription))->toBeNull();
 });
+
+test('monthly calendar anchors clamp February and recover the intended day', function (int $day, string $february, string $march): void {
+    $this->travelTo('2027-01-30 08:00:00');
+    [, $subscription, $package] = renewingTenant('2027-01-'.$day.' 17:23:45');
+    $service = app(SubscriptionRenewalService::class);
+    $service->recordRenewal($subscription, $package, 'calendar-first', 9900, 'GHS');
+    expect($subscription->fresh()->current_period_end->toDateTimeString())->toBe($february.' 17:23:45');
+    $this->travelTo($february.' 08:00:00');
+    $service->recordRenewal($subscription->fresh(), $package, 'calendar-second', 9900, 'GHS');
+    expect($subscription->fresh()->current_period_end->toDateTimeString())->toBe($march.' 17:23:45');
+    expect($service->recordRenewal($subscription->fresh(), $package, 'calendar-second', 9900, 'GHS'))->toBeFalse();
+    expect($subscription->fresh()->current_period_end->toDateTimeString())->toBe($march.' 17:23:45');
+})->with([[31, '2027-02-28', '2027-03-31'], [30, '2027-02-28', '2027-03-30']]);
+
+test('annual calendar anchors preserve leap-day through the next leap year', function (): void {
+    $this->travelTo('2028-02-29 08:00:00');
+    [, $subscription, $package] = renewingTenant('2028-02-29 17:23:45');
+    $subscription->update(['interval' => 'year', 'provider_plan' => 'growth_year']);
+    $service = app(SubscriptionRenewalService::class);
+    foreach (['2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29'] as $index => $expected) {
+        $service->recordRenewal($subscription->fresh(), $package, 'leap-calendar-'.$index, 99000, 'GHS');
+        expect($subscription->fresh()->current_period_end->toDateTimeString())->toBe($expected.' 17:23:45');
+        $this->travelTo($expected.' 08:00:00');
+    }
+});
+
+test('a legacy calendar anchor starts from its known end rather than inventing January history', function (): void {
+    $this->travelTo('2027-02-28 08:00:00');
+    [, $subscription, $package] = renewingTenant('2027-02-28 17:23:45');
+    app(SubscriptionRenewalService::class)->recordRenewal($subscription, $package, 'legacy-calendar', 9900, 'GHS');
+    expect($subscription->fresh()->current_period_end->toDateTimeString())->toBe('2027-03-28 17:23:45')
+        ->and($subscription->fresh()->billing_anchor_day)->toBe(28)
+        ->and($subscription->fresh()->billing_anchor_month)->toBe(2);
+});
+
+test('grace retains an established calendar anchor but a lapsed restart resets it', function (bool $lapsed): void {
+    $this->travelTo($lapsed ? '2027-04-10 08:00:00' : '2027-03-02 08:00:00');
+    [, $subscription, $package] = renewingTenant('2027-02-28 17:23:45');
+    $subscription->update(['billing_anchor_day' => 31, 'billing_anchor_month' => 1]);
+    app(SubscriptionRenewalService::class)->recordRenewal($subscription, $package, 'anchor-grace-restart', 9900, 'GHS');
+    $subscription->refresh();
+    expect($subscription->current_period_end->toDateTimeString())->toBe($lapsed ? '2027-05-10 08:00:00' : '2027-03-31 17:23:45')
+        ->and($subscription->billing_anchor_day)->toBe($lapsed ? 10 : 31)
+        ->and($subscription->billing_anchor_month)->toBe($lapsed ? 4 : 1);
+})->with([false, true]);
+
+test('subscription calendar anchors reject invalid or incomplete stored pairs', function (?int $day, ?int $month): void {
+    [, $subscription] = renewingTenant();
+    expect(fn () => $subscription->update(['billing_anchor_day' => $day, 'billing_anchor_month' => $month]))
+        ->toThrow(Illuminate\Database\QueryException::class);
+})->with([[0, 1], [32, 1], [1, 13], [null, 1], [1, null]]);

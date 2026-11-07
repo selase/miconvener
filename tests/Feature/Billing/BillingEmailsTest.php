@@ -244,3 +244,38 @@ test('every billing email renders in the branded layout', function (): void {
         ->and($rendered[1])->toContain('15 October 2026')
         ->and($rendered[2])->toContain('Free plan');
 });
+
+test('first-payment calendar anchors survive either callback order across month end', function (string $first): void {
+    $this->travelTo('2027-01-31 17:23:45');
+    [$tenant, $owner] = billingEmailTenant();
+    app()->instance(PaymentGateway::class, new PaystackGateway(['secret_key' => 'sk_one_account']));
+    $host = 'acme.'.mb_ltrim((string) config('session.domain'), '.');
+    $charge = [
+        'id' => 99887767,
+        'reference' => 'calendar-callback-order',
+        'status' => 'success',
+        'amount' => 9900,
+        'currency' => 'GHS',
+        'customer' => ['email' => 'owner@example.com'],
+        'metadata' => ['source' => 'miconvener', 'type' => 'plan_subscription', 'plan_slug' => 'growth', 'interval' => 'month', 'tenant_id' => $tenant->id],
+    ];
+    Http::fake(['api.paystack.co/transaction/verify/*' => Http::response(['status' => true, 'data' => $charge])]);
+    $callback = fn () => $this->actingAs($owner)->get("http://{$host}/billing/callback?reference=calendar-callback-order", ['HTTP_HOST' => $host])->assertRedirect();
+    if ($first === 'callback') {
+        $callback();
+    } else {
+        billingWebhook('charge.success', $charge);
+    }
+    $this->travelTo('2027-02-01 18:00:00');
+    if ($first === 'callback') {
+        billingWebhook('charge.success', $charge);
+    } else {
+        $callback();
+    }
+    $subscription = App\Models\Subscription::where('tenant_id', $tenant->id)->sole();
+    expect($subscription->current_period_end->toDateTimeString())->toBe('2027-02-28 17:23:45')
+        ->and($subscription->billing_anchor_day)->toBe(31)
+        ->and($subscription->billing_anchor_month)->toBe(1)
+        ->and(App\Models\Transaction::where('provider_transaction_id', 'calendar-callback-order')->count())->toBe(1);
+    Mail::assertQueuedCount(1);
+})->with(['callback', 'webhook']);

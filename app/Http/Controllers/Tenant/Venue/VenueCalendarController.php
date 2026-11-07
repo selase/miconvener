@@ -60,7 +60,7 @@ final class VenueCalendarController extends Controller
 
         $monthParam = (string) $request->query('month', now()->format('Y-m'));
         try {
-            $monthDate = Carbon::createFromFormat('Y-m', $monthParam);
+            $monthDate = Carbon::createFromFormat('!Y-m', $monthParam);
         } catch (Throwable) {
             $monthDate = now();
             $monthParam = $monthDate->format('Y-m');

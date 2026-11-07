@@ -13,6 +13,7 @@ const newOperationKey = () =>
 
 const STATES = {
     pending_host_approval: { label: 'Awaiting host approval', tone: 'blue', Icon: Clock },
+    confirmed: { label: 'Confirmed', tone: 'blue', Icon: CheckCircle2 },
     approved_hold: { label: 'Dates held', tone: 'amber', Icon: CheckCircle2 },
     hold_expired: { label: 'Hold expired', tone: 'slate', Icon: AlertCircle },
     declined: { label: 'Declined', tone: 'rose', Icon: XCircle },
@@ -97,6 +98,14 @@ export default function VenueRequestStatus({ booking }) {
     const until = approval.hold_expires_at
         ? formatInZone(approval.hold_expires_at, approval.timezone)
         : null;
+    const quoteStatus = booking.financial?.quote?.status;
+    const finalTerms = quoteStatus === 'open' || quoteStatus === 'accepted';
+    const holdNote = {
+        open: 'Review and accept the final quote below; nothing is charged until you choose to pay.',
+        accepted: booking.financial?.payments_open
+            ? 'The dates become a confirmed booking when your first payment is received.'
+            : 'The venue will contact you about payment.',
+    }[quoteStatus] ?? 'Payment is not available yet.';
 
     return (
         <section
@@ -113,10 +122,15 @@ export default function VenueRequestStatus({ booking }) {
                     host decides, and this page always shows the latest answer.
                 </p>
             )}
+            {status === 'confirmed' && (
+                <p className="text-ink-secondary leading-relaxed">
+                    Your booking is confirmed. See the payment summary below for any balance or refundable security still due.
+                </p>
+            )}
             {status === 'approved_hold' && (
                 <p className="text-ink-secondary leading-relaxed">
                     <span className="font-semibold text-ink">Dates held until {until}.</span> This
-                    is a hold, not a confirmed booking, and payment is not available yet.
+                    is a hold, not a confirmed booking. {holdNote}
                 </p>
             )}
             {status === 'hold_expired' && (
@@ -140,7 +154,7 @@ export default function VenueRequestStatus({ booking }) {
                 </p>
             )}
 
-            {approval.price_is_indicative && (
+            {approval.price_is_indicative && !finalTerms && (
                 <p className="text-ink-tertiary">
                     The price shown is indicative. The host confirms the final terms.
                 </p>

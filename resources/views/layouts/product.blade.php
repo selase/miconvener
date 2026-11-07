@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@yield('title', config('product-page.brand.name'))</title>
 
+    @include('partials.social-card')
+
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/brand/mark-32.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/assets/img/brand/mark-512.png" />
     <link rel="apple-touch-icon" href="/assets/img/brand/mark-180.png" />

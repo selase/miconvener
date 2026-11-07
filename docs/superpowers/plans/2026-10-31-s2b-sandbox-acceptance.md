@@ -1,0 +1,288 @@
+# S2b Venue Payments: Sandbox and Browser Acceptance Plan
+
+**Status:** prepared 31 October 2026 for the owner's review. S2b (#60-#66) is merged and deployed with venue requests and payments **off everywhere**. Running this plan changes nothing in production.
+
+**Purpose:** prove, in an isolated local environment with Paystack **test mode**, that the complete buyer, host and finance journeys behave as the design says, before any real venue is switched on. Passing this plan is one of the activation gates; the owner's merchant and policy approvals (section 9) are the others.
+
+## 0. Ground rules
+
+- **Local only.** A dedicated checkout, database, Herd site and Paystack **test** keys. No production database, key, merchant account, flag, seeder or command is touched. The production flag stays off (`venue:enable-payments` is only ever run against the local acceptance database).
+- **Test-mode money only.** Never put a live Paystack key in the acceptance environment. Keys live in the acceptance `.env`, never in the repo, a log or a screenshot.
+- **Locally captured email.** `MAIL_MAILER=log` (read `storage/logs`) or Herd's mail catcher. No real recipient is ever emailed. Use `@acceptance.test` addresses.
+- **Label every piece of evidence** as one of: **provider** (a real Paystack test-mode response or dashboard record), **simulated** (an HTTP fake, a locally signed webhook, a forced mail failure, a manually edited clock) or **database** (a ledger or table read). Simulated evidence never stands in for provider evidence on a step marked *provider required*.
+- **Stop conditions.** Stop and record a defect if: a ledger entry is unbalanced, money appears paid or confirmed that the provider did not capture, a buyer sees a commission or fee field, a user without the permission completes an action, or any step needs a production resource. Do not "fix and continue" inside the run: fix on a branch, then restart the affected section.
+
+## 1. Prerequisites
+
+| # | Item | Notes |
+|---|------|-------|
+| P1 | Acceptance checkout of `main` at the released commit (`d9f1a994` or later), on its own branch/worktree | Record the commit under test in the evidence log. |
+| P2 | Separate database `miconvener_acceptance` (and `DB_DATABASE` override); `migrate:fresh`, then the **role seeder first, then** `db:seed --class=PermissionsSeeder` (permissions are granted to roles that must already exist) | Never reuse `miconvener`, `miconvener_testing*` or a shared browsing DB. |
+| P3 | Herd site for the checkout, e.g. `herd link acceptance` giving `acceptance.test` with wildcard tenant subdomains; `APP_URL=http://acceptance.test`, `SESSION_DOMAIN=.acceptance.test` | Local Herd config only. |
+| P4 | Paystack **test** secret/public keys in `PAYSTACK_SECRET_KEY` (settlement shares it) | Test-mode dashboard open to inspect transactions, refunds and transfers. |
+| P5 | Webhook delivery path | A public tunnel to `/webhooks/paystack` (Herd Share or similar) set as the test account's webhook URL. If no tunnel is available, webhooks are **simulated** by posting a payload signed with the test secret (HMAC-SHA512 of the raw body in `x-paystack-signature`); the callback and `php artisan commerce:reconcile` still use the real provider. Record which path was used. |
+| P6 | Queue and scheduler | `QUEUE_CONNECTION=database` with a worker running, and `php artisan schedule:work`, so quote emails, retries and reconciliation run as in production. |
+| P7 | **Reservation agreement approval** | Approve Acceptance Hall's venue (reservation) terms on the superadmin agreements screen (`admin.store-agreements`, scope "Venue bookings"), as the application superadmin. This path is built in PR #68; it is merged (`ef9a42bc`), so the real screen is used. `venue:enable-payments` needs it. |
+| P8 | Evidence folder | One folder per run: `commit.txt`, `mail/`, `ledger/` (SQL dumps), `screens/`, `provider/` (dashboard screenshots with keys cropped), `log.md`. |
+
+### Test organisations (all local)
+
+| Org | Settlement | Venue requests | Venue payments | Purpose |
+|-----|-----------|----------------|----------------|---------|
+| **Acceptance Hall** | platform default | on (`venue:enable-requests`) | on (`venue:enable-payments`) once the agreement exists | the venue under test |
+| **Own Gateway Hall** | own gateway | on | refused by the command | proves the prerequisite checks |
+| **Bare Hall** | platform default | on | no agreement | proves the command refuses |
+| Users | Hall owner (Org Superadmin, all three venue-money permissions), Hall host-only (Org Admin, `manage venue` only), Hall finance-only (custom role: refunds + reconcile, no settlements) | proves the permission split |
+
+Buyers: `buyer1@acceptance.test`, `buyer2@acceptance.test`, `rival@acceptance.test`.
+
+## 2. Fixed numbers for the run
+
+Use the same amounts as the automated tests so results can be compared: hire GHS 1,000.00, extras GHS 50.00, refundable security GHS 200.00, deposit GHS 300.00, balance GHS 750.00. Commission is the agreed 3% on hire plus extras only (contract fee GHS 31.50, deposit allocation GHS 9.00, balance allocation GHS 22.50); security carries none. The tenant bears Paystack's processing fees; record the **actual** test-mode fee reported for each capture and compute the expected ledger from it:
+
+- Rental capture: Dr gateway clearing (amount - fee); Cr organiser payable (amount - fee - allocated commission); Cr platform revenue (allocated commission).
+- Security capture: Dr gateway clearing (amount - fee); Dr gateway fees (fee); Cr refundable security (full amount). Payable and revenue unchanged.
+- Rental refund: Dr organiser payable (amount - commission - fee); Dr gateway fees (fee, the processing fee the platform funds); Dr platform revenue (commission); Cr gateway clearing (amount). The debits sum to the amount credited. The approved default is the venue-funded case: Dr organiser payable (amount - commission); Dr platform revenue (commission); Cr gateway clearing (amount).
+- Security return: Dr refundable security (amount); Dr organiser payable (fee); Cr gateway fees (fee); Cr gateway clearing (amount).
+
+For every step that moves money, dump the ledger transaction and its entries and assert debits equal credits in integer pesewas.
+
+## 3. Journey A: the complete happy path (provider required)
+
+Run once end to end, in the browser, with captured email.
+
+| # | Actor | Action | Expected | Evidence |
+|---|-------|--------|----------|----------|
+| A1 | Buyer1 | Open the venue page, submit an approval-first request | Request page requires email verification; a code arrives in the mail log; after verifying, the request shows "awaiting approval", no price committed | screens, mail |
+| A2 | Host | Approve the request with a 24-hour hold | Dates held; buyer receives the hold email (no payment link); calendar shows a tentative hold | screens, mail |
+| A3 | Host | Send the final quote (deposit plan, security, balance and security due dates, cancellation terms) | Quote saved; a delivery record is created and sent; the buyer email shows amounts and deadlines in the venue's timezone and **no commission**; host panel shows "sent" | mail, DB |
+| A4 | Buyer1 | Follow the email link, verify, review, accept the exact terms | Acceptance recorded once; three charge orders created (deposit, balance, security) and listed (deposit due, balance not yet payable, security not yet payable); nothing charged | screens, DB |
+| A5 | Buyer1 | Pay the deposit with a Paystack **test card** (success card, test PIN/OTP per Paystack's current test documentation) | Redirect to the hosted page, return via callback; booking becomes confirmed; deposit paid; receipt available; booking page shows balance and security as due | provider, screens |
+| A6 | Database | Inspect | Of the three charge orders only the deposit order is paid, with one attempt, one observation, one `commerce_sale` ledger transaction (balanced), one held settlement reserve, one receipt, one confirmation email if configured | DB |
+| A7 | Provider | Webhook for the same payment (real tunnel or simulated) | No second sale, ledger entry or reserve; reconcile output unchanged | provider/simulated, DB |
+| A8 | Buyer1 | Pay the balance, then the security | Booking fully paid; security held as a refundable liability, no commission, no change to payable; two more receipts | provider, DB |
+| A9 | Host | After the event end (move the **local** clock or use a booking in the past), mark the event complete | Allowed only with the settlement permission; reserves released; completion recorded once | DB |
+| A10 | Finance | Return the security in full **before** any payout | Refund funded from the venue's available earnings (the venue covers the processing fee, so earnings must retain at least that fee); provider confirms; liability released; booking and calendar unchanged; no stock movement | provider, DB |
+| A11 | Owner | Reserve a payout of the available amount **after** the security return, send it, and finalise with the transfer OTP (if the security return has not been done, leave the security processing fee out of the payout) | Reserve reduces available; payout needs the OTP; completion posts the payout once; security cash and any still-held reserves never fund it | provider, DB |
+
+**Pass:** every expected result, balanced ledger at each step, no console errors, mail log contains exactly the expected messages.
+
+## 4. Journey B: failure and edge cases
+
+Each case states how to produce it and whether it is **provider** or **simulated**.
+
+| # | Case | How | Expected |
+|---|------|-----|----------|
+| B1 | Declined card | Provider test decline card | Attempt fails; booking stays on hold; no ledger; buyer can retry on the same page without a duplicate attempt |
+| B2 | Abandoned checkout | Close the hosted page, return to the booking page | Attempt stays ready/continuable; paying later works; no second order |
+| B3 | Unknown outcome (**simulated**) | Make checkout initialisation fail (provider unreachable) | Attempt marked unknown, shown as "being prepared"; **no second attempt can be created until reconciled**; `commerce:reconcile` resolves it |
+| B4 | Wrong email / signed out | Open the booking or accept with another email | No access, no acceptance, no data leak |
+| B5 | Forged or stale terms | Edit the accept request hash; accept after the quote expires | Refused with a message; nothing recorded |
+| B6 | Quote replaced and withdrawn | Host sends v2, then withdraws it with a reason | Buyer email for v2, then a withdrawal email with the reason; buyer page shows withdrawn; no payments offered |
+| B7a | Overdue balance | Accept a quote, pay the deposit, then move the local clock past the balance due date | Balance shown overdue and still payable |
+| B7b | Unaccepted quote expires | Send a quote and leave it unaccepted; move the local clock past its expiry | Expired quote offers no payment and cannot be accepted |
+| B8 | Late payment, dates free | Pay at the hosted page, but let the hold lapse before anything confirms it (**simulated** by delaying the callback, the webhook **and** `commerce:reconcile`; delaying only reconciliation leaves the other two to confirm it) | Provider paid time decides timeliness: confirms if the slot is still free |
+| B9 | Late payment, dates taken | Rival confirmed the dates; payment captured | Held for review, no occupancy, no sale; finance sees it and can refund it in full |
+| B10 | Extra capture | Pay twice for the same charge (second via a second attempt) | Second capture held for review and refunded individually; the valid payment and booking untouched |
+| B11 | Wrong amount/account/reference (**simulated** evidence) | Feed mismatched verification data in a local test harness | Held for review, never posted as a sale |
+| B12 | Duplicate callback and webhook | Replay both several times | Exactly one sale, one reserve, one receipt |
+| B13 | Legacy conflict | Create an older-path booking whose payment arrives after its dates were taken | Conflict listed on the finance desk; verify with the platform account; refund in full; replaying the old callback never confirms it; money the old path already posted stays blocked |
+| B14 | Permission split | Repeat refund, reconcile and complete as host-only and finance-only users | Each refused (403/no button) unless holding exactly that permission; a store-finance user cannot reach venue charges |
+| B15 | Organisation prerequisites | Run `venue:enable-payments` for Own Gateway Hall and Bare Hall | Refused with the missing prerequisite; nothing enabled |
+| B16 | Flag off after money taken | Turn payments off mid-way | New checkouts refused; captured money still recorded and refundable |
+| B17 | Mail failure (**simulated**) | Point SMTP at a closed port, send a quote | Quote committed; notice retries at 5, 30 and 180 minutes (up to four attempts), then shows failed to the host. Once a notice is terminally failed the retry command does **not** revive it: the host sees the failure and must send the quote again. Restoring SMTP *before* the last attempt lets the retry succeed |
+| B18a | Worker stopped (**simulated**) | Stop the queue worker while issuing a quote | Quote committed; the job waits on the queue and is delivered when the worker returns; a notice stuck `sending` for 15 minutes is recovered by `venue:deliver-quote-notices` |
+| B18b | Queue submission fails (**simulated**) | Make the queue connection reject the job (e.g. point it at an unreachable backend) while issuing a quote | Quote committed; notice stays `queued`; the scheduled `venue:deliver-quote-notices` sweep submits it once the queue is back |
+
+## 5. Journey C: refund funding
+
+| # | Case | Expected |
+|---|------|----------|
+| C1 | Refund a rental charge when the venue's available earnings cannot cover it (only this booking exists, its earnings are reserved) | Status `needs_funding`; **nothing is sent to Paystack** (provider shows no refund); desk explains it waits |
+| C2 | Add a second, funded booking's earnings, then refresh the refund | Refund submitted once under the original reference; provider shows one refund; desk shows pending |
+| C3 | Provider completes the refund; refresh twice | One `commerce_refund` ledger transaction; order refunded; commission returned from the stored allocation; booking cancelled only when no rental money remains |
+| C4 | Provider refund submission fails (**simulated**) | Refund `unknown`, reconcilable under the same reference, never resent blindly |
+| C5 | Refund requested after the earnings were released | Refused with the platform-administrator message |
+| C6 | Security return when the venue cannot cover the processing fee | Waits as `needs_funding` until it can |
+
+## 6. Journey D: payout OTP
+
+| # | Case | Expected |
+|---|------|----------|
+| D1 | Reserve a payout larger than available (including held reserves and security) | Refused |
+| D2 | Reserve within available, send it | Parked as awaiting OTP; sending again does not resend |
+| D3 | Finalise with a wrong OTP, then the right one | Wrong code refused without duplicating the transfer; right code proceeds once |
+| D4 | Verify the transfer, reconcile twice | One payout ledger transaction; transfer cost recognised only on the verified release |
+| D5 | Race a security return and a payout (two browser sessions, near-simultaneous) | Together they never spend more than the available balance; no duplicate refund or transfer |
+
+Paystack test-mode transfers need a test balance and a verifiable recipient. If creating a test recipient or transfer is not possible, record that as a blocker; the owner decides how to proceed. Hosted payment acceptance is manual (see section 11).
+
+## 7. Browser matrix
+
+Drive the real application with headless Chrome (the Playwright tool was not available; use the globally installed Puppeteer) and also walk each journey by hand once.
+
+- **Surfaces:** buyer request page and booking page (quote, accept, pay, receipt, every charge state); host inquiry page (quote form, withdraw, email status, complete); finance desk (conflicts, held captures, refunds, empty state); console navigation ("Venue money" appears only with a venue-money permission).
+- **Viewports:** 1280x900 and 390x844. **Themes:** light and dark.
+- **Keyboard:** Tab through every flow in order; every control reachable, named and visibly focused; form errors announced and focus moved; modal-free flows so no trap.
+- **States to see:** priced and price-on-request listings; full payment, deposit plus balance, security; wrong email; stale or expired quote; changed policy mid-flow; withdrawn quote; email failed; staff exception (legacy conflict); a payment under review; refund pending, needs funding and refunded.
+- **Checks per screen:** no horizontal overflow, no console errors, no failed requests other than intended refusals, contrast of status colours, loading and error messages appear and take focus, a stale tab refreshes on focus.
+- **Pre-activation requirement:** white text on the accent colour is 4.31:1 (the shared primary button token). Fix the token (to at least 4.5:1) and re-check the buttons before any venue is enabled.
+
+## 8. Pass criteria and reporting
+
+- **Pass** needs: every Journey A step; every B/C/D case behaving as stated (or explicitly recorded as simulated with its covering automated test); a balanced ledger throughout; no stop condition hit; the browser matrix with no open P1 or P2 defect.
+- The report states, for each journey, the commit tested, what was provider evidence versus simulated, the defects found and their fixes (each fix its own reviewed PR), and the cleanup performed.
+- **Cleanup:** drop only the acceptance database and unlink the Herd site; delete no other database or worktree (existing worktree and test-database cleanup is deferred until this plan finishes).
+
+## 9. Approvals
+
+### Decisions already made (reused, not re-opened)
+
+- 3% default venue commission, adjustable per organisation by application superadmin only; commission on hire and extras only; cap applied once; security carries none.
+- Deposit chosen explicitly by the host (an integer amount) with a balance due date; security held separately and returned in full; no damage deductions in this release.
+- Full-capture refunds only; the venue bears Paystack's processing and refund costs; refunds are refused after earnings are released.
+- Earnings are released only after the host marks the event complete; payouts stay manual with the per-transfer OTP on; no automatic payout.
+- Platform collection first (the supported platform Paystack account); venue payments activated per organisation, off by default.
+- Ambiguous older captures are refund-only; money the older path already posted stays blocked until a category-aware adapter exists.
+- Purpledot merchandise and its agreement are unaffected.
+
+### Outstanding, genuinely merchant-specific (needed before a real venue is enabled)
+
+1. **Pilot venue and legal entity**, and who signs the agreement.
+2. **That venue's reservation agreement values** if they differ from the defaults: rate (default 3%), any cap, `holdback_pesewas`, receipt and support wording, support contact.
+3. **The venue's own cancellation and refund terms and its security-deposit policy** (the exact text buyers will see).
+4. **The venue's payout recipient** (mobile money or bank) and who may release payouts and enter the OTP.
+5. **Named acceptance recipients:** the test emails, the Paystack test account owner and where the test keys are kept.
+6. **Go-live sign-off:** who flips `venue:enable-payments` for the first venue, with which first scope (deposit-only, or deposit, balance and security), and the date.
+
+### Engineering gap found while preparing this plan (fixed in PR #68)
+
+- Nothing in the application could approve a reservation-scope commercial agreement: the superadmin agreements screen only created purchase-scope agreements, so `venue:enable-payments` could never succeed for a real organisation. PR #68 lets the application superadmin choose the scope on that screen (venue terms must take the commission from the venue's side; approving one scope never touches the other) and tests that `venue:enable-payments` succeeds once the venue terms are approved there. #68 is merged and deployed.
+
+## 10. Deployment verification already done (read-only)
+
+The documented deploy command (`php artisan migrate --force && php artisan db:seed --class=PermissionsSeeder --force`, recorded in `AGENTS.md` and confirmed as the production environment's configured deploy command) ran as part of Cloud deployment `depl-a31d2c2f-e5f8-42e8-9134-58b38b78daf2` for `d9f1a994`, which finished with status `deployment.succeeded`. The Cloud CLI does not expose command output, so success of the deploy command is inferred from the successful deployment. Because the seeder grants a new permission to the built-in roles only on the run that creates it, the three venue-money permissions should have reached Superadmin and Org Superadmin on that deployment. A successful deployment does not prove the grants, so **verification gate:** before activation, confirm in production (read-only) that the three permission rows exist and which roles hold them; run the seeder only if they do not, with the owner's approval.
+
+## 11. Run log: first local run (31 October 2026)
+
+**Commit under test:** `ef9a42bc` (main after #68). This is a partial run: the browser matrix is partially completed and A5-A11 are pending. **Environment:** a separate checkout and database `miconvener_acceptance`; the app served locally with a port-mapped browser (`*.acceptance.localhost`); Paystack **test** keys; email to the log; queue worker running; headless Chrome driving the real pages. Test buyers use `@example.org` addresses because Paystack rejects `.test` emails. The production flags were not touched.
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| P7 venue terms on the real superadmin screen | **Pass**: surcharge refused with its message; approval shows under "venue bookings" only; 390px no overflow; select labelled | database, screenshots (`/private/tmp/claude-501/-Users-selase-Sites-miconvener/bf63d587-984d-4a41-9530-0162a26f05ea/scratchpad/acc/agreements-approved-desktop.png`, `agreements-approved-phone.png`) |
+| B15 organisation prerequisites | **Pass**: own-gateway (platform account + agreement) and no-agreement (agreement) refused; the venue under test enabled, disabled and re-enabled | database |
+| A1 request with emailed verification code | **Pass** | mail log |
+| A2 approve dates, A3 final quote | **Pass**: hold email; quote email carries amounts, deadlines and cancellation terms and **no commission**; host sees its own commission (GHS 31.50 on GHS 1,050.00) and "the buyer was sent the quote email" | mail log; screenshots in `/private/tmp/claude-501/-Users-selase-Sites-miconvener/bf63d587-984d-4a41-9530-0162a26f05ea/scratchpad/acc/` (`a1-*`, `a2-*`, `a3-*`) |
+| A4 buyer accepts the exact terms | **Pass**: three payments listed; nothing charged | database, screenshots |
+| A5 hosted payment | **Initialisation passed with the provider** (a real test checkout URL was issued). **The hosted page sits behind a Cloudflare bot check, so the card payment cannot be automated**; **A5-A11 (deposit, balance, security, refund, payout, OTP) are pending**: a person completes them at the hosted page | provider (initialisation only) |
+| F1 definitive rejection at initialisation (not an uncertain-outcome B3 test) | **Observed with the real provider**: Paystack rejected an invalid email (HTTP 400); the attempt was held as unknown, the buyer told to wait, and `commerce:reconcile` reported it unresolved. **Finding F1** below. B3 proper (timeout or unreachable provider) was not run | provider, database |
+| B4 wrong email, signed out | **Pass** (404; redirected to verify) | HTTP |
+| B5 forged terms hash | **Pass**: no acceptance recorded (0 accepted decisions) | database |
+| B6 withdraw with reason | **Pass**: buyer sees the reason and no payment is offered; withdrawal email sent; the host can issue a replacement | mail log, screenshots |
+| B14 permission split | **Pass**: host-only user gets 403 on the venue money desk; the owner sees it with its empty states | HTTP, screenshots |
+| Browser matrix (real data) | **Partially completed**: buyer (accepted, withdrawn), host inquiry and finance desk at desktop and 390px, light and dark: no horizontal overflow, every focus stop named and visible. Not yet covered: remaining states in section 7 and the keyboard walk-through by hand. Known: white on the accent colour is 4.31:1 (shared token) | screenshots (`/private/tmp/claude-501/-Users-selase-Sites-miconvener/bf63d587-984d-4a41-9530-0162a26f05ea/scratchpad/shots/*.png`: buyer, host, finance by viewport and theme) |
+| B1, B2, B7-B13, B16-B18, C, D | **Not run in the browser**; covered by the automated feature and real-worker tests named in the plan; B17/B18 (mail and queue outage) are covered by `VenueQuoteNoticesTest` | automated, simulated |
+
+**Evidence location:** screenshots and driver scripts are local scratch files under `/private/tmp/claude-501/-Users-selase-Sites-miconvener/bf63d587-984d-4a41-9530-0162a26f05ea/scratchpad` (not committed); the mail log and the `miconvener_acceptance` database hold the rest. Anyone confirming independently should re-run the listed steps against `ef9a42bc`.
+
+### Findings from this run
+
+- **F1 (decided: fix first, separate PR):** a definitive provider rejection at checkout initialisation (an HTTP 400 such as "Invalid Email Address Passed") is stored as an *unknown* attempt, so the buyer cannot retry until staff resolve it. The fix goes in its own PR with merchandise regression tests: recognised definitive rejections may permit a retry; timeouts, malformed responses and duplicate-reference ambiguity stay unresolved. Not every 4xx proves nothing was created. Final financial acceptance resumes after it merges.
+- **F2 (fixed in #70):** the buyer's hold panel said payment was unavailable and the price indicative while a "Pay now" button was shown.
+- **F3 (known):** accent-colour button text contrast is 4.31:1.
+
+### Still needed before any activation
+
+1. F1 fixed and merged (separate PR), then the failed-initialisation retry re-checked.
+2. A person completes the Paystack **test-card** payments (deposit, balance, security) at the hosted page, then the test-mode refund and payout/OTP steps (A5-A11, D), recorded with provider evidence. Simulated or automated coverage is not a substitute.
+3. Contrast of the accent button token fixed to at least 4.5:1.
+4. The rest of the browser matrix and the by-hand keyboard walk-through (section 7).
+5. The permission verification gate in section 10.
+6. The merchant-specific approvals in section 9, and the owner's explicit go-live approval (who flips `venue:enable-payments`, first scope, date).
+
+
+## 12. Codex continuation — 2 November 2026 (activation still blocked)
+
+This run started from `0e80d73b` in `.worktrees/artifact-completion`, branch `codex/s2b-acceptance`. It uses a new local database, `miconvener_acceptance_codex_20261102`, synthetic organisation `acceptance-hall`, buyer `buyer1@example.org`, Paystack test keys and logged mail. Claude's checkout, databases and earlier evidence were preserved. No production flags, data, payments or deployment were changed.
+
+### Provider-backed results
+
+- Request `VRQ-27B7SKFM` was requested through the real browser, email-verified using local captured mail, approved by the host, quoted and accepted. Its actual date is 3 November 2026; balance/security deadlines are 07:00/08:00 Africa/Accra that day. This differs from the original illustrative later date.
+- The owner completed **test Mobile Money**, not test cards: GHS300 deposit, GHS750 balance and GHS200 security. Each capture posted once. Rental commission was GHS9 + GHS22.50; security commission was zero. The security journal credited refundable liability account 2030.
+- Finance requested the full GHS200 security return through the real page. Paystack later reported `processed`; one refund journal was posted. The seller bore GHS3.90 processing cost. Booking and rental payments stayed confirmed.
+- Re-verifying the original deposit twice left counts unchanged: five balanced journals (including the completed GHS2 payout below), three receipts, two reserves. This is provider-backed verification replay, not a separately delivered public webhook.
+- A GHS10 test payout was sent once and the owner released its OTP. Paystack reported success for GHS9 with fee zero, whereas GHS1 was reserved for the fee. It remains in **processing / fee accounting review**, with no payout journal. It was never resent or declared reconciled. Retain this evidence.
+- A distinct GHS2 payout used a **process-local zero transfer-fee configuration**, matching Paystack's observed test-mode fee. The owner released the new OTP. Provider verification reported paid, net GHS2, fee zero; two reconciliations produced exactly one balanced payout journal. Production fee settings were unchanged. This does not prove live-fee accounting or resolve the earlier mismatch.
+
+### Explicit simulations and limitations
+
+- Early event completion was refused. Moving Carbon's clock only inside one guarded local PHP process to after the event end allowed authorised completion and released both rental reserves. Neither the system clock nor the stored event dates were changed. The post-end completion was a service-level check, not an end-to-end browser clock test.
+- The HTTP local payout form cannot call `crypto.randomUUID` in that insecure browser context. Test payout account verification, reservation and submission therefore used native application services against the isolated database and test provider. Owner OTP release used the actual browser form. Repeat reservation/send in a trusted HTTPS browser before activation; do not count the HTTP service setup as that browser pass.
+- The recipient was Paystack's documented test MTN number `0551234987`, provider-resolved before creating the local account. No real recipient details were used.
+- Receipt delivery means **local log transport only**, not external email delivery. All three immutable receipts were recovered through the outbox after the rendering fix.
+- Declined-card and abandoned-hosted-checkout browser cases remain open. No hosted test-card payments were performed in this run. Simulated test coverage must not be labelled provider acceptance.
+- Full browser matrix, shared button contrast, remaining refund-funding/provider cases and security-return/payout race remain activation gates unless separately evidenced. The GHS10 fee-review record remains open. Merchant-specific terms, read-only permission verification and explicit owner activation approval are still required.
+
+### Defects corrected locally, not yet merged or deployed
+
+1. Reservation receipt snapshots used structured seller/line fields that the merchandise mail could not render. Adapt them only for rendering, retain immutable snapshots, link to the venue dossier, and omit collection wording. Existing local outbox records subsequently delivered to the log.
+2. Venue payment callbacks returned to merchandise order history. Reservation callbacks now return to the protected venue dossier; goods retain their original return route.
+3. Confirmed approval-flow bookings fell back to “Awaiting host approval” with an empty status panel. Add the explicit confirmed badge and explanation.
+4. Venue-only payouts required a purchase agreement. When no purchase agreement exists, payout validation now resolves approved reservation terms. If purchase terms exist, their validation remains authoritative: a valid venue agreement cannot bypass invalid merchandise terms. Checkout scope, permissions, original-account identity and balance locks are unchanged.
+
+### Self-review
+
+- Existing callback, booking badge, receipt/outbox and payout surfaces were updated; no new dependencies, permissions, seeders, config keys or schema were introduced. No new AGENTS rule is necessary for these corrections; finance invariants remain in force.
+- Regression tests failed before the corresponding fixes. Focused runs: 39 payment/receipt tests (170 assertions), 11 booking-status UI tests, 26 venue-settlement/payout tests (115 assertions), and 60 checkout/legacy/quote-notice tests (265 assertions). Eight real PostgreSQL payment races also passed (88 assertions). JavaScript lint, formatting, changed PHP static analysis and asset build passed. These are scoped results, not a fresh full-suite or CI claim.
+- Discoverability uses existing booking, receipt and finance links. Existing loading, errors, access checks and empty states remain; the confirmed state now has meaningful text. Complete responsive/keyboard/contrast acceptance is still open. Payout-account setup discoverability is weak: Store finance says “Finance” but the general Finance page does not expose the account form for this fixture; address before pilot onboarding.
+- Recommendation: review these corrections in a dedicated PR, keep venue activation off, and finish the explicitly open gates above. Do not erase the test-mode fee discrepancy or silently substitute a fee to make the first payout pass.
+
+
+#### Touchpoints updated
+
+- Existing callback navigation, booking status, receipt rendering/outbox and payout validation: updated and regression-tested; rebuilt `public/build` retained.
+- AGENTS, dependencies, schema, config, `.env.example`, permission and role seeders: no new rule or surface requiring changes. Synthetic fixtures are local only. The checked-in acceptance record is the handover; private run metadata remains outside Git.
+
+#### UI Gap Analysis
+
+- Discoverability: corrected booking/receipt links; existing payout account setup guidance remains a pre-pilot gap as noted above.
+- Empty/loading/error and permission states: existing controls retained; no authorisation bypass added. Unknown transfers stay blocked.
+- Responsive/accessibility: textual confirmation fix introduces no new control; full mobile, keyboard and contrast matrix is not certified by this run.
+
+#### Solved
+
+The four corrections listed above. No financial history was rewritten, no production fee waived and no successful transfer resent.
+
+#### Recommended for user decision
+
+Keep activation off. Review the correction branch first, then complete trusted-HTTPS reservation/send, hosted decline/abandonment, missing financial acceptance cases and merchant policy sign-off. The GHS10 test fee mismatch requires an explicit resolution policy or retention as quarantined test evidence; do not silently force it paid.
+
+#### Not gaps
+
+Logged mail, synthetic recipients, process-local time simulation and zero-fee test configuration are deliberate isolation choices, labelled as such; they are not evidence of external email delivery, production fees or complete end-to-end browser acceptance.
+
+### Continuation: trusted HTTPS and final correction review
+
+The limitations above describe the first pass, not completed gates. Subsequent checks on 2 November:
+
+- Trusted local HTTPS is now in use. Through the real finance page an oversized payout and a below-fee payout were refused; a GHS3 unsent reservation was created and cancelled. Available funds returned to GHS982.12. The earlier provider submission and owner OTP evidence remain hybrid service/browser checks, as labelled above.
+- A separate synthetic booking (`VRQ-DECLINE01`) exercised the hosted **test-card Declined** option. Provider reconciliation marked the attempt failed with no capture. Before that, leaving checkout and returning resumed the same attempt. After the definitive decline a new checkout was available. The buyer then cancelled the unpaid booking. No real card or funds were used.
+- The security-return/payout concurrency gate is covered by the eight real PostgreSQL worker tests already reported (including the dedicated security refund versus payout race); it is not an outstanding race-test gate.
+- Primary and hover tokens now meet 4.5:1 against their foregrounds. Marketplace solid accent controls use theme-aware foregrounds; the dark AI gradient uses a darker start. Five contrast regression tests cover tokens and affected surfaces. Confirmed buyer page checks at 390px and 1280px found no horizontal overflow, in light and dark themes.
+- The complete PHP CI suite passed on PR #83's preceding head. A component test's immediate checkbox-state assertion failed once in the parallel CI run and passed in isolation. It now waits for the actual enabled state; production checkout logic is unchanged. The focused checkout/status/contrast run passes 27 tests. Final CI must still pass on the final head.
+- Independent review found no blockers in the finance corrections or final contrast/test delta.
+- The owner selected **Purpledot** as the first venue pilot. Other organisations and catalogue hotels are not authorised for activation. Read-only production inspection found the three venue-money permission rows, each with two role grants, and no approved venue agreements. Purpledot has no public venue listing in that inspection. No venue, availability or commercial participation will be invented.
+
+Remaining release distinctions: the GHS10 test fee mismatch remains quarantined, not reconciled; local receipt delivery was logged mail; production fee accounting was not tested with real money. Complete any merchant-specific setup and read-only permission/role verification before activation. Do not describe those distinctions as waived by a green CI run.
+
+A further host-page walkthrough found a duplicate legacy financial summary beneath the final accepted quote. It displayed the original estimate and labelled cumulative rental receipts as a deposit. Approval-first bookings now omit that legacy block and use their existing authoritative final-quote/payment panel; legacy bookings retain the existing summary. The new regression failed before the fix; 13 inquiry-summary/venue-money tests pass afterwards, lint and rebuilt assets pass. Host dossier and finance pages were inspected at 390px/1280px in both themes without document overflow; table content uses its own horizontal scroll. Keyboard focus on the finance account selector was visible. Production permission inspection additionally confirmed the expected Superadmin and Org Superadmin grants; no seeding is needed.
+
+
+### Final release and pilot closure — 2 November 2026
+
+- PR #83 final reviewed head `eeb83ebb` passed Laravel (14m58s) and code-quality (failed-only rerun,3m50s); the unrelated badge test failure did not recur. Squash merge `5319b916` deployed successfully as `depl-a320b852-79f0-4fff-b841-8299477a9043`.
+- A separate hosted Test Success card paid GHS10 on `VRQ-REFUND01`. Native finance services reserved the existing available funds as an **unsent** payout: the full rental refund stayed `needs_funding` with no provider submission. Cancelling that reservation restored funding, and reconciliation submitted the original refund once. Paystack later confirmed completion: order refunded, booking cancelled, stored GHS0.30 commission returned. Reconciliation repeated without another journal. All seven synthetic journals balance (two refund journals including the earlier security return). This is provider-backed acceptance with labelled native-service setup, not an entirely manual browser journey.
+- Production venue agreement v4 for Purpledot was approved under the owner's pilot/release authorisation:3%, seller-funded fees, full security return and manual payouts. Merchandise agreement v3 was preserved. Existing venue-money permissions and both expected role grants were verified read-only.
+- The owner supplied a real 20-seat classroom at Lakeside Estate. The listing is published as price-on-request; no hire rate, deposit, amenities or image was invented during publication. Only Purpledot's requests/payments were enabled; a before/after check confirmed every other organisation remains off. The public page and request entry were verified in the browser; no production booking or charge was created. The owner later confirmed AC and a presentation screen, added under those exact generic labels.
+- The GHS10 test-transfer fee mismatch is retained in the isolated database as accounting-review evidence. It was not forced paid, resent or treated as a successful reconciled payout. Logged receipts and process-local clock/zero-fee setup remain explicit limitations on the type of evidence, not assertions about live fees or external delivery.
+- Remaining listing content: real photos. Request-form polish uses declared seating/capacity instead of the generic banquet/50 initial values, while preserving existing defaults where capacity supports them. Wider merchant rollout still requires separate approval.

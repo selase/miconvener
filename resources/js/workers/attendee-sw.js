@@ -53,6 +53,7 @@ self.addEventListener('fetch', (event) => {
     const request = event.request;
     const url = new URL(request.url);
     if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+    if (url.pathname.startsWith('/attendee-profiles/') || url.pathname.includes('/public-profile')) return;
     if (STATIC.test(url.pathname)) {
         event.respondWith(
             (async () => {

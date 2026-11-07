@@ -33,6 +33,7 @@ final class Permission extends SpatiePermission
         'create communication',
         'update communication',
         'delete communication',
+        'manage public attendee profiles',
         'manage organization settings',
         'read finance',
         'manage giving',

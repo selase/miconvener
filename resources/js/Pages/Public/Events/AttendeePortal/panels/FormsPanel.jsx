@@ -477,7 +477,7 @@ export default function FormsPanel({ registration, isOnline = true }) {
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-accent px-6 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+                                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-accent px-6 text-xs font-semibold text-accent-ink hover:opacity-90 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                             >
                                 {submitting ? (
                                     <>
@@ -557,7 +557,7 @@ export default function FormsPanel({ registration, isOnline = true }) {
                                     item.has_submitted
                                         ? 'border border-border bg-surface text-ink hover:border-accent'
                                         : item.is_eligible
-                                          ? 'bg-accent text-white hover:opacity-90'
+                                          ? 'bg-accent text-accent-ink hover:opacity-90'
                                           : 'border border-border bg-surface-subtle text-ink-secondary cursor-not-allowed opacity-75'
                                 }`}
                             >

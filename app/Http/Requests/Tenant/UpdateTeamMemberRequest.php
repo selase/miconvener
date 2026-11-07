@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant;
 
+use App\Http\Requests\Concerns\NormalisesPhoneNumber;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Authorization\PermissionCeiling;
@@ -15,6 +16,8 @@ use Propaganistas\LaravelPhone\Rules\Phone;
 
 final class UpdateTeamMemberRequest extends FormRequest
 {
+    use NormalisesPhoneNumber;
+
     public function authorize(): bool
     {
         if (! $this->user()->can('update user')) {
@@ -47,7 +50,7 @@ final class UpdateTeamMemberRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
-            'phone_no' => ['required', (new Phone)->country(['GH', 'AUTO'])],
+            'phone_no' => ['required', (new Phone)->international()->country('GH')],
             'role' => [
                 'required',
                 'exists:roles,id',

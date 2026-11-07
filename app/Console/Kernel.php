@@ -15,7 +15,7 @@ final class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->call(fn () => app(\App\Services\Events\Profiles\ProfileRetention::class)->sweep())->hourly()->name('events:purge-attendee-profiles')->withoutOverlapping()->onOneServer();
         // Deliberately not every minute. The environment scales to zero and the
         // scheduler wakes it, so a per-minute task holds it awake continuously and
         // the scale-to-zero setting buys nothing. Aligned with payouts:reconcile so
@@ -31,6 +31,7 @@ final class Kernel extends ConsoleKernel
         // Recurring events — maintain rolling window of upcoming session occurrences
         $schedule->command('events:generate-recurring-sessions')->dailyAt('02:30')->withoutOverlapping();
         $schedule->command('events:send-occurrence-reminders')->hourly()->withoutOverlapping();
+        $schedule->command('venue:deliver-quote-notices')->everyFiveMinutes()->withoutOverlapping();
 
         // Usage Metering & Billing
         $schedule->command('tenants:audit-storage')->dailyAt('03:00');

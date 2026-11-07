@@ -5,6 +5,7 @@ import Button from '@/Components/Console/Button';
 import PageHeader from '@/Components/Console/PageHeader';
 import StatusPill from '@/Components/Console/StatusPill';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
+import VenueFinancialPanel from '@/Components/Venue/VenueFinancialPanel';
 import VenueApprovalPanel, { VenuePaymentConflictBanner } from '@/Components/Venue/VenueApprovalPanel';
 import {
     Inbox,
@@ -44,7 +45,7 @@ const STATUS_MAP = {
     cancelled: 'neutral',
 };
 
-export default function InquiryShow({ shop, inquiry }) {
+export default function InquiryShow({ shop, inquiry, can }) {
     const approvalFlow = Boolean(inquiry.approval?.flow);
     const shownStatus = approvalFlow ? inquiry.approval.effective_status : inquiry.status;
     const [quoteModalOpen, setQuoteModalOpen] = useState(false);
@@ -215,6 +216,7 @@ export default function InquiryShow({ shop, inquiry }) {
                     <VenuePaymentConflictBanner conflicts={inquiry.approval?.conflicts} />
 
                     {approvalFlow && <VenueApprovalPanel inquiry={inquiry} />}
+                    {approvalFlow && <VenueFinancialPanel inquiry={inquiry} can={can} />}
 
                     {/* Specifications Grid */}
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -280,6 +282,7 @@ export default function InquiryShow({ shop, inquiry }) {
                         </div>
 
                         {/* Space & Financial Status */}
+                        {!approvalFlow && (
                         <div className="rounded-xl border border-border bg-canvas/40 p-4 space-y-3 text-xs">
                             <div className="font-semibold text-ink flex items-center gap-1.5">
                                 <CreditCard className="h-4 w-4 text-accent" />
@@ -310,6 +313,7 @@ export default function InquiryShow({ shop, inquiry }) {
                                 </div>
                             </div>
                         </div>
+                        )}
                     </div>
 
                     {/* Special Logistics Notes */}

@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\Transaction;
 use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
+use App\Services\Billing\SubscriptionPeriod;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Pricing\GhanaPaymentProof;
@@ -68,9 +69,9 @@ final class WebhookController extends Controller
                         'provider_subscription_id' => $stripeInvoice->subscription,
                         'provider_plan_id' => $stripeInvoice->lines->data[0]->price->id ?? null,
                         'status' => 'active',
-                        'current_period_end' => isset($stripeInvoice->lines->data[0]->period->end)
-                            ? Carbon::createFromTimestamp($stripeInvoice->lines->data[0]->period->end)
-                            : now()->addMonth(),
+                        ...(isset($stripeInvoice->lines->data[0]->period->end)
+                            ? ['current_period_end' => Carbon::createFromTimestamp($stripeInvoice->lines->data[0]->period->end)]
+                            : SubscriptionPeriod::starting('month')),
                         'amount_paid' => $stripeInvoice->amount_paid,
                         'currency' => $stripeInvoice->currency,
                         'transaction_id' => $stripeInvoice->payment_intent ?? $stripeInvoice->id,
@@ -261,7 +262,7 @@ final class WebhookController extends Controller
                         'provider_subscription_id' => 'ps_'.$reference,
                         'provider_plan_id' => $planSlug.'_'.$interval,
                         'status' => 'active',
-                        'current_period_end' => $interval === 'year' ? now()->addYear() : now()->addMonth(),
+                        ...SubscriptionPeriod::starting($interval),
                         'amount_paid' => $data['amount'] ?? 0,
                         'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
                         'transaction_id' => $reference,
@@ -290,7 +291,7 @@ final class WebhookController extends Controller
 
             if ($package) {
                 $subscriptionCode = $data['subscription_code'] ?? ($data['plan_object']['subscription_code'] ?? null);
-                $nextPaymentDate = $data['paid_at'] ? Carbon::parse($data['paid_at'])->addMonth() : now()->addMonth();
+                $periodStart = isset($data['paid_at']) ? Carbon::parse($data['paid_at']) : Carbon::now();
 
                 $dto = [
                     'package_id' => $package->id,
@@ -298,7 +299,7 @@ final class WebhookController extends Controller
                     'provider_subscription_id' => $subscriptionCode ?? $data['id'],
                     'provider_plan_id' => $planCode,
                     'status' => 'active',
-                    'current_period_end' => $nextPaymentDate,
+                    ...SubscriptionPeriod::starting('month', $periodStart),
                     'amount_paid' => $data['amount'] ?? 0,
                     'currency' => mb_strtolower($data['currency'] ?? 'usd'),
                     'transaction_id' => $reference,

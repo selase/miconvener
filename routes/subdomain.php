@@ -240,6 +240,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/venue/rooms/{room}/seats', [EventVenueController::class, 'assignSeat'])->name('tenant.events.venue.seats.assign');
     Route::delete('events/{event}/venue/rooms/{room}/seats/{assignment}', [EventVenueController::class, 'unassignSeat'])->name('tenant.events.venue.seats.unassign');
     Route::get('events/{event}/venue/unseated', [EventVenueController::class, 'searchUnseated'])->name('tenant.events.venue.unseated');
+    Route::get('events/{event}/public-profiles', [App\Http\Controllers\Tenant\EventAttendeeProfileController::class, 'index'])->name('tenant.events.public-profiles.index');
+    Route::patch('events/{event}/public-profiles', [App\Http\Controllers\Tenant\EventAttendeeProfileController::class, 'toggle'])->name('tenant.events.public-profiles.switch');
+    Route::post('events/{event}/public-profiles/{profile}/hide', [App\Http\Controllers\Tenant\EventAttendeeProfileController::class, 'hide'])->whereUuid('profile')->name('tenant.events.public-profiles.hide');
     Route::get('events/{event}/venue-collaboration', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'show'])->name('tenant.events.venue-collaboration.show');
     Route::post('events/{event}/venue-collaboration/messages', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'storeMessage'])->name('tenant.events.venue-collaboration.messages.store');
     Route::post('events/{event}/venue-collaboration/inspections', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'storeInspection'])->name('tenant.events.venue-collaboration.inspections.store');
@@ -498,6 +501,18 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             Route::post('inquiries/{inquiry}/renew', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'renew'])->name('inquiries.renew');
         });
 
+        Route::post('inquiries/{inquiry}/financial-quote', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'issue'])->whereUuid('inquiry')->middleware('throttle:venue-decisions')->name('inquiries.financial-quote');
+        Route::post('inquiries/{inquiry}/complete', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'complete'])->whereUuid('inquiry')->middleware('throttle:venue-decisions')->name('inquiries.complete');
+        Route::post('financial-quotes/{quote}/withdraw', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'withdraw'])->whereUuid('quote')->middleware('throttle:venue-decisions')->name('financial-quotes.withdraw');
+
+        Route::prefix('finance')->name('finance.')->middleware('throttle:venue-decisions')->group(function (): void {
+            Route::get('/', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'index'])->withoutMiddleware('throttle:venue-decisions')->name('index');
+            Route::post('conflicts/{action}/verify', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'verify'])->whereUuid('action')->name('conflicts.verify');
+            Route::post('resolutions/{resolution}/resolve', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'resolve'])->whereUuid('resolution')->name('resolutions.resolve');
+            Route::post('charges/{charge}/refund', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'refund'])->whereUuid('charge')->name('charges.refund');
+            Route::post('refunds/{refund}/reconcile', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'reconcileRefund'])->whereUuid('refund')->name('refunds.reconcile');
+        });
+
         Route::get('calendar', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'index'])->name('calendar.index');
         Route::post('calendar/blocks', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'storeBlock'])->name('calendar.blocks.store');
         Route::delete('calendar/blocks/{block}', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'destroyBlock'])
@@ -563,6 +578,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/abstracts/{abstract}/reviews', [App\Http\Controllers\Tenant\AbstractReviewController::class, 'submit'])->name('tenant.events.reviews.submit');
 
     Route::patch('events/{event}/visibility', [EventController::class, 'updateVisibility'])->name('tenant.events.visibility');
+    Route::patch('events/{event}/community-prompts', [EventController::class, 'updateCommunityPrompts'])->name('tenant.events.community-prompts');
     Route::get('events/{event}/speakers/{speaker}/portal-link', [EventSpeakerController::class, 'portalLink'])->name('tenant.events.speakers.portal-link');
     Route::post('events/{event}/speakers/{speaker}/invite', [EventSpeakerController::class, 'invite'])->name('tenant.events.speakers.invite');
 
@@ -648,6 +664,7 @@ Route::post('/e/{event}/checkout/{registration}/member-benefits/reassess', [Even
 Route::get('/e/{event}/checkout/{registration}/member-callback', [EventCheckoutController::class, 'memberCallback'])->name('public.events.member-callback');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->block(15, 15)->name('public.events.contribute');
+Route::post('/e/{event}/messages', [App\Http\Controllers\Public\EventGoodwillMessageController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.messages.store');
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::post('/e/{event}/checkout/{registration}/paystack', [EventCheckoutController::class, 'payWithPaystack'])->name('public.events.checkout.paystack');

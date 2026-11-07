@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendee\PlatformConfirmAccessCodeRequest;
 use App\Http\Requests\Attendee\PlatformSendAccessCodeRequest;
 use App\Http\Requests\Attendee\UpdateContributionTributeRequest;
+use App\Models\Event;
 use App\Models\EventContribution;
 use App\Models\Tenant;
 use App\Services\Events\AttendeePortalRateLimiter;
@@ -68,6 +69,7 @@ final class PlatformAttendeeAccessController extends Controller
             'communityPhoneVerified' => app(\App\Services\Community\PhoneVerification::class)->verifiedPhone($request->session()) !== null,
             'communityReturnUrl' => $this->communityReturnUrl($request, $organiserSlug),
             'organiser' => $organiser,
+            'joinEvent' => $this->joinEvent($request),
             'verifiedEmail' => $verifiedEmail !== null ? ContactMask::email($verifiedEmail) : null,
             'initialHistory' => $history,
             'initialCertificates' => $certificates,
@@ -367,6 +369,28 @@ final class PlatformAttendeeAccessController extends Controller
         ]);
     }
 
+    /**
+     * The upcoming event a visitor is trying to open the attendee area of, so the
+     * verify page can offer registration to someone who has not registered yet.
+     *
+     * @return array{name: string, register_url: string}|null
+     */
+    private function joinEvent(Request $request): ?array
+    {
+        if (! preg_match('#^/my/join/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})#i', (string) $request->query('return_to'), $match)) {
+            return null;
+        }
+        $event = Event::withoutGlobalScopes()->whereNull('deleted_at')->published()->with('tenant')->find($match[1]);
+        if ($event === null || $event->tenant === null || $event->tenant->status === TenantStatusEnum::BANNED || ! $event->ends_at->isFuture()) {
+            return null;
+        }
+
+        return [
+            'name' => $event->name,
+            'register_url' => route('public.events.show', ['subdomain' => $event->tenant->slug, 'event' => $event->slug]).'?'.http_build_query(['attendee_area' => 'register']),
+        ];
+    }
+
     private function communityReturnUrl(Request $request, ?string $organiserSlug): ?string
     {
         $value = $request->query('return_to');
@@ -388,7 +412,7 @@ final class PlatformAttendeeAccessController extends Controller
             return $expected;
         }
         if (preg_match('#^/e/([a-z0-9-]+)$#D', $parsed['path'] ?? '', $matches)
-            && \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->published()->where('slug', $matches[1])->exists()) {
+            && Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->published()->where('slug', $matches[1])->exists()) {
             return route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $matches[1]]);
         }
 

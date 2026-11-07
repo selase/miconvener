@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Marketplace;
 
+use App\Models\CommercePaymentReference;
 use App\Models\StoreOrder;
 use App\Models\StorePaymentAttempt;
 use App\Models\StorePaymentObservation;
@@ -11,7 +12,7 @@ use App\Services\Finance\LedgerService;
 
 final class StorePaymentConfirmer
 {
-    public function __construct(private readonly CommerceOrderLocks $locks, private readonly LedgerService $ledger, private readonly CommerceOfferingRegistry $offerings) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly LedgerService $ledger, private readonly CommerceOfferingRegistry $offerings, private readonly CommercePaymentReferences $references) {}
 
     public function confirm(StorePaymentObservation $capture): StoreOrder
     {
@@ -20,6 +21,9 @@ final class StorePaymentConfirmer
             $capture = StorePaymentObservation::query()->where('order_id', $order->id)->lockForUpdate()->findOrFail($capture->id);
             $attempt = StorePaymentAttempt::query()->where('order_id', $order->id)->lockForUpdate()->findOrFail($capture->attempt_id);
             if ($capture->processing_state === 'posted') {
+                return $order;
+            }
+            if ($capture->processing_state === 'review' && $order->offering_type === 'reservation') {
                 return $order;
             }
             if (StorePaymentObservation::query()->where('attempt_id', $attempt->id)->where('observation_version', '>', $capture->observation_version)->exists()) {
@@ -49,12 +53,22 @@ final class StorePaymentConfirmer
                 } else {
                     $order->update(['review_reason' => $issues[0]]);
                 }
+                $this->linkReference($attempt, $capture->fresh());
 
                 return $order;
             }
             $offering->applyCapture($order, $attempt, $capture);
+            $this->linkReference($attempt, $capture->fresh());
 
             return $order;
         });
+    }
+
+    private function linkReference(StorePaymentAttempt $attempt, StorePaymentObservation $capture): void
+    {
+        $claim = CommercePaymentReference::query()->where('provider', $attempt->provider)->where('account_fingerprint', $attempt->account_fingerprint)->where('reference', $attempt->reference)->first();
+        if ($claim !== null && $capture->ledger_transaction_id !== null) {
+            $this->references->linkLedger($claim, $attempt->reference);
+        }
     }
 }

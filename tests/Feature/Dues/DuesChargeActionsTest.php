@@ -182,7 +182,7 @@ test('only an open charge can be waived, voided or recorded', function () {
 
 test('an exited member can still have existing open charges waived, voided or recorded', function () {
     [, $user, $member] = duesChargeTenant();
-    $a = duesOpenCharge($member);
+    $a = duesOpenCharge($member, ['period_start' => '2025-12-01', 'period_end' => '2025-12-31']);
     $b = duesOpenCharge($member, ['period_start' => '2026-01-01', 'period_end' => '2026-01-31']);
     $c = duesOpenCharge($member, ['period_start' => '2026-02-01', 'period_end' => '2026-02-28']);
     $member->update(['status' => MemberStatusEnum::Exited]);

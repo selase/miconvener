@@ -5,6 +5,9 @@
 @section('content')
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
+        @can('moderate-public-attendee-profiles')
+            <p><a class="btn btn-light-primary mb-5" href="{{ route('admin.attendee-profiles.index', $tenant) }}">Attendee profile moderation</a></p>
+        @endcan
         @can('access-superadmin-dashboard')
             <p><a class="btn btn-light-primary mb-5" href="{{ route('admin.store-agreements.index', $tenant) }}">Commerce agreement</a></p>
         @endcan

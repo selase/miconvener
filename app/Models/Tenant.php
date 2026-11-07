@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
+ * @property string|null $attendee_profile_generation
  * @property string|null $package_id Null until a plan is assigned; self-signups
  *                                   on a paid plan have none until they pay.
  * @property-read string|null $logo_url The stored logo's public URL, or null when there is none.
@@ -39,6 +40,10 @@ final class Tenant extends Model
     public const string SETTLEMENT_MODE_OWN_GATEWAY = 'own_gateway';
 
     protected $connection = 'landlord';
+
+    protected $attributes = ['storage_limit_snapshot' => null];
+
+    protected $hidden = ['storage_limit_snapshot', 'attendee_profile_generation'];
 
     protected $fillable = [
         'id',
@@ -88,6 +93,7 @@ final class Tenant extends Model
     ];
 
     protected $casts = [
+        'storage_limit_snapshot' => 'integer',
         'status' => TenantStatusEnum::class,
         'encryption_at_rest' => 'boolean',
         'meta' => 'array',
@@ -693,6 +699,9 @@ final class Tenant extends Model
      */
     public function featureLimitValue(string $featureSlug): ?int
     {
+        if ($featureSlug === 'storage_bytes') {
+            return app(\App\Services\Tenancy\StorageAllowances::class)->limit($this);
+        }
         $limit = $this->planLimitValue($featureSlug);
 
         if ($limit === null) {

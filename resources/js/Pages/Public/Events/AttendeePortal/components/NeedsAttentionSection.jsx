@@ -69,7 +69,7 @@ export default function NeedsAttentionSection({ items }) {
                             <div className="shrink-0">
                                 <a
                                     href={item.action?.url ?? `/my/events/${item.registration_id}`}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:opacity-90 transition-opacity"
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-accent-ink shadow-sm hover:opacity-90 transition-opacity"
                                 >
                                     <span>{item.action?.label ?? 'View details'}</span>
                                     <ArrowRight className="h-3.5 w-3.5" />

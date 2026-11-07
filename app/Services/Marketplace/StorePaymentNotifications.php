@@ -26,7 +26,7 @@ final class StorePaymentNotifications
             if (! $capture && ($data['reference_reported'] ?? false) === true && ($data['reference'] ?? null) === $current->reference
                 && ($data['status'] ?? null) === 'failed' && ! in_array($current->status, ['succeeded', 'review', 'captured'], true)) {
                 $current->update(['status' => 'failed', 'last_verified_at' => now()]);
-                if ($order->state === 'review' && $order->review_reason === 'expired_unresolved_attempt'
+                if ($order->offering_type === 'purchase' && $order->state === 'review' && $order->review_reason === 'expired_unresolved_attempt'
                     && $order->payment_state === 'awaiting' && $order->expires_at->lessThanOrEqualTo(now())
                     && ! StorePaymentObservation::query()->where('order_id', $order->id)->exists()
                     && ! $order->attempts()->where('status', '<>', 'failed')->exists()) {
@@ -47,7 +47,7 @@ final class StorePaymentNotifications
     public function paystack(array $data, string $accountIdentity): bool
     {
         $metadata = WebhookController::metadata($data['metadata'] ?? null);
-        if (($metadata['source'] ?? null) !== 'miconvener_store') {
+        if (! in_array($metadata['source'] ?? null, ['miconvener_store', 'miconvener_venue'], true)) {
             return false;
         }
         $reference = $data['reference'] ?? null;

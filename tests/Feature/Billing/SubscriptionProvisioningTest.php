@@ -253,3 +253,36 @@ it('switch to free logs a plan change as cancel', function () {
         ->exists()
     )->toBeTrue();
 });
+
+it('retains a first-period calendar anchor through February and later provider date updates', function (): void {
+    $this->travelTo('2027-01-31 08:00:00');
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $package = makePackage('calendar-pro', 1);
+    $dto = [
+        'package_id' => $package->id,
+        'provider' => 'paystack',
+        'provider_subscription_id' => 'calendar-first',
+        'provider_plan_id' => 'calendar-pro_month',
+        'status' => 'active',
+        'interval' => 'month',
+        ...App\Services\Billing\SubscriptionPeriod::starting('month', Carbon\CarbonImmutable::parse('2027-01-31 17:23:45')),
+        'amount_paid' => 1900,
+        'currency' => 'ghs',
+        'transaction_id' => 'calendar-provision-first',
+    ];
+    $service = app(SubscriptionProvisioningService::class);
+    $service->provision($tenant, $dto);
+    $subscription = Subscription::where('tenant_id', $tenant->id)->sole();
+    expect($subscription->current_period_end->toDateTimeString())->toBe('2027-02-28 17:23:45')
+        ->and($subscription->billing_anchor_day)->toBe(31)
+        ->and($subscription->billing_anchor_month)->toBe(1);
+    expect($service->provision($tenant, $dto))->toBeFalse();
+    unset($dto['billing_anchor_day'], $dto['billing_anchor_month']);
+    $dto['transaction_id'] = 'calendar-provider-explicit-end';
+    $dto['current_period_end'] = Carbon\CarbonImmutable::parse('2027-03-31 17:23:45');
+    $service->provision($tenant, $dto);
+    expect($subscription->fresh()->current_period_end->toDateTimeString())->toBe('2027-03-31 17:23:45')
+        ->and($subscription->fresh()->billing_anchor_day)->toBe(31)
+        ->and($subscription->fresh()->billing_anchor_month)->toBe(1);
+});

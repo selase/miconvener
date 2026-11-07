@@ -12,8 +12,10 @@ use App\Models\Tenant;
 use App\Services\Events\DoorCheckIn;
 use App\Services\Events\EventSections;
 use App\Services\Events\EventWorkspaceSnapshot;
+use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\RecurrenceService;
 use App\Services\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -292,6 +294,26 @@ final class EventController extends Controller
         ]);
     }
 
+    /**
+     * Whether the public event page shows the follow and membership options. On its
+     * own route, like visibility, so the choice takes effect without a full form.
+     */
+    public function updateCommunityPrompts(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $eventModel = $this->resolveEvent($this->getTenant(), $event);
+
+        $validated = $request->validate(['show_community_prompts' => ['required', 'boolean']]);
+        $eventModel->update(['show_community_prompts' => $validated['show_community_prompts']]);
+
+        return response()->json([
+            'show_community_prompts' => $eventModel->show_community_prompts,
+            'message' => $eventModel->show_community_prompts
+                ? 'This event page invites visitors to follow the organiser and see its membership options.'
+                : 'This event page no longer shows follow or membership options.',
+        ]);
+    }
+
     public function destroy(Request $request, string $subdomain, string $event): JsonResponse|RedirectResponse
     {
         $this->authorize('delete event');
@@ -547,6 +569,7 @@ final class EventController extends Controller
 
         $validated = $request->validate([
             'allow_contributions' => ['required', 'boolean'],
+            'allow_goodwill_messages' => ['sometimes', 'boolean'],
             'contribution_title' => ['nullable', 'string', 'max:255'],
             'contribution_description' => ['nullable', 'string', 'max:1000'],
             'contribution_presets' => ['nullable', 'array'],
@@ -670,6 +693,7 @@ final class EventController extends Controller
         $snapshot = app(EventWorkspaceSnapshot::class);
         $phase = $snapshot->phase($eventModel);
         $hasActiveGateway = $tenant->canAcceptPayments();
+        $publicUrl = route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]);
         $givingLinks = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
         $canReadGivingFinance = auth()->user()->can('read finance');
 
@@ -725,7 +749,8 @@ final class EventController extends Controller
             'stats' => $section === EventSections::OVERVIEW ? $this->overviewStats($eventModel) : null,
             'hasActiveGateway' => $hasActiveGateway,
             'settlementMode' => $tenant->settlement_mode,
-            'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
+            'publicUrl' => $publicUrl,
+            'publicQr' => $section === EventSections::OVERVIEW ? QrCodeGenerator::svgDataUri($publicUrl, 1024) : null,
             'sections' => $sections->menuFor(request()->user(), $tenant, $eventModel),
             'section' => $section,
             'phase' => $phase,
@@ -873,6 +898,27 @@ final class EventController extends Controller
 
         unset($validated['hero_image']);
 
+        return $this->withUtcTimes($validated);
+    }
+
+    /**
+     * The form sends the wall-clock time the organiser typed, which means the
+     * time in the event's own timezone. Stored times are UTC, so they are
+     * converted here; a value that already names an offset is left alone.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function withUtcTimes(array $validated): array
+    {
+        foreach (['starts_at', 'ends_at'] as $field) {
+            $value = $validated[$field] ?? null;
+
+            if (is_string($value) && ! preg_match('/(Z|[+-]\d{2}:?\d{2})$/', $value)) {
+                $validated[$field] = CarbonImmutable::parse($value, $validated['timezone'])->utc();
+            }
+        }
+
         return $validated;
     }
 
@@ -905,6 +951,7 @@ final class EventController extends Controller
             'description' => $event->description,
             'status' => $event->status,
             'visibility' => $event->visibility,
+            'show_community_prompts' => $event->showsCommunityPrompts(),
             'speaker_slide_policy' => $event->speaker_slide_policy ?? Event::SPEAKER_POLICY_AFTER,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),
@@ -1008,6 +1055,7 @@ final class EventController extends Controller
             'contribution_min_amount_pesewas' => $event->contribution_min_amount_pesewas ?? 100,
             'contribution_goal_amount_pesewas' => $event->contribution_goal_amount_pesewas,
             'show_tribute_wall' => (bool) $event->show_tribute_wall,
+            'allow_goodwill_messages' => (bool) $event->allow_goodwill_messages,
             'show_contributor_amounts' => (bool) $event->show_contributor_amounts,
             'is_recurring' => (bool) $event->is_recurring,
             'recurrence_pattern' => $event->recurrence_pattern,

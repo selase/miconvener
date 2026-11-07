@@ -98,3 +98,35 @@ it('deletes only its new file if saving the version fails', function () {
     ], ['Accept' => 'application/json']))->toThrow(RuntimeException::class, 'Simulated database failure');
     expect(CommunityLibraryItem::query()->count())->toBe(0)->and(Storage::disk('community-library-local')->allFiles())->toBe([]);
 });
+
+it('shows readable staff capacity without exposing storage locations', function () {
+    [$tenant, $user] = libraryStaff();
+    $tenant->forceFill(['storage_limit_snapshot' => -1])->saveQuietly();
+    $item = CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id]);
+    CommunityLibraryVersion::factory()->create(['tenant_id' => $tenant->id, 'item_id' => $item->id, 'size' => 4096]);
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($tenant->slug)])
+        ->get(route('tenant.community.library.index', ['subdomain' => $tenant->slug]))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('storage', ['used' => 4096, 'limit' => null, 'retained' => true]));
+});
+
+it('accepts an exact quota boundary and counts retained editions without blocking their reading', function () {
+    [$tenant, $user] = libraryStaff();
+    Storage::fake('community-library-local');
+    $content = "%PDF-1.4\nCurrent edition";
+    $oldSize = 100;
+    $item = CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id]);
+    $old = CommunityLibraryVersion::factory()->create(['tenant_id' => $tenant->id, 'item_id' => $item->id, 'size' => $oldSize]);
+    Storage::disk($old->disk)->put($old->path, 'retained edition');
+    $item->update(['current_version_id' => $old->id]);
+    $tenant->forceFill(['storage_limit_snapshot' => $oldSize + mb_strlen($content)])->saveQuietly();
+    $storage = app(CommunityContentStorage::class);
+    $stored = $storage->put($tenant, UploadedFile::fake()->createWithContent('notes.pdf', $content));
+    expect($stored['size'])->toBe(mb_strlen($content));
+    CommunityLibraryVersion::factory()->create(['tenant_id' => $tenant->id, 'item_id' => $item->id, 'size' => mb_strlen($content)]);
+    expect(fn () => $storage->put($tenant, UploadedFile::fake()->createWithContent('next.pdf', $content)))
+        ->toThrow(Illuminate\Validation\ValidationException::class);
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($tenant->slug)])
+        ->get(route('tenant.community.library.version', ['subdomain' => $tenant->slug, 'item' => $item->id, 'version' => $old->id]))
+        ->assertOk()->assertStreamedContent('retained edition');
+    expect($item->versions()->count())->toBe(2);
+});
