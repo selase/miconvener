@@ -48,13 +48,13 @@ Confirm actual sibling naming and current methods when building. Keep business l
 
 ## Task 1 — Import contract, schema and preview
 
-- [ ] Write failing tests for a CSV preview requiring `full_name,email`; allow optional `phone,ticket_type,external_reference,payment_status,external_amount,currency` through explicit column mapping. Return line numbers, row errors and a downloadable template. Default payment status is `free`; require currency for external amounts, parse decimals strictly into minor units and reject negatives or unsupported precision.
-- [ ] Run the new tests and verify the intended failures.
-- [ ] Implement UTF-8/BOM CSV parsing with quoted commas, CRLF, blank-line handling and fixed limits of 5 MiB, 2,000 rows, 20 columns and bounded cell lengths. Reject binary files, malformed records and ambiguous/duplicate headers. Treat all cell content as text, never spreadsheet expressions. Escape formula-like values in any CSV error/result export.
-- [ ] Resolve ticket labels against this event only; require an explicit mapping when ambiguous. Preview may operate on draft events. Confirmation rejects cancelled/ended events and changed or deleted ticket types. Existing private-event access rules remain authoritative.
-- [ ] Persist a private preview bound to tenant, event, actor, file digest and 24-hour expiry. Freeze canonical accepted data server-side. Confirmation accepts row identifiers/choices only, never client-supplied financial fields or recipient lists.
-- [ ] Classify exact in-file duplicates and existing event registrations using scoped external reference, then normalized email. Never match by name or phone alone. Existing cancelled/rejected registrations, shared emails and contradictory references are conflicts. First release supports skip or correction followed by a fresh preview, not overwrite/reactivation.
-- [ ] Test cross-tenant/event access, permissions, expiry, malformed files, duplicates and private responses. Run focused tests, Pint and commit.
+- [x] Write failing tests for a CSV preview requiring `full_name,email`; allow optional `phone,ticket_type,external_reference,payment_status,external_amount,currency` through explicit column mapping. Return line numbers, row errors and a downloadable template. Default payment status is `free`; require currency for external amounts, parse decimals strictly into minor units and reject negatives or unsupported precision.
+- [x] Run the new tests and verify the intended failures.
+- [x] Implement UTF-8/BOM CSV parsing with quoted commas, CRLF, blank-line handling and fixed limits of 5 MiB, 2,000 rows, 20 columns and bounded cell lengths. Reject binary files, malformed records and ambiguous/duplicate headers. Treat all cell content as text, never spreadsheet expressions. Escape formula-like values in any CSV error/result export.
+- [x] Resolve ticket labels against this event only; require an explicit mapping when ambiguous. Preview may operate on draft events. Confirmation rejects cancelled/ended events and changed or deleted ticket types. Existing private-event access rules remain authoritative.
+- [x] Persist a private preview bound to tenant, event, actor, file digest and 24-hour expiry. Freeze canonical accepted data server-side. Confirmation accepts row identifiers/choices only, never client-supplied financial fields or recipient lists.
+- [x] Classify exact in-file duplicates and existing event registrations using scoped external reference, then normalized email. Never match by name or phone alone. Existing cancelled/rejected registrations, shared emails and contradictory references are conflicts. First release supports skip or correction followed by a fresh preview, not overwrite/reactivation.
+- [x] Test cross-tenant/event access, permissions, expiry, malformed files, duplicates and private responses. Run focused tests, Pint and commit.
 
 ## Task 2 — Confirmation, admission, retries and financial separation
 
