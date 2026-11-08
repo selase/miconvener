@@ -9,7 +9,7 @@ test('the dead feature and feature_limit middleware aliases are not attached to 
         ->filter(function ($route): bool {
             $middleware = $route->gatherMiddleware();
 
-            return collect($middleware)->contains(fn (string $m): bool => str_starts_with($m, 'feature:') || str_starts_with($m, 'feature_limit:') || $m === 'feature' || $m === 'feature_limit');
+            return collect($middleware)->contains(fn (mixed $m): bool => is_string($m) && (str_starts_with($m, 'feature:') || str_starts_with($m, 'feature_limit:') || $m === 'feature' || $m === 'feature_limit'));
         });
 
     expect($offendingRoutes)->toHaveCount(0);
