@@ -284,6 +284,13 @@ export default function AttendeeImportPanel({ event, onImported = () => {} }) {
                                         again while admitting rows.
                                     </p>
                                     <p>
+                                        Existing registrations and historical paid payment links
+                                        reserve places, including cancelled or refunded paid
+                                        registrations. Review these with the platform or increase
+                                        actual capacity if appropriate. Reservations have no
+                                        automatic expiry.
+                                    </p>
+                                    <p>
                                         Confirmation creates tickets and normal registration
                                         webhooks may notify connected systems. No invitations, SMS,
                                         subscriptions or check-ins are created.

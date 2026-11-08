@@ -51,7 +51,7 @@ function runImportRace(Event $event, array $jobs, bool $quota = false): void
 {
     $db = $event->getConnection();
     $config = config('database.connections.landlord');
-    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => $config['database'], 'DB_HOST' => $config['host'], 'DB_PORT' => (string) $config['port'], 'DB_USERNAME' => $config['username'], 'DB_PASSWORD' => $config['password'], 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
+    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => $config['database'], 'DB_HOST' => $config['host'], 'DB_PORT' => (string) $config['port'], 'DB_USERNAME' => $config['username'], 'DB_PASSWORD' => $config['password'], 'APP_ENV' => 'testing', 'APP_KEY' => (string) config('app.key'), 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $workers = array_map(fn ($job) => (new Process([PHP_BINARY, base_path('tests/Fixtures/events/attendee-import-worker.php')], base_path(), $environment))->setTimeout(90)->setInput(json_encode($job, JSON_THROW_ON_ERROR)), $jobs);
     $db->beginTransaction();
     if ($quota) {
