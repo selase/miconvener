@@ -760,6 +760,10 @@ final class PublicEventController extends Controller
             'plan_your_visit_content' => $event->plan_your_visit_content,
             'registration_settings' => $event->effectiveRegistrationSettings(),
             'show_registration' => (bool) $event->show_registration,
+            'show_managing_organisation' => (bool) $event->show_managing_organisation,
+            'social_links_mode' => $event->social_links_mode,
+            'social_links' => $withhold && $event->social_links_mode === 'event' ? [] : $event->publicSocialLinks(),
+            'contact_email' => $withhold ? null : $event->contact_email,
             'capacity_reservation_note' => app(\App\Services\Events\AdmissionClaims::class)->applies($event) ? 'Places may be reserved while existing registrations or payment links are being reviewed.' : null,
             'form_fields' => $event->formFields()->ordered()->get()->map(fn (EventFormField $f): array => [
                 'id' => $f->id,

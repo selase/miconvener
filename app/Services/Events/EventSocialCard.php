@@ -22,7 +22,7 @@ final class EventSocialCard
     {
         $card = [
             'title' => $event->name,
-            'site_name' => $tenant->name,
+            'site_name' => $event->show_managing_organisation ? $tenant->name : $event->name,
             'type' => 'website',
         ];
 

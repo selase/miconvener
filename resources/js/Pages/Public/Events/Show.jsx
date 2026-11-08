@@ -1940,6 +1940,15 @@ export default function Show({
     community = null,
     participation = null,
 }) {
+    const showManagingOrganisation = event.show_managing_organisation !== false;
+    const contactEmail = showManagingOrganisation
+        ? org.contact_email
+        : event.contact_email || org.contact_email;
+    const socialLinksMode = event.social_links_mode ?? 'organisation';
+    const socialLinks =
+        socialLinksMode === 'hidden'
+            ? {}
+            : (event.social_links ?? (socialLinksMode === 'organisation' ? org.links || {} : {}));
     const [needsRegistration, setNeedsRegistration] = useState(false);
     useEffect(() => {
         setNeedsRegistration(
@@ -2042,66 +2051,81 @@ export default function Show({
                     )}
                 </div>
                 <div className="mx-auto w-[calc(100%-3rem)] max-w-[1100px] lg:w-[72vw]">
-                    <section
-                        aria-label="Event organiser"
-                        className="relative flex flex-wrap items-center gap-3 pb-6 pt-5"
-                    >
-                        {event.hosts?.length > 0 ? (
-                            <EventHostCredits hosts={event.hosts} byline />
-                        ) : (
-                            <>
-                                {org.logo_url ? (
-                                    <img
-                                        src={org.logo_url}
-                                        alt=""
-                                        className="h-11 w-11 shrink-0 border border-border bg-white object-contain p-1"
-                                    />
-                                ) : (
-                                    <div
-                                        aria-hidden="true"
-                                        className="flex h-11 w-11 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
-                                    >
-                                        {org.name?.slice(0, 1)}
+                    {(showManagingOrganisation ||
+                        event.hosts?.length > 0 ||
+                        Object.keys(socialLinks).length > 0) && (
+                        <section
+                            aria-label="Event organiser"
+                            className="relative flex flex-wrap items-center gap-3 pb-6 pt-5"
+                        >
+                            {event.hosts?.length > 0 ? (
+                                <EventHostCredits hosts={event.hosts} byline />
+                            ) : showManagingOrganisation ? (
+                                <>
+                                    {org.logo_url ? (
+                                        <img
+                                            src={org.logo_url}
+                                            alt=""
+                                            className="h-11 w-11 shrink-0 border border-border bg-white object-contain p-1"
+                                        />
+                                    ) : (
+                                        <div
+                                            aria-hidden="true"
+                                            className="flex h-11 w-11 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
+                                        >
+                                            {org.name?.slice(0, 1)}
+                                        </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <span className="block text-[10px] text-ink-tertiary">
+                                            Hosted by
+                                        </span>
+                                        <a
+                                            href="#event-organiser"
+                                            className="text-[13px] font-medium hover:text-accent"
+                                        >
+                                            {org.name}
+                                        </a>
                                     </div>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                    <span className="block text-[10px] text-ink-tertiary">
-                                        Hosted by
+                                </>
+                            ) : null}
+                            {showManagingOrganisation && community?.followingEnabled && (
+                                <details className="group">
+                                    <summary className="cursor-pointer list-none border border-border bg-surface px-4 py-2 text-xs text-ink [&::-webkit-details-marker]:hidden">
+                                        + Follow {org.name}
+                                    </summary>
+                                    <div className="absolute inset-x-0 top-full z-20 border border-border bg-surface p-5 shadow-lg sm:inset-x-auto sm:right-0 sm:w-80">
+                                        <FollowControl
+                                            identity={community.identity}
+                                            initialFollowing={community.following}
+                                            followUrl={community.followUrl}
+                                            signInUrl={community.signInUrl}
+                                            sourceEventId={event.id}
+                                        />
+                                    </div>
+                                </details>
+                            )}
+                            {Object.keys(socialLinks).length > 0 && (
+                                <div
+                                    className="w-full"
+                                    aria-label={
+                                        socialLinksMode === 'event'
+                                            ? 'Event social links'
+                                            : `${org.name} social links`
+                                    }
+                                >
+                                    <span className="text-[10px] text-ink-tertiary">
+                                        {socialLinksMode === 'event'
+                                            ? 'Event links'
+                                            : showManagingOrganisation
+                                              ? `Managed by ${org.name}`
+                                              : 'Social links'}
                                     </span>
-                                    <a
-                                        href="#event-organiser"
-                                        className="text-[13px] font-medium hover:text-accent"
-                                    >
-                                        {org.name}
-                                    </a>
+                                    <OrganiserLinks links={socialLinks} />
                                 </div>
-                            </>
-                        )}
-                        {community?.followingEnabled && (
-                            <details className="group">
-                                <summary className="cursor-pointer list-none border border-border bg-surface px-4 py-2 text-xs text-ink [&::-webkit-details-marker]:hidden">
-                                    + Follow {org.name}
-                                </summary>
-                                <div className="absolute inset-x-0 top-full z-20 border border-border bg-surface p-5 shadow-lg sm:inset-x-auto sm:right-0 sm:w-80">
-                                    <FollowControl
-                                        identity={community.identity}
-                                        initialFollowing={community.following}
-                                        followUrl={community.followUrl}
-                                        signInUrl={community.signInUrl}
-                                        sourceEventId={event.id}
-                                    />
-                                </div>
-                            </details>
-                        )}
-                        {Object.keys(org.links || {}).length > 0 && (
-                            <div className="w-full" aria-label={`${org.name} social links`}>
-                                <span className="text-[10px] text-ink-tertiary">
-                                    Managed by {org.name}
-                                </span>
-                                <OrganiserLinks links={org.links} />
-                            </div>
-                        )}
-                    </section>
+                            )}
+                        </section>
+                    )}
                     {needsRegistration && event.show_registration !== false && (
                         <div
                             role="status"
@@ -2376,61 +2400,77 @@ export default function Show({
                                     <EventHostCredits hosts={event.hosts} />
                                 </section>
                             )}
-                            <section
-                                id="event-organiser"
-                                className="scroll-mt-6 border-t border-border py-8"
-                            >
-                                <p className="mb-5 text-xs uppercase tracking-[0.12em] text-ink-tertiary">
-                                    Managing organisation
-                                </p>
-                                <div className="flex items-start gap-4">
-                                    {org.logo_url ? (
-                                        <img
-                                            src={org.logo_url}
-                                            alt=""
-                                            loading="lazy"
-                                            className="h-14 w-14 border border-border bg-white object-contain p-1"
-                                        />
-                                    ) : (
-                                        <div
-                                            aria-hidden="true"
-                                            className="flex h-14 w-14 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
-                                        >
-                                            {org.name?.slice(0, 1)}
-                                        </div>
-                                    )}
-                                    <div className="min-w-0">
-                                        <h2 className="text-xl font-medium tracking-tight">
-                                            {org.name}
-                                        </h2>
-                                        {org.description && (
-                                            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
-                                                {org.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {org.contact_email && (
+                            {!showManagingOrganisation && contactEmail && (
+                                <section
+                                    className="border-t border-border py-6"
+                                    aria-label="Event contact"
+                                >
                                     <button
                                         type="button"
                                         onClick={() => setDialog('contact')}
-                                        className="mt-4 border border-border px-4 py-2.5 text-xs font-medium hover:border-accent hover:text-accent"
+                                        className="border border-border px-4 py-2.5 text-xs font-medium hover:border-accent hover:text-accent"
                                     >
-                                        Contact {org.name}
+                                        Contact event team
                                     </button>
-                                )}
-                                {community && (
-                                    <div className="mt-6 flex flex-col items-start gap-4 border-t border-border pt-5">
-                                        <a
-                                            href={community.organisation.about_url}
-                                            className="inline-block text-sm text-accent underline underline-offset-4"
-                                        >
-                                            About {org.name} and membership options
-                                        </a>
+                                </section>
+                            )}
+                            {showManagingOrganisation && (
+                                <section
+                                    id="event-organiser"
+                                    className="scroll-mt-6 border-t border-border py-8"
+                                >
+                                    <p className="mb-5 text-xs uppercase tracking-[0.12em] text-ink-tertiary">
+                                        Managing organisation
+                                    </p>
+                                    <div className="flex items-start gap-4">
+                                        {org.logo_url ? (
+                                            <img
+                                                src={org.logo_url}
+                                                alt=""
+                                                loading="lazy"
+                                                className="h-14 w-14 border border-border bg-white object-contain p-1"
+                                            />
+                                        ) : (
+                                            <div
+                                                aria-hidden="true"
+                                                className="flex h-14 w-14 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
+                                            >
+                                                {org.name?.slice(0, 1)}
+                                            </div>
+                                        )}
+                                        <div className="min-w-0">
+                                            <h2 className="text-xl font-medium tracking-tight">
+                                                {org.name}
+                                            </h2>
+                                            {org.description && (
+                                                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
+                                                    {org.description}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                )}
-                            </section>
+
+                                    {org.contact_email && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setDialog('contact')}
+                                            className="mt-4 border border-border px-4 py-2.5 text-xs font-medium hover:border-accent hover:text-accent"
+                                        >
+                                            Contact {org.name}
+                                        </button>
+                                    )}
+                                    {community && (
+                                        <div className="mt-6 flex flex-col items-start gap-4 border-t border-border pt-5">
+                                            <a
+                                                href={community.organisation.about_url}
+                                                className="inline-block text-sm text-accent underline underline-offset-4"
+                                            >
+                                                About {org.name} and membership options
+                                            </a>
+                                        </div>
+                                    )}
+                                </section>
+                            )}
                         </main>
                     </div>
                     {event.sponsors.length > 0 && (
@@ -2503,16 +2543,16 @@ export default function Show({
                 <Modal
                     open={dialog === 'contact'}
                     onClose={() => setDialog(null)}
-                    title={`Contact ${org.name}`}
+                    title={showManagingOrganisation ? `Contact ${org.name}` : 'Contact event team'}
                 >
                     <p className="text-sm text-ink-secondary">
                         Questions about the event? Reach your organiser directly.
                     </p>
                     <a
-                        href={`mailto:${org.contact_email}`}
+                        href={`mailto:${contactEmail}`}
                         className="mt-4 inline-block break-all text-sm text-accent underline"
                     >
-                        {org.contact_email}
+                        {contactEmail}
                     </a>
                 </Modal>
             </article>
