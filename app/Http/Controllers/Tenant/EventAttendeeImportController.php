@@ -63,7 +63,7 @@ final class EventAttendeeImportController extends Controller
     public function invite(EventAttendeeImportRequest $request, string $subdomain, string $event, string $import, \App\Services\Events\AttendeeImportInvitations $service): JsonResponse
     {
         $batch = $this->find($request, $event, $import);
-        $service->select($batch, $request->validated('operation_key'), $request->validated('registrations'));
+        $service->select($batch, $request->validated('operation_key'), $request->validated('registrations'), $request->validated('revisions'));
 
         return $this->result($batch, $request);
     }
@@ -87,7 +87,7 @@ final class EventAttendeeImportController extends Controller
                 foreach ($rows as $row) {
                     $data = $row->data;
                     $cells = [$row->line, $row->status, $data['full_name'] ?? '', $data['email'] ?? '', implode(' ', $row->errors ?? [])];
-                    fputcsv($handle, array_map(fn ($value): string => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'".$value : (string) $value, $cells), escape: '');
+                    fputcsv($handle, array_map(\App\Support\CsvCell::safe(...), $cells), escape: '');
                 }
             });
             fclose($handle);
@@ -102,7 +102,9 @@ final class EventAttendeeImportController extends Controller
     private function result(EventAttendeeImport $import, EventAttendeeImportRequest $request): JsonResponse
     {
         $finance = $request->user()->can('read finance');
-        $rows = $import->rows->map(function ($row) use ($finance): array {
+        $registrations = \App\Models\EventRegistration::query()->where('tenant_id', $import->tenant_id)->where('event_id', $import->event_id)->where('attendee_import_id', $import->id)->get(['id', 'email', 'member_benefit_access_version'])->keyBy('id');
+        $rows = $import->rows->map(function ($row) use ($finance, $registrations): array {
+            $recipient = $registrations->get($row->registration_id);
             $data = $row->data;
             if (! $finance && $data !== null) {
                 unset($data['external_amount'], $data['currency'], $data['external_reference']);
@@ -111,7 +113,7 @@ final class EventAttendeeImportController extends Controller
                 unset($data['ticket_revision']);
             }
 
-            return ['id' => $row->id, 'line' => $row->line, 'status' => $row->status, 'data' => $data, 'errors' => $row->errors, 'registration_id' => $row->registration_id];
+            return ['id' => $row->id, 'line' => $row->line, 'status' => $row->status, 'data' => $data, 'errors' => $row->errors, 'registration_id' => $row->registration_id, 'invitation_recipient' => $recipient?->email, 'invitation_revision' => $recipient?->memberBenefitRecipientToken()];
         });
 
         return response()->json(['id' => $import->id, 'status' => $import->status, 'expires_at' => $import->expires_at, 'message' => $import->message, 'rows' => $rows, 'counts' => $rows->countBy('status'), 'invitations' => \App\Models\EventAttendeeImportInvitation::query()->where('import_id', $import->id)->get(['status'])->countBy('status')])->header('Cache-Control', 'private, no-store');

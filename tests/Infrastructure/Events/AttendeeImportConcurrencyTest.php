@@ -69,7 +69,7 @@ function runImportRace(Event $event, array $jobs, bool $quota = false): void
             $waiting = (int) $db->selectOne("select count(*) as waiting from pg_stat_activity where datname=current_database() and application_name='attendee-import-worker' and wait_event_type='Lock'")->waiting;
             usleep(20000);
         } while ($waiting < count($workers) && microtime(true) < $deadline);
-        expect($waiting)->toBe(count($workers));
+        expect($waiting)->toBe(count($workers), implode(' | ', array_map(fn ($worker): string => $worker->getErrorOutput().' '.$worker->getOutput(), $workers)));
         $db->commit();
         foreach ($workers as $worker) {
             $worker->wait();

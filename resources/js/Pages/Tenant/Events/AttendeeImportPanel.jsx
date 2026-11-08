@@ -35,12 +35,16 @@ export default function AttendeeImportPanel({ event, onImported = () => {} }) {
     const [busy, setBusy] = useState(false);
     const [page, setPage] = useState(0);
     const confirmKey = useRef(null);
+    const previewKeys = useRef({});
     const inviteKey = useRef(null);
     const base = `/events/${event.id}/attendee-imports`;
     const receive = (data) => {
         setBatch(data);
-        if (data.status === 'preview')
+        if (data.status === 'preview') {
+            previewKeys.current[data.id] ||= crypto.randomUUID();
+            confirmKey.current = previewKeys.current[data.id];
             setRows(data.rows.filter((row) => row.status === 'valid').map((row) => row.id));
+        }
     };
     const request = async (path, options = {}, upload = null) => {
         const response = upload
@@ -102,7 +106,6 @@ export default function AttendeeImportPanel({ event, onImported = () => {} }) {
                 .filter(([, value]) => value)
                 .forEach(([key, value]) => body.append(`ticket_mapping[${key}]`, value));
             receive(await request(`${base}/preview`, {}, body));
-            confirmKey.current = crypto.randomUUID();
             setPage(0);
             setRecipients([]);
         });
@@ -321,7 +324,7 @@ export default function AttendeeImportPanel({ event, onImported = () => {} }) {
                                                     {row.status === 'created' && (
                                                         <input
                                                             type="checkbox"
-                                                            aria-label={`Invite ${row.data?.email || `line ${row.line}`}`}
+                                                            aria-label={`Invite ${row.invitation_recipient || row.data?.email || `line ${row.line}`}`}
                                                             checked={recipients.includes(
                                                                 row.registration_id
                                                             )}
@@ -430,7 +433,8 @@ export default function AttendeeImportPanel({ event, onImported = () => {} }) {
                                                     )
                                                     .map((row) => (
                                                         <li key={row.id}>
-                                                            {row.data?.email ||
+                                                            {row.invitation_recipient ||
+                                                                row.data?.email ||
                                                                 `Attendee on line ${row.line}`}
                                                         </li>
                                                     ))}
@@ -448,6 +452,19 @@ export default function AttendeeImportPanel({ event, onImported = () => {} }) {
                                                                         operation_key:
                                                                             inviteKey.current,
                                                                         registrations: recipients,
+                                                                        revisions:
+                                                                            Object.fromEntries(
+                                                                                created
+                                                                                    .filter((row) =>
+                                                                                        recipients.includes(
+                                                                                            row.registration_id
+                                                                                        )
+                                                                                    )
+                                                                                    .map((row) => [
+                                                                                        row.registration_id,
+                                                                                        row.invitation_revision,
+                                                                                    ])
+                                                                            ),
                                                                     }),
                                                                 }
                                                             )

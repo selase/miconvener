@@ -86,7 +86,7 @@ final class EventReportController extends Controller
             'payment_summary' => auth()->user()?->can('read finance') ? $this->paymentSummary($eventModel) : null,
             'available_columns' => $availableColumns,
             'default_columns' => self::DEFAULT_REGISTRATION_COLUMNS,
-        ]);
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function exportRegistrations(Request $request, string $subdomain, string $event): StreamedResponse
@@ -119,14 +119,18 @@ final class EventReportController extends Controller
             $eventModel->registrations()->with('ticketType:id,name')->orderBy('created_at')->chunk(200, function ($registrations) use ($handle, $columns, $seatLabels): void {
                 foreach ($registrations as $registration) {
                     fputcsv($handle, array_map(
-                        fn (string $key): string => $this->resolveRegistrationColumn($key, $registration, $seatLabels->get($registration->id)?->seat_label),
+                        function (string $key) use ($registration, $seatLabels): mixed {
+                            $value = $this->resolveRegistrationColumn($key, $registration, $seatLabels->get($registration->id)?->seat_label);
+
+                            return in_array($key, ['amount', 'platform_fee', 'external_amount'], true) ? $value : \App\Support\CsvCell::safe($value);
+                        },
                         $columns,
                     ));
                 }
             });
 
             fclose($handle);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
     }
 
     public function exportCheckins(string $subdomain, string $event): StreamedResponse

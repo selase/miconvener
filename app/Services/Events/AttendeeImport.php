@@ -159,7 +159,7 @@ final class AttendeeImport
                 $import->rows()->create(['tenant_id' => $event->tenant_id, ...$row]);
             }
 
-            return $import;
+            return $import->refresh();
         });
     }
 
@@ -226,7 +226,7 @@ final class AttendeeImport
             $context->setTenant($tenant);
             setPermissionsTeamId($tenant->id);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
-            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status !== User::STATUS_ACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event)) {
+            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status === User::STATUS_INACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event)) {
                 $import->update(['status' => 'stopped', 'message' => 'The initiating staff member no longer has event import permission. Restore access and resume.']);
 
                 return;
@@ -295,7 +295,7 @@ final class AttendeeImport
             if ($import->rows()->where('selected', true)->where('status', 'pending')->exists()) {
                 $this->dispatch($import);
             } else {
-                $import->update(['status' => 'completed', 'message' => 'Completed rows are retained. Correct failed rows in a fresh preview. No invitations were sent.']);
+                $import->update(['status' => 'completed', 'message' => 'Completed rows are retained. Correct failed rows in a fresh preview.']);
             }
         } finally {
             if ($oldTenant !== null) {

@@ -502,7 +502,7 @@ final class EventController extends Controller
 
             $eventModel->registrations()->orderByDesc('created_at')->chunk(200, function ($registrations) use ($handle): void {
                 foreach ($registrations as $registration) {
-                    fputcsv($handle, [
+                    fputcsv($handle, array_map(\App\Support\CsvCell::safe(...), [
                         $registration->full_name,
                         $registration->email,
                         $registration->phone,
@@ -516,12 +516,12 @@ final class EventController extends Controller
                         $registration->admissionPaymentLabel(),
                         auth()->user()?->can('read finance') ? $registration->external_amount : null,
                         auth()->user()?->can('read finance') ? $registration->external_currency : null,
-                    ]);
+                    ]), escape: '');
                 }
             });
 
             fclose($handle);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv', 'Cache-Control' => 'private, no-store']);
     }
 
     public function exportContributions(string $subdomain, string $event): \Symfony\Component\HttpFoundation\StreamedResponse
