@@ -26,6 +26,12 @@ final class StandardEventPaymentConfirmer
         $candidate->getConnection()->transaction(function () use ($candidate, $reference, $amount, $gatewayFee, $currency, $provider, $platform, $metadata, $splitReceived): void {
             $registration = EventRegistration::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->id);
             $event = Event::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($registration->event_id);
+            if ($registration->isImported()) {
+                app(\App\Services\Operations\OperationalSignals::class)->recordWebhookFailure('external_admission_capture', 'Unexpected '.$provider.' capture for imported registration '.$registration->id.'; provider reconciliation required.');
+                \Illuminate\Support\Facades\Log::warning('Unexpected native capture for imported admission requires reconciliation', ['registration_id' => $registration->id, 'tenant_id' => $registration->tenant_id, 'provider' => $provider, 'reference_sha256' => hash('sha256', (string) $reference), 'amount' => $amount, 'currency' => $currency]);
+
+                return;
+            }
             if ($registration->member_benefit_required || $registration->isConfirmed() || ($registration->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW && $registration->payment_reference === $reference)) {
                 return;
             }

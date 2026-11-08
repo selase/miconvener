@@ -92,6 +92,40 @@ export default function ReportsPanel({ event }) {
                 </div>
             </div>
 
+            {data.payment_summary && (
+                <section
+                    aria-label="Payments by source"
+                    className="mb-5 space-y-3 border border-border p-4 text-sm"
+                >
+                    <h2 className="font-medium text-ink">
+                        Payments by source and original currency
+                    </h2>
+                    {Object.entries({
+                        native: 'MiConvener ticket collections',
+                        external: 'Paid elsewhere — organiser declarations',
+                        contributions: 'MiConvener contributions',
+                    }).map(([key, label]) => (
+                        <div key={key}>
+                            <p className="font-medium">{label}</p>
+                            {data.payment_summary[key]?.length ? (
+                                data.payment_summary[key].map((total) => (
+                                    <p key={total.currency}>
+                                        {total.currency} {(total.amount / 100).toFixed(2)}
+                                    </p>
+                                ))
+                            ) : (
+                                <p className="text-ink-muted">No recorded amounts</p>
+                            )}
+                        </div>
+                    ))}
+                    <p className="text-xs text-ink-muted">
+                        External declarations are unverified historical information and never enter
+                        platform revenue, commission, refunds or payout availability. Unknown
+                        external amounts are excluded. Settlement remains authoritative for
+                        MiConvener money.
+                    </p>
+                </section>
+            )}
             <div className="border border-border p-4">
                 <b className="text-sm font-medium text-ink">Build a registrations report</b>
                 <div className="mt-3.5">

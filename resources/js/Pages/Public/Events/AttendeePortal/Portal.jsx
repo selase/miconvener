@@ -384,6 +384,13 @@ export default function Portal({
                                     ? `Your ticket for ${event.name} is ready. We've also emailed it to you.`
                                     : `We've emailed ${registration.email}. Confirm your address there and your ticket is issued straight away.`}
                             </p>
+                            {registration.registration_source === 'external_import' && (
+                                <p className="mt-3 text-sm text-ink-secondary">
+                                    {registration.admission_payment_label}. This admission was
+                                    imported by the organiser. MiConvener did not collect or verify
+                                    external payments.
+                                </p>
+                            )}
                             {!verified && (
                                 <p className="mt-5 border border-border bg-surface px-5 py-4 text-[13px] text-ink-secondary">
                                     Can't find it? Check your spam folder, or register again with

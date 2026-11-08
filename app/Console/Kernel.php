@@ -15,6 +15,11 @@ final class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        $schedule->call(fn () => app(\App\Services\Events\AttendeeImport::class)->purge())->daily()->name('events:purge-import-previews')->withoutOverlapping()->onOneServer();
+        $schedule->call(function (): void {
+            app(\App\Services\Events\AttendeeImport::class)->recover();
+            app(\App\Services\Events\AttendeeImportInvitations::class)->recover();
+        })->everyFiveMinutes()->name('events:recover-attendee-imports')->withoutOverlapping()->onOneServer();
         $schedule->call(fn () => app(\App\Services\Events\Profiles\ProfileRetention::class)->sweep())->hourly()->name('events:purge-attendee-profiles')->withoutOverlapping()->onOneServer();
         // Deliberately not every minute. The environment scales to zero and the
         // scheduler wakes it, so a per-minute task holds it awake continuously and

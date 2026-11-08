@@ -130,7 +130,7 @@ final class PlatformAttendeeWorkspaceAuthorizer
             return;
         }
         $registration = EventRegistration::withoutGlobalScopes()->find($registrationId);
-        if ($registration?->member_benefit_required) {
+        if ($registration !== null && ($registration->member_benefit_required || $registration->isImported())) {
             $tokens = $session->get(self::RECIPIENTS_SESSION_KEY, []);
             $tokens[$registrationId] = $registration->memberBenefitRecipientToken();
             $session->put(self::RECIPIENTS_SESSION_KEY, $tokens);
@@ -143,7 +143,7 @@ final class PlatformAttendeeWorkspaceAuthorizer
             return true;
         }
         $registration ??= EventRegistration::withoutGlobalScopes()->find($registrationId);
-        if (! $registration?->member_benefit_required) {
+        if ($registration === null || (! $registration->member_benefit_required && ! $registration->isImported())) {
             return true;
         }
         $token = $session->get(self::RECIPIENTS_SESSION_KEY, [])[$registrationId] ?? null;

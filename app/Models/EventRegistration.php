@@ -73,6 +73,13 @@ final class EventRegistration extends Model
     protected $attributes = ['member_benefit_required' => false, 'member_benefit_access_version' => 1];
 
     protected $fillable = [
+        'attendee_import_id',
+        'registration_source',
+        'external_source',
+        'external_reference',
+        'admission_payment_source',
+        'external_amount',
+        'external_currency',
         'member_benefit_access_version',
         'member_benefit_required',
         'member_benefit_quote_id',
@@ -121,6 +128,7 @@ final class EventRegistration extends Model
         'member_benefit_access_version' => 'integer',
         'member_benefit_required' => 'boolean',
         'member_benefit_identity' => 'array',
+        'external_amount' => 'integer',
         'amount' => 'integer',
         'discount_amount' => 'integer',
         'platform_fee_amount' => 'integer',
@@ -135,6 +143,11 @@ final class EventRegistration extends Model
     ];
 
     protected $hidden = [
+        'external_source',
+        'external_reference',
+        'external_amount',
+        'external_currency',
+        'attendee_import_id',
         'attendee_profile_generation',
         'qr_token',
         'member_benefit_identity',
@@ -200,6 +213,21 @@ final class EventRegistration extends Model
      * What the gateway was asked to collect. Registrations created before fee
      * pass-through existed carry no value and were charged the ticket price.
      */
+    public function isImported(): bool
+    {
+        return $this->registration_source === 'external_import';
+    }
+
+    public function admissionPaymentLabel(): string
+    {
+        return match ($this->admission_payment_source) {
+            'paid_elsewhere' => 'Paid elsewhere',
+            'complimentary' => 'Complimentary',
+            'free' => 'Imported free admission',
+            default => $this->amount > 0 ? 'MiConvener payment' : 'Free',
+        };
+    }
+
     public function effectiveChargedAmount(): int
     {
         return (int) ($this->charged_amount ?? $this->amount);

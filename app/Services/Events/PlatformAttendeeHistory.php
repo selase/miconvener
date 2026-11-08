@@ -437,7 +437,7 @@ final class PlatformAttendeeHistory
         $reveal = ! $event->isPrivate() || $reg->isConfirmed();
 
         return [
-            'registration_id' => $reg->id, 'registration_status' => $reg->status,
+            'registration_id' => $reg->id, 'registration_status' => $reg->status, 'registration_source' => $reg->registration_source, 'admission_payment_label' => $reg->admissionPaymentLabel(),
             'event_workspace_url' => route('attendee.my.events.workspace', ['registration' => $reg->id]),
             'event' => ['name' => $event->name, 'slug' => $event->slug, 'starts_at' => $event->starts_at->toIso8601String(), 'ends_at' => $event->ends_at->toIso8601String(), 'timezone' => $event->timezone, 'location' => $reveal ? $event->address : null, 'hero_image_url' => $reveal ? $event->heroImageUrl() : null],
             'organiser' => ['id' => $reg->tenant->id, 'name' => $reg->tenant->name, 'slug' => $reg->tenant->slug, 'logo_url' => \App\Libraries\Helper::storageUrl($reg->tenant->logo)],

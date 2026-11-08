@@ -24,7 +24,7 @@ final class EventRegistrationVerifyEmail extends Mailable
 
     public function __construct(public EventRegistration $registration)
     {
-        $this->recipientToken = $registration->member_benefit_required ? $registration->memberBenefitRecipientToken() : null;
+        $this->recipientToken = ($registration->member_benefit_required || $registration->isImported()) ? $registration->memberBenefitRecipientToken() : null;
     }
 
     public function envelope(): Envelope

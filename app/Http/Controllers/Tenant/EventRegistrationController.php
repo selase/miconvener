@@ -424,6 +424,11 @@ final class EventRegistrationController extends Controller
                 $registrationModel->fill(['member_benefit_access_version' => $registrationModel->member_benefit_access_version + 1, 'member_benefit_identity' => null, 'member_benefit_quote_id' => null, 'email_verified_at' => null]);
             }
 
+            if ($registrationModel->isImported() && $emailChanged) {
+                $registrationModel->email_verified_at = null;
+                $registrationModel->rotateTicketCredentials();
+            }
+
             $previousEmail = $registrationModel->email;
             $registrationModel->update($request->validated());
 
@@ -452,7 +457,7 @@ final class EventRegistrationController extends Controller
             ->whereNull('consumed_at')
             ->update(['consumed_at' => now()]);
 
-        if ($registration->hasVerifiedEmail()) {
+        if ($registration->isImported() || $registration->hasVerifiedEmail()) {
             return;
         }
 

@@ -152,7 +152,7 @@ final class PublicEventController extends Controller
         return $registrationModel->getConnection()->transaction(function () use ($registrationModel, $tenant): RedirectResponse {
             $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
             $registrationModel->event()->lockForUpdate()->firstOrFail();
-            abort_if($registrationModel->member_benefit_required && ! hash_equals($registrationModel->memberBenefitRecipientToken(), (string) request()->query('recipient')), 403);
+            abort_if(($registrationModel->member_benefit_required || $registrationModel->isImported()) && ! hash_equals($registrationModel->memberBenefitRecipientToken(), (string) request()->query('recipient')), 403);
             $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
 
             // Following this link opens the ticket it belongs to, and nothing else.
@@ -192,8 +192,10 @@ final class PublicEventController extends Controller
             $registrationModel->save();
 
             if ($registrationModel->isConfirmed()) {
-                app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
-                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                if (! $registrationModel->isImported()) {
+                    app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
+                    app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                }
                 Mail::to($registrationModel->email)->queue((new EventRegistrationConfirmed($registrationModel))->afterCommit());
             }
 
@@ -435,8 +437,9 @@ final class PublicEventController extends Controller
         // ceiling is turned away rather than accumulating rows they cannot honour.
         // An event that was live when its organizer moved to a smaller plan keeps
         // registering until it ends; the smaller ceiling applies to new events.
+        app(\App\Services\Events\RegistrationQuota::class)->acquire($eventModel);
         $registrationLimit = $eventModel->isGrandfathered() ? null : $tenant->featureLimitValue('event_registrations');
-        if ($registrationLimit !== null && ! app(FeatureMeteringService::class)->canUse($tenant, 'event_registrations')) {
+        if ($registrationLimit !== null && ! app(\App\Services\Events\RegistrationQuota::class)->hasRoom($eventModel)) {
             Log::warning('Registration refused: tenant is at its plan registration limit', [
                 'tenant_id' => $tenant->id,
                 'event_id' => $eventModel->id,
@@ -623,8 +626,10 @@ final class PublicEventController extends Controller
         // If they never confirmed their address there is no ticket to resend --
         // sending "here is your ticket" with nothing in it would be worse than
         // useless, so they get the verification link again.
-        if ($registration->isConfirmed() && ! $registration->hasVerifiedEmail() && ! $registration->ticket_code) {
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+        if ($registration->isConfirmed() && ! $registration->hasVerifiedEmail() && (! $registration->ticket_code || $registration->isImported())) {
+            if (! $registration->isImported()) {
+                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            }
             Mail::to($registration->email)->queue((new EventRegistrationVerifyEmail($registration))->afterCommit());
 
             return;
@@ -642,7 +647,9 @@ final class PublicEventController extends Controller
             return;
         }
 
-        app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+        if (! $registration->isImported()) {
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+        }
         Mail::to($registration->email)->queue($mailable);
     }
 
