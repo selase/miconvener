@@ -99,3 +99,33 @@ Confirm actual sibling naming and current methods when building. Keep business l
 This plan deliberately keeps the two changes independently reviewable, with the host work able to ship without the importer. Imported attendees get existing event capabilities according to their normal verification, ticket and feature settings. Source-system payments are declarations, not gateway evidence. Existing public host copy can be overridden without transferring tenant access or seller responsibilities.
 
 No implementation has started. A real CSV is helpful during acceptance to validate mapping expectations, but synthetic data is sufficient to implement the approved contract. Before using a real file, confirm the organisation is authorised to upload and contact those attendees and agree the selected rows and invitation action explicitly.
+
+## Second review amendments — 8 November 2026
+
+These clarifications govern the tasks above and must be included in their tests.
+
+### Admission, identity and locking
+
+- Import writes require the existing `update event` permission and event staff scope, not merely access to Guests. Preview/results also require appropriate event read/update access; queued work rechecks the initiating actor's current authority. External monetary declarations additionally require the existing finance-reading permission, with private fields excluded from non-finance DTOs and exports.
+- There is a concrete lock-order hazard to resolve before implementation. Public registration takes an event lock, while verification and member-benefit lifecycle paths take a registration lock before the event lock. Do not introduce an event-then-existing-registration import path. New-row admission locks the event and rechecks duplicate/capacity state; existing registrations are skipped without mutation. Test confirmation against verification, cancellation and competing public admission. Broader lock consolidation requires a separately justified change rather than an incidental refactor.
+- Decide admission independently of public sales windows. Staff may import externally accepted attendees to a draft or published event even if public registration is closed, provided the event has not ended/cancelled and capacities, limits, event scope and restricted-access rules pass. Explicit staff import confirmation records that the organiser has accepted these attendees; never mimic a public payment or silently bypass membership checks.
+- Do not call the public registration endpoint once per row. Reuse `EventRegistration::issueTicket()` for new credentials, without weakening the existing public verification flow. Test the imported registration through access invitation, verified /my access, ticket transfer, ticket regeneration and duplicate scans. Existing uploaded QR/ticket values are never accepted as platform credentials.
+- Custom registration answers are not required to recreate a person's external admission. Preserve names/email and supported mapped fields, and explicitly show that remaining profile answers were not supplied. Do not fabricate required answers, dietary information or privacy/marketing consent. Later attendee edits use the existing validation. Optional phone values use the application's international normalization rules and remain strings so leading zeros survive.
+- Duplicate identity is event-scoped, including recurring events. Never merge different occurrence records implicitly. Normalize email with the existing platform rule. A source namespace plus external reference identifies a row within this event; conflicting reference/email pairs require correction. Changes to names or ticket mapping on a retry cannot create a second admission.
+
+### Durable batches and communications
+
+- A stopped, expired or unauthorised worker leaves a resumable result with a clear staff message. Workers must not use the actor's browser session or manufacture email proofs. Define which batch states are retryable and reject changed selections under a reused operation key.
+- Invitation permission does not imply mailing every address in an uploaded file. Freeze the selected registration IDs, event identity and recipient addresses for each send operation. Staff see imported, queued, sent, failed and uncertain counts separately. Explain that transport ambiguity can duplicate an email even when the registration and ticket are created only once. A hard guarantee of exactly-once SMTP delivery is outside the contract.
+- Imports emit the normal existing registration webhooks, which may notify connected systems even when invitation mail is off. Show that consequence in the confirmation summary and audit the import batch/source without disclosing private QR credentials or raw upload contents.
+- Preview and result exports omit private ticket credentials and sensitive attendee fields not needed to resolve row errors. Audit retention cleanup as well as ordinary event/tenant purge; financial provenance follows the applicable retained-history rules rather than the transient 30-day preview policy.
+
+### Host credits and scope control
+
+- Ship host presentation and CSV imports as separate PRs, starting with host presentation because it is independently useful and avoids importing attendee data while its identity presentation is unsettled. Task numbering remains a dependency guide within each slice, not a requirement to mix both into one release.
+- The first host slice changes the public event byline and host section only. Audit other surfaces, but keep expansion into ticket/PDF, certificates, calendar and social-card rendering as explicit reviewed follow-ups unless their current text becomes misleading. Financial receipts keep the legal seller. Do not let a broad audit become an unbounded redesign.
+- Label tenant About/Follow controls with the managing organisation so following Purpledot cannot be mistaken for following a named individual host. Logo removal and returning to tenant fallback must be reversible through the editor; host data must respect draft/private-event visibility.
+
+### Owner choices still needed
+
+The limits and restrictions in this plan are recommendations awaiting approval, including mandatory attendee email, handling shared family emails, membership-restricted events, and historical-payment visibility. No real CSV, real invitation send or production data change is authorised by this document. Confirm the final CSV mapping against a representative header/sample before implementation acceptance; personal attendee data is not needed for planning.
