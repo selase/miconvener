@@ -73,6 +73,7 @@ final class EventRegistration extends Model
     protected $attributes = ['member_benefit_required' => false, 'member_benefit_access_version' => 1];
 
     protected $fillable = [
+        'checkout_admission_guard_version',
         'attendee_import_id',
         'registration_source',
         'external_source',
@@ -128,6 +129,7 @@ final class EventRegistration extends Model
         'member_benefit_access_version' => 'integer',
         'member_benefit_required' => 'boolean',
         'member_benefit_identity' => 'array',
+        'checkout_admission_guard_version' => 'integer',
         'external_amount' => 'integer',
         'amount' => 'integer',
         'discount_amount' => 'integer',
@@ -143,6 +145,7 @@ final class EventRegistration extends Model
     ];
 
     protected $hidden = [
+        'checkout_admission_guard_version',
         'external_source',
         'external_reference',
         'external_amount',

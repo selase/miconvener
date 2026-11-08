@@ -286,12 +286,16 @@ test('uncertain invitation transport is retained and never replayed automaticall
 
 test('dispatch interruption retains frozen confirmation and resumes without another admission', function (): void {
     $preview = ($this->preview)("full_name,email\nAda,ada@example.test")->json();
+    $originalDispatcher = app(Illuminate\Contracts\Bus\Dispatcher::class);
     $dispatcher = Mockery::mock(Illuminate\Contracts\Bus\Dispatcher::class);
     $dispatcher->shouldReceive('dispatch')->andThrow(new RuntimeException('Queue unavailable'));
     app()->instance(Illuminate\Contracts\Bus\Dispatcher::class, $dispatcher);
     $body = ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$preview['rows'][0]['id']]];
     $this->postJson($this->url.'/'.$preview['id'].'/confirm', $body, ['HTTP_HOST' => $this->host])->assertOk()->assertJsonPath('status', 'stopped');
     expect(App\Models\EventAttendeeImport::find($preview['id'])->selection_digest)->not->toBeNull();
+    app()->instance(Illuminate\Contracts\Bus\Dispatcher::class, $originalDispatcher);
+    $this->postJson($this->url.'/'.$preview['id'].'/resume', [], ['HTTP_HOST' => $this->host])->assertOk();
+    Queue::assertPushed(App\Jobs\Events\ProcessAttendeeImport::class, fn ($job): bool => $job->importId === $preview['id']);
     app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
     app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
     expect(EventRegistration::count())->toBe(1);
@@ -335,4 +339,79 @@ test('invitation selection rejects recipient changes after staff review', functi
     $this->postJson($this->url.'/'.$preview['id'].'/invite', $body, ['HTTP_HOST' => $this->host])->assertConflict();
     expect(App\Models\EventAttendeeImportInvitation::count())->toBe(0);
     $this->getJson($this->url.'/'.$preview['id'], ['HTTP_HOST' => $this->host])->assertOk()->assertJsonPath('rows.0.invitation_recipient', 'changed@example.test');
+});
+
+test('recent imports and explicit resume remain scoped to the initiating staff member', function (): void {
+    $preview = ($this->preview)("full_name,email\nAda,ada@example.test")->json();
+    $this->postJson($this->url.'/'.$preview['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$preview['rows'][0]['id']]], ['HTTP_HOST' => $this->host])->assertOk();
+    $this->getJson($this->url, ['HTTP_HOST' => $this->host])->assertOk()->assertJsonPath('imports.0.id', $preview['id']);
+    $otherEvent = Event::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->getJson("http://{$this->host}/events/{$otherEvent->id}/attendee-imports", ['HTTP_HOST' => $this->host])->assertOk()->assertJsonCount(0, 'imports');
+    $foreign = Event::factory()->create();
+    $this->getJson("http://{$this->host}/events/{$foreign->id}/attendee-imports", ['HTTP_HOST' => $this->host])->assertNotFound();
+    $other = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($other->id);
+    $other->assignRole('Org Admin');
+    $this->actingAs($other);
+    $this->getJson($this->url, ['HTTP_HOST' => $this->host])->assertOk()->assertJsonCount(0, 'imports');
+    $this->postJson($this->url.'/'.$preview['id'].'/resume', [], ['HTTP_HOST' => $this->host])->assertNotFound();
+});
+
+test('sweepers recover untouched admission and invitations while interrupted email stays uncertain', function (): void {
+    $this->event->update(['status' => 'published']);
+    $preview = ($this->preview)("full_name,email\nAda,ada@example.test\nBen,ben@example.test")->json();
+    $operation = (string) Illuminate\Support\Str::uuid();
+    $this->postJson($this->url.'/'.$preview['id'].'/confirm', ['operation_key' => $operation, 'rows' => array_column($preview['rows'], 'id')], ['HTTP_HOST' => $this->host])->assertOk();
+    App\Models\EventAttendeeImport::whereKey($preview['id'])->update(['updated_at' => now()->subMinutes(10)]);
+    Queue::fake();
+    app(App\Services\Events\AttendeeImport::class)->recover();
+    expect(EventRegistration::count())->toBe(0);
+    Queue::assertPushed(App\Jobs\Events\ProcessAttendeeImport::class, fn ($job): bool => $job->importId === $preview['id']);
+    expect(App\Models\EventAttendeeImport::find($preview['id'])->operation_key)->toBe($operation);
+    app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
+    $registration = EventRegistration::firstOrFail();
+    $this->postJson($this->url.'/'.$preview['id'].'/invite', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => EventRegistration::pluck('id')->all(), 'revisions' => ($this->invitationRevisions)($preview['id'])], ['HTTP_HOST' => $this->host])->assertOk();
+    $this->postJson($this->url.'/'.$preview['id'].'/retry-invitations', [], ['HTTP_HOST' => $this->host])->assertOk();
+    $invitation = App\Models\EventAttendeeImportInvitation::firstOrFail();
+    Queue::assertPushed(App\Jobs\Events\DeliverAttendeeImportInvitation::class, fn ($job): bool => $job->invitationId === $invitation->id);
+    $invitation->update(['status' => 'sending', 'claimed_at' => now()->subMinutes(10)]);
+    Queue::fake();
+    app(App\Services\Events\AttendeeImportInvitations::class)->recover();
+    expect($invitation->fresh()->status)->toBe('uncertain');
+    $untouched = App\Models\EventAttendeeImportInvitation::where('id', '!=', $invitation->id)->firstOrFail();
+    Queue::assertPushed(App\Jobs\Events\DeliverAttendeeImportInvitation::class, 1);
+    Queue::assertPushed(App\Jobs\Events\DeliverAttendeeImportInvitation::class, fn ($job): bool => $job->invitationId === $untouched->id);
+    $untouched->update(['status' => 'failed']);
+    Queue::fake();
+    app(App\Services\Events\AttendeeImportInvitations::class)->recover();
+    Queue::assertPushed(App\Jobs\Events\DeliverAttendeeImportInvitation::class, 1);
+    Queue::assertPushed(App\Jobs\Events\DeliverAttendeeImportInvitation::class, fn ($job): bool => $job->invitationId === $untouched->id);
+    app(App\Services\Events\AttendeeImportInvitations::class)->deliver($invitation->id);
+    Mail::assertNothingSent();
+});
+
+test('fresh global superadmin authority works without a tenant pivot and revocation stops queued work', function (): void {
+    $this->event->update(['status' => 'published']);
+    $global = User::factory()->create(['tenant_id' => null]);
+    setPermissionsTeamId(null);
+    $global->assignRole('Superadmin');
+    setPermissionsTeamId($this->tenant->id);
+    $this->actingAs($global);
+    $first = ($this->preview)("full_name,email\nFirst,first@example.test")->assertOk()->json();
+    $this->postJson($this->url.'/'.$first['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$first['rows'][0]['id']]], ['HTTP_HOST' => $this->host])->assertOk();
+    app(App\Services\Events\AttendeeImport::class)->process($first['id']);
+    expect(EventRegistration::where('email', 'first@example.test')->exists())->toBeTrue();
+    $registration = EventRegistration::where('email', 'first@example.test')->firstOrFail();
+    $this->postJson($this->url.'/'.$first['id'].'/invite', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registration->id], 'revisions' => ($this->invitationRevisions)($first['id'])], ['HTTP_HOST' => $this->host])->assertOk();
+    $second = ($this->preview)("full_name,email\nSecond,second@example.test")->assertOk()->json();
+    $this->postJson($this->url.'/'.$second['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$second['rows'][0]['id']]], ['HTTP_HOST' => $this->host])->assertOk();
+    setPermissionsTeamId(null);
+    $global->removeRole('Superadmin');
+    setPermissionsTeamId($this->tenant->id);
+    app(App\Services\Events\AttendeeImport::class)->process($second['id']);
+    expect(EventRegistration::where('email', 'second@example.test')->exists())->toBeFalse()->and(App\Models\EventAttendeeImport::find($second['id'])->status)->toBe('stopped');
+    $invitation = App\Models\EventAttendeeImportInvitation::firstOrFail();
+    app(App\Services\Events\AttendeeImportInvitations::class)->deliver($invitation->id);
+    expect($invitation->fresh()->status)->toBe('failed');
+    Mail::assertNothingSent();
 });

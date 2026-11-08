@@ -56,6 +56,11 @@ final class MemberBenefitLifecycle
         if ($event->trashed() || ! $event->isPublished() || ($type !== null && ! $type->is_active)) {
             return false;
         }
+        if (app(AdmissionClaims::class)->applies($event)) {
+            $capacity = $type === null ? $event->capacity : $type->capacity;
+
+            return $capacity === null || app(AdmissionClaims::class)->count($event, $type?->id, $registration->id) < $capacity;
+        }
         $count = $event->registrations()->confirmed()->where('id', '!=', $registration->id);
         if ($type !== null) {
             return $type->capacity === null || $count->where('ticket_type_id', $type->id)->count() < $type->capacity;
@@ -109,7 +114,7 @@ final class MemberBenefitLifecycle
 
     public function release(EventRegistration $registration, string $reason): void
     {
-        if (! $registration->member_benefit_required && $this->sharesInventory($registration->event) && ! $this->hasCapacity($registration)) {
+        if (! $registration->member_benefit_required && ($this->sharesInventory($registration->event) || app(AdmissionClaims::class)->applies($registration->event)) && ! $this->hasCapacity($registration)) {
             return;
         }
         if (! $this->eligible($registration) || ($registration->member_benefit_required && (! $this->hasCapacity($registration) || ! $this->priceMatches($registration)))) {

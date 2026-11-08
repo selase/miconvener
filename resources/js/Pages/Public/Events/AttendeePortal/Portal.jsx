@@ -72,7 +72,7 @@ const STATUS_NOTICE = {
         color: 'text-warning-fg',
         title: "You're on the waitlist",
         description: (event, registration) =>
-            `${event.name} is at capacity — you're number ${registration.waitlist_position} in line. We'll email you the moment a spot opens up.`,
+            `${event.name} is at capacity — you're number ${registration.waitlist_position} in line. We'll email you the moment a spot opens up. ${event.capacity_reservation_note || ''}`,
     },
     rejected: {
         icon: XCircle,

@@ -14,7 +14,7 @@ final class EventAttendeeImportRequest extends FormRequest
     public function authorize(): bool
     {
         $tenant = app(TenantContext::class)->getTenant();
-        if (! $tenant || ! $this->user()?->can('update event')) {
+        if (! $tenant || ! $this->user() || (! $this->user()->isGlobalSuperAdmin() && ! $tenant->users()->whereKey($this->user()->id)->exists()) || ! $this->user()->can('update event')) {
             return false;
         }
         $event = Event::query()->where('tenant_id', $tenant->id)->findOrFail($this->route('event'));

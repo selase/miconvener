@@ -82,7 +82,7 @@ final class AttendeeImportInvitations
             $context->setTenant($tenant);
             setPermissionsTeamId($tenant->id);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
-            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status === User::STATUS_INACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event) || ! $event->isPublished() || ($event->ends_at ?? $event->starts_at)->isPast()) {
+            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status === User::STATUS_INACTIVE || (! $actor->isGlobalSuperAdmin() && ! $tenant->users()->whereKey($actor->id)->exists()) || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event) || ! $event->isPublished() || ($event->ends_at ?? $event->starts_at)->isPast()) {
                 $candidate->update(['status' => 'failed', 'message' => 'Restore staff event permission and publication before retrying.']);
 
                 return;

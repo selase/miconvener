@@ -1097,6 +1097,11 @@ function RegistrationPanel({ event }) {
                     Choose how to attend
                     <Ticket className="h-4 w-4 text-ink-tertiary" />
                 </h2>
+                {event.capacity_reservation_note && (
+                    <p className="mb-3 text-xs text-ink-secondary">
+                        {event.capacity_reservation_note}
+                    </p>
+                )}
                 {availableTicketTypes.length > 0 && (
                     <fieldset className="space-y-2">
                         <legend className="sr-only">Ticket options</legend>

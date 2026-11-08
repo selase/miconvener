@@ -49,7 +49,8 @@ test('the reports summary reflects real counts', function () {
     $response->assertJsonPath('counts.registrations', 2); // confirmed + checked_in both count as confirmed
     $response->assertJsonPath('counts.checked_in', 1);
     $response->assertJsonPath('counts.forum_threads', 1);
-    expect($response->json('available_columns'))->toHaveCount(12);
+    expect($response->json('available_columns'))->toHaveCount(16);
+    expect(array_column($response->json('available_columns'), 'key'))->toContain('registration_source', 'admission_payment_source', 'external_amount', 'external_currency');
 });
 
 test('the registrations export only includes the requested columns, in a fixed order', function () {

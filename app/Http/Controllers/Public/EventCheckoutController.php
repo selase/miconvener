@@ -358,6 +358,8 @@ final class EventCheckoutController extends Controller
             return redirect()->back()->with('error', 'This registration does not require payment.');
         }
 
+        $registrationModel = app(\App\Services\Events\AdmissionClaims::class)->forCheckout($registrationModel);
+
         $validated = $request->validate([
             'proof_file' => ['required', 'file', 'mimes:png,jpg,jpeg,webp,pdf', 'max:10240'],
             'payment_method' => ['required', 'string', Rule::in([
@@ -434,6 +436,7 @@ final class EventCheckoutController extends Controller
 
     private function startPaystackCheckout(Tenant $tenant, EventRegistration $registration, string $workspaceUrl): Response|RedirectResponse
     {
+        $registration = app(\App\Services\Events\AdmissionClaims::class)->forCheckout($registration);
         try {
             $paystack = $this->paystackResolver->gatewayFor($tenant, $this->commissionFor($registration), (string) $registration->currency);
         } catch (CommissionSplitUnavailableException $e) {
@@ -466,6 +469,7 @@ final class EventCheckoutController extends Controller
 
     private function startStripeCheckout(Tenant $tenant, EventRegistration $registration, string $workspaceUrl): Response|RedirectResponse
     {
+        $registration = app(\App\Services\Events\AdmissionClaims::class)->forCheckout($registration);
         $row = $this->stripeConnect->isAvailableFor($tenant) ? $this->stripeConnect->connectedGateway($tenant) : null;
 
         if (! $row) {

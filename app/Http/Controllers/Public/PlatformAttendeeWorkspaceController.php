@@ -207,7 +207,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'self_check_in_available' => app(SelfCheckIn::class)->isAvailableFor($registrationModel),
                 'registration_source' => $registrationModel->registration_source,
                 'admission_payment_label' => $registrationModel->admissionPaymentLabel(),
-                'email_verified' => $registrationModel->hasVerifiedEmail() || ($registrationModel->isImported() && $this->authorizer->canAccess($request->session(), $registrationModel)),
+                'email_verified' => $registrationModel->hasVerifiedEmail() || $registrationModel->isImported(),
                 'awaiting_checkout' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true)
                     && ($registrationModel->member_benefit_required || blank($registrationModel->payment_reference)),
                 'checkout_url' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true) && $registrationModel->tenant !== null
@@ -1307,6 +1307,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
 
         return [
             'public_profiles_available' => $registration !== null && $event->public_attendee_profiles && app(\App\Services\Events\Profiles\ProfileEligibility::class)->registrationEligible($registration),
+            'capacity_reservation_note' => app(\App\Services\Events\AdmissionClaims::class)->applies($event) ? 'Places may be reserved while existing registrations or payment links are being reviewed.' : null,
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,

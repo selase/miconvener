@@ -226,7 +226,7 @@ final class AttendeeImport
             $context->setTenant($tenant);
             setPermissionsTeamId($tenant->id);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
-            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status === User::STATUS_INACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event)) {
+            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status === User::STATUS_INACTIVE || (! $actor->isGlobalSuperAdmin() && ! $tenant->users()->whereKey($actor->id)->exists()) || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event)) {
                 $import->update(['status' => 'stopped', 'message' => 'The initiating staff member no longer has event import permission. Restore access and resume.']);
 
                 return;
@@ -260,12 +260,8 @@ final class AttendeeImport
                         if ($types->isNotEmpty() || $data['ticket_type_id'] !== null) {
                             abort_unless($ticket !== null && ! $ticket->isInviteOnly() && hash_equals($data['ticket_revision'], hash('sha256', json_encode($ticket->only(['name', 'is_active', 'capacity', 'access_code', 'member_price']), JSON_THROW_ON_ERROR))), 409, 'Ticket settings changed. Create a fresh preview.');
                         }
-                        $count = $locked->registrations()->confirmed();
                         $capacity = $ticket === null ? $locked->capacity : $ticket->capacity;
-                        if ($ticket !== null) {
-                            $count->where('ticket_type_id', $ticket->id);
-                        }
-                        abort_if($capacity !== null && $count->count() >= $capacity, 409, 'No admission places remain. Increase capacity and use a fresh preview.');
+                        abort_if($capacity !== null && app(AdmissionClaims::class)->count($locked, $ticket?->id) >= $capacity, 409, 'No admission places remain. Existing registrations or historical paid payment links reserve places, including cancelled or refunded paid registrations. Review with the platform or increase actual capacity if appropriate, then preview again. Reservations do not expire automatically.');
                         $quota = app(RegistrationQuota::class);
                         $quota->acquire($locked);
                         $quota->assertRoom($locked);
