@@ -229,6 +229,12 @@ final class Event extends Model
         return config('app.env') === 'production' ? 's3' : 'public';
     }
 
+    /** @return HasMany<EventHost, $this> */
+    public function hosts(): HasMany
+    {
+        return $this->hasMany(EventHost::class)->whereHas('event', fn (Builder $query) => $query->whereColumn('events.tenant_id', 'event_hosts.tenant_id'))->orderBy('sort_order')->orderBy('id');
+    }
+
     public function heroImageUrl(): ?string
     {
         return Helper::storageUrl($this->hero_image_path);
@@ -907,6 +913,12 @@ final class Event extends Model
             $disk = self::uploadDisk();
 
             foreach ($event->materials()->pluck('file_path') as $path) {
+                if ($path) {
+                    $event->uploadAssetsForDeletion[] = [$disk, $path];
+                }
+            }
+
+            foreach (EventHost::withoutGlobalScopes()->where('tenant_id', $event->tenant_id)->where('event_id', $event->id)->pluck('logo_path') as $path) {
                 if ($path) {
                     $event->uploadAssetsForDeletion[] = [$disk, $path];
                 }

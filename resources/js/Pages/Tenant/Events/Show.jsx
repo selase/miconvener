@@ -1,3 +1,4 @@
+import EventHostsPanel from './EventHostsPanel';
 import PublicProfilesPanel from './panels/PublicProfilesPanel';
 import MemberPaymentReviewPanel from './MemberPaymentReviewPanel';
 import MemberBenefitsPanel from './MemberBenefitsPanel';
@@ -542,6 +543,11 @@ export default function Show({
         overview: () => (
             <div className="grid gap-6">
                 <OverviewNow event={event} overview={overview} />
+                <EventHostsPanel
+                    key={`${event.id}-${event.hosts_version}`}
+                    event={event}
+                    canEdit={canManageEvent}
+                />
                 {page.auth?.can?.manage_public_attendee_profiles && (
                     <PublicProfilesPanel eventId={event.id} />
                 )}

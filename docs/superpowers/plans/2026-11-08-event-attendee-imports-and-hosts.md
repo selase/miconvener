@@ -2,7 +2,7 @@
 
 > For agentic workers, use superpowers:executing-plans after owner approval. Follow the tasks in order, write failing regression tests first, and tick steps in the same commit as the work.
 
-**Status** — Prepared for owner review. Implementation, merge, deployment, production imports and messages await approval.
+**Status** — Host slice implemented locally for independent review. CSV import work remains a separate slice. Merge, deployment, production imports and messages remain unapproved.
 
 **Goal** — Let an organiser manage an externally registered event through MiConvener and credit one or more public hosts independently of the tenant account.
 
@@ -78,12 +78,12 @@ Confirm actual sibling naming and current methods when building. Keep business l
 
 ## Task 4 — Event-specific hosts and multiple-host presentation
 
-- [ ] Write failing tests for tenant fallback, one host, multiple ordered hosts, individual hosts, scoped edit permissions and foreign host/logo references.
-- [ ] Add ordered EventHost records and a tenant-scoped relationship. Preserve all existing event/tenant identities. Use explicit replace-list updates in one transaction with a stale-update guard so simultaneous edits cannot silently overwrite one another.
-- [ ] Add Overview host editing with name/type/logo/link, reordering and removal. Apply existing safe image-upload rules, bounded names and HTTPS URL validation. Do not fetch arbitrary website URLs on the server. Validate image ownership and safely retire replaced uploads according to existing storage rules.
-- [ ] Add a public `hosts` DTO and use it in the event byline and host section. Preserve the tenant's About/Follow, contact details and existing social links under managing-organisation identity. Host links do not automatically become tenant social accounts or imply endorsement/verification.
-- [ ] Audit event listings, structured data, calendar export, social metadata, ticket/PDF, certificates and event emails. Public event organiser credits use explicit host data where semantically appropriate; financial seller/remittance identity and existing receipt snapshots retain their authoritative source. State exactly which surfaces change in the review report.
-- [ ] Add component and HTTP tests for names, order, fallback, long text, missing logos, unsafe links, locked/private event payloads and unchanged tenant permissions/financial identity. Rebuild assets, run focused tests and Pint, then commit.
+- [x] Write failing tests for tenant fallback, one host, multiple ordered hosts, individual hosts, scoped edit permissions and foreign host/logo references.
+- [x] Add ordered EventHost records and a tenant-scoped relationship. Preserve all existing event/tenant identities. Use explicit replace-list updates in one transaction with a stale-update guard so simultaneous edits cannot silently overwrite one another.
+- [x] Add Overview host editing with name/type/logo/link, reordering and removal. Apply existing safe image-upload rules, bounded names and HTTPS URL validation. Do not fetch arbitrary website URLs on the server. Validate image ownership and safely retire replaced uploads according to existing storage rules.
+- [x] Add a public `hosts` DTO and use it in the event byline and host section. Preserve the tenant's About/Follow, contact details and existing social links under managing-organisation identity. Host links do not automatically become tenant social accounts or imply endorsement/verification.
+- [x] Audit event listings, structured data, calendar export, social metadata, ticket/PDF, certificates and event emails. Public event organiser credits use explicit host data where semantically appropriate; financial seller/remittance identity and existing receipt snapshots retain their authoritative source. State exactly which surfaces change in the review report.
+- [x] Add component and HTTP tests for names, order, fallback, long text, missing logos, unsafe links, locked/private event payloads and unchanged tenant permissions/financial identity. Rebuild assets, run focused tests and Pint, then commit.
 
 ## Task 5 — Integrated acceptance, review and release proposal
 
@@ -98,7 +98,7 @@ Confirm actual sibling naming and current methods when building. Keep business l
 
 This plan deliberately keeps the two changes independently reviewable, with the host work able to ship without the importer. Imported attendees get existing event capabilities according to their normal verification, ticket and feature settings. Source-system payments are declarations, not gateway evidence. Existing public host copy can be overridden without transferring tenant access or seller responsibilities.
 
-No implementation has started. A real CSV is helpful during acceptance to validate mapping expectations, but synthetic data is sufficient to implement the approved contract. Before using a real file, confirm the organisation is authorised to upload and contact those attendees and agree the selected rows and invitation action explicitly.
+The independent host slice is implemented locally. A real CSV is helpful during acceptance to validate mapping expectations, but synthetic data is sufficient to implement the approved contract. Before using a real file, confirm the organisation is authorised to upload and contact those attendees and agree the selected rows and invitation action explicitly.
 
 ## Second review amendments — 8 November 2026
 
@@ -142,3 +142,42 @@ An event can combine attendees imported from another registration system with ne
 - Preview/confirmation must not silently reopen registration or alter ticket prices, sales windows, settlement settings or collection flags. Organisers can use the existing event controls to configure future MiConvener registration and collections.
 
 Add acceptance tests for a single event with imported paid-elsewhere attendees, a new native paid registration and an existing supported contribution from an imported attendee. Verify shared capacity, duplicate registration protection, independent receipts, retained external provenance, separate financial totals and source-correct refund controls. Invitations and public host credits remain independent of payment collection.
+
+## Host slice self-review — 8 November 2026
+
+### Touchpoints updated
+
+- AGENTS.md: documented presentation-only host identity, versioned updates and logo/private-page rules.
+- Plan-owned SDD ledger: implementation decisions and verification evidence recorded. No personal memory files changed.
+- Navigation: editor is embedded in the existing event Overview. No new permission, role, seeder, dependency, config or environment setting is needed; existing `update event` and event-staff scope apply server-side.
+- Tests: HTTP coverage includes fallback, ordering, individual/organisation types, HTTPS validation, record/logo ownership, stale versions, atomic replacement, ten-host bounds, staff scope, private/draft visibility, logo retention/removal and permanent purge. Components cover editing/reordering/removal, errors, reader state, long names, missing logos and independent organisation controls.
+
+### UI Gap Analysis
+
+- Discoverability/empty state: Overview → Public hosts; the empty list explicitly describes organisation fallback and offers Add host to editors.
+- Permission gating: readers see credits only; saves independently require event update permission and staff scope.
+- Loading/errors: disabled controls while saving, status/error announcements, explicit stale-edit reload action and network-error recovery retain unsaved inputs.
+- Accessibility: labelled native fields, explicit reorder/remove button names and keyboard controls. Responsive wrapping/grid and existing theme tokens are used.
+- Browser acceptance limitation: no live Herd browser session was switched to the isolated test database. Actual 390px, dark-mode and keyboard visual acceptance remains a release check; component tests do not establish viewport layout.
+
+### Solved (auto-fixed)
+
+- Kept tenant About, Follow, contacts and social links explicitly attributed to the managing organisation while using event hosts for public byline/host credits.
+- Added logo cleanup to permanent event purge, preserving files during reversible soft deletion.
+- Replaced an instance-bound tenant relationship constraint that was incorrect under eager loading with a correlated ownership constraint.
+- Added bounded eager loading for the shared console event presenter to avoid relying on global automatic relationship loading for listed events.
+
+### Recommended for user decision
+
+- Before release, perform the isolated rendered desktop/390px/dark/keyboard acceptance check (about 20 minutes). Recommend completing it before deployment.
+- Ticket/PDF, certificate, calendar and social-card host expansion remains an explicitly reviewed follow-up under the second amendment. No follow-up expansion is required to preserve current seller/issuer identity.
+
+### Not gaps
+
+- `org` remains the managing organisation; hosts do not alter tenant access, support, payment routing, commissions, legal seller or receipt snapshots.
+- Audited surfaces: console event listings retain tenant context; no public organiser listing/structured host data is introduced. Calendar exports contain event/session facts, not an overridden host identity. Social metadata retains managing-site identity and event facts. Ticket/PDF and certificate issuer branding and transactional email sender/support identity remain tenant-based. Only the public byline/host section and their organisation labels change.
+- Logo websites are HTTPS links opened with noopener/noreferrer/nofollow, never fetched by the server. SVG and arbitrary logo URLs/paths are not accepted. Removing all hosts restores the tenant fallback; logos can be removed/reuploaded through the same editor.
+- No production data, outbound email, push, merge or deployment is part of this slice.
+
+
+Host verification: 52 affected HTTP tests / 350 assertions passed (`EventHostsTest`, `EventVisibilityTest`, `CommunityPromptsSwitchTest`, `EventWorkspaceTest`, `EventStaffAssignmentTest`); 18 affected frontend tests passed (`EventHosts`, `eventPagePresentation`); full PHPStan passed with 1 GiB limit; Pint, production build and diff whitespace checks passed. Only the dedicated host test database was used for these backend tests. An overlapping verification attempt was discarded and rerun serially after resetting that dedicated schema. A broad frontend attempt was stopped after timeouts outside this slice; no full-suite pass is claimed. Live browser acceptance is being handled independently and is not included in these counts.

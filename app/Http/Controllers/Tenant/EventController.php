@@ -52,6 +52,7 @@ final class EventController extends Controller
             : null;
 
         $allEvents = Event::where('tenant_id', $tenant->id)
+            ->with('hosts')
             ->when($assignedOnly !== null, fn ($query) => $query->whereIn('id', $assignedOnly))
             ->withCount(['registrations as registrations_count' => fn ($query) => $query->confirmed()])
             ->orderByDesc('starts_at')
@@ -942,6 +943,8 @@ final class EventController extends Controller
     private function toPayload(Event $event): array
     {
         return [
+            'hosts' => app(\App\Services\Events\EventHosts::class)->payload($event),
+            'hosts_version' => (int) $event->hosts_version,
             'members_only' => $event->members_only, 'member_ticket_price' => $event->member_ticket_price,
             'member_benefits_enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant),
             'has_member_benefit_history' => $event->registrations()->where('member_benefit_required', true)->exists(),

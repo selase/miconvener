@@ -711,6 +711,7 @@ final class PublicEventController extends Controller
         $withhold = $event->isPrivate() && ! $revealDetails;
 
         return [
+            'hosts' => $withhold ? [] : app(\App\Services\Events\EventHosts::class)->payload($event),
             'public_attendee_profiles_url' => ! $withhold && app(\App\Services\Events\Profiles\ProfileRollout::class)->allows($event) ? route('attendee.profiles.index', ['event' => $event->id], false) : null,
             'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only, 'prompt' => $event->members_only || $event->showsCommunityPrompts()],
             'name' => $event->name,
