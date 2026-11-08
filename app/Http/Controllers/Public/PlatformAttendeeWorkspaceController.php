@@ -205,7 +205,9 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'room_name' => $registrationModel->seatAssignment?->room?->name,
                 'checked_in' => $registrationModel->isPresent(),
                 'self_check_in_available' => app(SelfCheckIn::class)->isAvailableFor($registrationModel),
-                'email_verified' => $registrationModel->hasVerifiedEmail(),
+                'registration_source' => $registrationModel->registration_source,
+                'admission_payment_label' => $registrationModel->admissionPaymentLabel(),
+                'email_verified' => $registrationModel->hasVerifiedEmail() || $registrationModel->isImported(),
                 'awaiting_checkout' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true)
                     && ($registrationModel->member_benefit_required || blank($registrationModel->payment_reference)),
                 'checkout_url' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true) && $registrationModel->tenant !== null
@@ -259,7 +261,8 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 ? QrCodeGenerator::svgDataUri($registrationModel->qr_token)
                 : null,
             'checked_in' => $registrationModel->checked_in_at !== null,
-            'payment_confirmed' => $registrationModel->isConfirmed(),
+            'payment_confirmed' => ! $registrationModel->isImported() && $registrationModel->isConfirmed(),
+            'admission_payment_label' => $registrationModel->admissionPaymentLabel(),
         ]);
     }
 
@@ -294,12 +297,12 @@ final class PlatformAttendeeWorkspaceController extends Controller
         $email = app(\App\Services\Events\PlatformAttendeeVerification::class)->verifiedEmail($request->session());
         abort_unless($reg !== null && $email !== null && \App\Services\Events\PlatformAttendeeVerification::normalise($reg->email) === $email, 401);
         abort_if($reg->tenant === null || $reg->tenant->status === TenantStatusEnum::BANNED || $reg->event === null || $reg->event->deleted_at !== null, 404);
-        abort_unless($reg->isConfirmed() && $reg->email_verified_at !== null && filled($reg->qr_token) && filled($reg->ticket_code), 403);
+        abort_unless($reg->isConfirmed() && ($reg->email_verified_at !== null || $reg->isImported()) && filled($reg->qr_token) && filled($reg->ticket_code), 403);
 
         return response()->json([
             'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
             'event' => $this->buildEventPayload($reg->event, revealDetails: true, registration: $reg),
-            'registration' => ['id' => $reg->id, 'full_name' => $reg->full_name, 'status' => $reg->status, 'ticket_code' => $reg->ticket_code, 'ticket_type_name' => $reg->ticketType?->name, 'qr_image' => QrCodeGenerator::svgDataUri($reg->qr_token), 'checked_in' => $reg->isPresent(), 'seat_label' => $reg->seatAssignment?->seat_label, 'room_name' => $reg->seatAssignment?->room?->name],
+            'registration' => ['registration_source' => $reg->registration_source, 'admission_payment_label' => $reg->admissionPaymentLabel(), 'id' => $reg->id, 'full_name' => $reg->full_name, 'status' => $reg->status, 'ticket_code' => $reg->ticket_code, 'ticket_type_name' => $reg->ticketType?->name, 'qr_image' => QrCodeGenerator::svgDataUri($reg->qr_token), 'checked_in' => $reg->isPresent(), 'seat_label' => $reg->seatAssignment?->seat_label, 'room_name' => $reg->seatAssignment?->room?->name],
         ])->header('Cache-Control', 'private, no-store');
     }
 
@@ -1304,6 +1307,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
 
         return [
             'public_profiles_available' => $registration !== null && $event->public_attendee_profiles && app(\App\Services\Events\Profiles\ProfileEligibility::class)->registrationEligible($registration),
+            'capacity_reservation_note' => app(\App\Services\Events\AdmissionClaims::class)->applies($event) ? 'Places may be reserved while existing registrations or payment links are being reviewed.' : null,
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,

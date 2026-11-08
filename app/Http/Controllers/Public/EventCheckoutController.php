@@ -48,6 +48,8 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        abort_if($registrationModel->isImported(), 422, 'This is imported admission, not a MiConvener payment receipt. Open your attendee ticket instead.');
+
         if ($registrationModel->member_benefit_required) {
             $registrationModel->setRelation('event', Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($registrationModel->event_id));
             abort_unless($registrationModel->event->slug === $event && $this->canClaimWorkspace($registrationModel), 403);
@@ -153,6 +155,8 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        abort_if($registrationModel->isImported(), 422, 'Imported admission has no MiConvener admission payment to collect. External payments remain with the original provider.');
+
         if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
             throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);
         }
@@ -181,6 +185,8 @@ final class EventCheckoutController extends Controller
         $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
             ->where('id', $registration)
             ->firstOrFail();
+
+        abort_if($registrationModel->isImported(), 422, 'Imported admission has no MiConvener admission payment to collect. External payments remain with the original provider.');
 
         if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
             throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);
@@ -352,6 +358,8 @@ final class EventCheckoutController extends Controller
             return redirect()->back()->with('error', 'This registration does not require payment.');
         }
 
+        $registrationModel = app(\App\Services\Events\AdmissionClaims::class)->forCheckout($registrationModel);
+
         $validated = $request->validate([
             'proof_file' => ['required', 'file', 'mimes:png,jpg,jpeg,webp,pdf', 'max:10240'],
             'payment_method' => ['required', 'string', Rule::in([
@@ -428,6 +436,7 @@ final class EventCheckoutController extends Controller
 
     private function startPaystackCheckout(Tenant $tenant, EventRegistration $registration, string $workspaceUrl): Response|RedirectResponse
     {
+        $registration = app(\App\Services\Events\AdmissionClaims::class)->forCheckout($registration);
         try {
             $paystack = $this->paystackResolver->gatewayFor($tenant, $this->commissionFor($registration), (string) $registration->currency);
         } catch (CommissionSplitUnavailableException $e) {
@@ -460,6 +469,7 @@ final class EventCheckoutController extends Controller
 
     private function startStripeCheckout(Tenant $tenant, EventRegistration $registration, string $workspaceUrl): Response|RedirectResponse
     {
+        $registration = app(\App\Services\Events\AdmissionClaims::class)->forCheckout($registration);
         $row = $this->stripeConnect->isAvailableFor($tenant) ? $this->stripeConnect->connectedGateway($tenant) : null;
 
         if (! $row) {

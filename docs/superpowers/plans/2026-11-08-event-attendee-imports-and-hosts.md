@@ -2,7 +2,7 @@
 
 > For agentic workers, use superpowers:executing-plans after owner approval. Follow the tasks in order, write failing regression tests first, and tick steps in the same commit as the work.
 
-**Status** — Host slice implemented locally for independent review. CSV import work remains a separate slice. Merge, deployment, production imports and messages remain unapproved.
+**Status** — The owner approved implementation through Proceed. CSV imports are implemented and undergoing final verification and draft PR review. Merge, deployment, production imports and live messages require their separate approvals.
 
 **Goal** — Let an organiser manage an externally registered event through MiConvener and credit one or more public hosts independently of the tenant account.
 
@@ -48,33 +48,34 @@ Confirm actual sibling naming and current methods when building. Keep business l
 
 ## Task 1 — Import contract, schema and preview
 
-- [ ] Write failing tests for a CSV preview requiring `full_name,email`; allow optional `phone,ticket_type,external_reference,payment_status,external_amount,currency` through explicit column mapping. Return line numbers, row errors and a downloadable template. Default payment status is `free`; require currency for external amounts, parse decimals strictly into minor units and reject negatives or unsupported precision.
-- [ ] Run the new tests and verify the intended failures.
-- [ ] Implement UTF-8/BOM CSV parsing with quoted commas, CRLF, blank-line handling and fixed limits of 5 MiB, 2,000 rows, 20 columns and bounded cell lengths. Reject binary files, malformed records and ambiguous/duplicate headers. Treat all cell content as text, never spreadsheet expressions. Escape formula-like values in any CSV error/result export.
-- [ ] Resolve ticket labels against this event only; require an explicit mapping when ambiguous. Preview may operate on draft events. Confirmation rejects cancelled/ended events and changed or deleted ticket types. Existing private-event access rules remain authoritative.
-- [ ] Persist a private preview bound to tenant, event, actor, file digest and 24-hour expiry. Freeze canonical accepted data server-side. Confirmation accepts row identifiers/choices only, never client-supplied financial fields or recipient lists.
-- [ ] Classify exact in-file duplicates and existing event registrations using scoped external reference, then normalized email. Never match by name or phone alone. Existing cancelled/rejected registrations, shared emails and contradictory references are conflicts. First release supports skip or correction followed by a fresh preview, not overwrite/reactivation.
-- [ ] Test cross-tenant/event access, permissions, expiry, malformed files, duplicates and private responses. Run focused tests, Pint and commit.
+- [x] Write failing tests for a CSV preview requiring `full_name,email`; allow optional `phone,ticket_type,external_reference,payment_status,external_amount,currency` through explicit column mapping. Return line numbers, row errors and a downloadable template. Default payment status is `free`; require currency for external amounts, parse decimals strictly into minor units and reject negatives or unsupported precision.
+- [x] Run the new tests and verify the intended failures.
+- [x] Implement UTF-8/BOM CSV parsing with quoted commas, CRLF, blank-line handling and fixed limits of 5 MiB, 2,000 rows, 20 columns and bounded cell lengths. Reject binary files, malformed records and ambiguous/duplicate headers. Treat all cell content as text, never spreadsheet expressions. Escape formula-like values in any CSV error/result export.
+- [x] Resolve ticket labels against this event only; require an explicit mapping when ambiguous. Preview may operate on draft events. Confirmation rejects cancelled/ended events and changed or deleted ticket types. Existing private-event access rules remain authoritative.
+- [x] Persist a private preview bound to tenant, event, actor, file digest and 24-hour expiry. Freeze canonical accepted data server-side. Confirmation accepts row identifiers/choices only, never client-supplied financial fields or recipient lists.
+- [x] Classify exact in-file duplicates and existing event registrations using scoped external reference, then normalized email. Never match by name or phone alone. Existing cancelled/rejected registrations, shared emails and contradictory references are conflicts. First release supports skip or correction followed by a fresh preview, not overwrite/reactivation.
+- [x] Test cross-tenant/event access, permissions, expiry, malformed files, duplicates and private responses. Run focused tests, Pint and commit.
 
 ## Task 2 — Confirmation, admission, retries and financial separation
 
-- [ ] Write failing tests for repeated confirmation, concurrent imports, import versus public registration at the final available place, cancellation, external-payment reporting and missing identity proof.
-- [ ] Run tests, then implement confirmation through a durable batch with a unique submission key. Freeze selected valid rows and policy options. Use bounded queued chunks with an honest progress/result screen; no request waits for thousands of registrations.
-- [ ] Recheck permission, tenant/event state, capacity and plan allowances for each chunk. Audit the existing registration lock order first and use one compatible order across public registration, imports and relevant ticket writers. Persist each row result in the same transaction as its registration. Concurrent retries must return the original result without consuming another place or issuing another credential.
-- [ ] Preserve earlier completed rows if a later row fails. Present created/skipped/failed counts and the specific rows to correct; retries operate only on unfinished rows. Never roll back successfully created attendees as an implicit batch undo.
-- [ ] Issue one native ticket/QR per accepted admitted attendee through the existing model behavior, without marking the email verified. Confirmed admission and verified ownership remain separate. Exercise signed access links, /my discovery and email-code access to demonstrate no identity shortcut.
-- [ ] Store imported amounts only in typed external provenance. Keep native amount/charge fields from creating a payable or financial receipt. Audit event revenue, exports, admission, cancellation, refunds, provider callbacks and ticket resend so external records are labelled correctly and cannot enter platform money paths.
-- [ ] Preserve normal after-commit webhooks exactly once per created state transition, existing event counts and anonymised Going totals. Imports never create attendance/check-in records or publish attendee profiles.
-- [ ] Run focused import, admission, finance and real PostgreSQL contention tests, Pint and commit. Include existing free/paid/offline/member-benefit registration regressions appropriate to changed shared code.
+- [x] Write failing tests for repeated confirmation, concurrent imports, import versus public registration at the final available place, cancellation, external-payment reporting and missing identity proof.
+- [x] Run tests, then implement confirmation through a durable batch with a unique submission key. Freeze selected valid rows and policy options. Use bounded queued chunks with an honest progress/result screen; no request waits for thousands of registrations.
+- [x] Recheck permission, tenant/event state, capacity and plan allowances for each chunk. Audit the existing registration lock order first and use one compatible order across public registration, imports and relevant ticket writers. Persist each row result in the same transaction as its registration. Concurrent retries must return the original result without consuming another place or issuing another credential.
+- [x] Preserve earlier completed rows if a later row fails. Present created/skipped/failed counts and the specific rows to correct; retries operate only on unfinished rows. Never roll back successfully created attendees as an implicit batch undo.
+- [x] Issue one native ticket/QR per accepted admitted attendee through the existing model behavior, without marking the email verified. Confirmed admission and verified ownership remain separate. Exercise signed access links, /my discovery and email-code access to demonstrate no identity shortcut.
+- [x] Store imported amounts only in typed external provenance. Keep native amount/charge fields from creating a payable or financial receipt. Audit event revenue, exports, admission, cancellation, refunds, provider callbacks and ticket resend so external records are labelled correctly and cannot enter platform money paths.
+- [x] Preserve normal after-commit webhooks exactly once per created state transition, existing event counts and anonymised Going totals. Imports never create attendance/check-in records or publish attendee profiles.
+- [x] Run focused import, admission, finance and real PostgreSQL contention tests, Pint and commit. Include existing free/paid/offline/member-benefit registration regressions appropriate to changed shared code.
 
 ## Task 3 — Explicit invitations and import management UI
 
-- [ ] Write failing endpoint/component tests for the Guests → Import attendees entry point, upload/mapping, preview, errors, confirmation totals, resumable progress and results.
-- [ ] Build with existing console controls. Display payment separation, capacity limits and unresolved duplicates before confirmation. Show “No invitations sent” until the organiser explicitly requests delivery.
-- [ ] Implement a durable transactional invitation outbox with a stable batch/registration identity and bounded workers. Reuse existing access-verification mail and ticket mail patterns after inspecting their behavior for unverified imported registrations. Dispatch failure must retain retryable work; ambiguous transport outcomes require the established reconciliation policy. Keep delivery status visible to staff, without secrets in logs.
-- [ ] Test zero mail before explicit confirmation, recipient isolation, authorization on retry, failed queue dispatch recovery, duplicate submission and safe resend. Marketing subscriptions, SMS credits and public-profile consent remain independent.
-- [ ] Expire previews after 24 hours and purge uploaded source files after parsing. Retain minimal import provenance, row outcomes and necessary financial history; remove transient parsed/error-row personal data after 30 days. Use tenant-aware private storage and existing deletion policies.
-- [ ] Test retention, errors, empty states, keyboard access, dark mode and narrow layout. Rebuild and commit public/build with frontend changes; run focused tests, Pint and commit.
+- [x] Write failing endpoint/component tests for the Guests → Import attendees entry point, upload/mapping, preview, errors, confirmation totals, resumable progress and results.
+- [x] Build with existing console controls. Display payment separation, capacity limits and unresolved duplicates before confirmation. Show “No invitations sent” until the organiser explicitly requests delivery.
+- [x] Implement a durable transactional invitation outbox with a stable batch/registration identity and bounded workers. Reuse existing access-verification mail and ticket mail patterns after inspecting their behavior for unverified imported registrations. Dispatch failure must retain retryable work; ambiguous transport outcomes require the established reconciliation policy. Keep delivery status visible to staff, without secrets in logs.
+- [x] Test zero mail before explicit confirmation, recipient isolation, authorization on retry, failed queue dispatch recovery, duplicate submission and safe resend. Marketing subscriptions, SMS credits and public-profile consent remain independent.
+- [x] Expire previews after 24 hours and purge uploaded source files after parsing. Retain minimal import provenance, row outcomes and necessary financial history; remove transient parsed/error-row personal data after 30 days. Use tenant-aware private storage and existing deletion policies.
+- [x] Test retention, errors, empty states, keyboard access, dark mode and narrow layout. Rebuild and commit public/build with frontend changes; run focused tests, Pint and commit.
+
 
 ## Task 4 — Event-specific hosts and multiple-host presentation
 
@@ -98,7 +99,7 @@ Confirm actual sibling naming and current methods when building. Keep business l
 
 This plan deliberately keeps the two changes independently reviewable, with the host work able to ship without the importer. Imported attendees get existing event capabilities according to their normal verification, ticket and feature settings. Source-system payments are declarations, not gateway evidence. Existing public host copy can be overridden without transferring tenant access or seller responsibilities.
 
-The independent host slice is implemented locally. A real CSV is helpful during acceptance to validate mapping expectations, but synthetic data is sufficient to implement the approved contract. Before using a real file, confirm the organisation is authorised to upload and contact those attendees and agree the selected rows and invitation action explicitly.
+Implementation and local acceptance use synthetic CSV data. A representative real CSV header remains useful for checking mapping expectations; personal attendee data is not required for that review. Before using a real file, confirm the organisation is authorised to upload and contact those attendees and agree the selected rows and invitation action explicitly.
 
 ## Second review amendments — 8 November 2026
 
@@ -128,7 +129,7 @@ These clarifications govern the tasks above and must be included in their tests.
 
 ### Owner choices still needed
 
-The limits and restrictions in this plan are recommendations awaiting approval, including mandatory attendee email, handling shared family emails, membership-restricted events, and historical-payment visibility. No real CSV, real invitation send or production data change is authorised by this document. Confirm the final CSV mapping against a representative header/sample before implementation acceptance; personal attendee data is not needed for planning.
+The owner adopted the recommended implementation defaults through Proceed, including mandatory attendee email, shared-email conflicts, first-release membership restrictions and separate historical-payment visibility. No real CSV, real invitation send or production data change is authorised by this document. Confirm the final CSV mapping against a representative header/sample before implementation acceptance; personal attendee data is not needed for planning.
 
 ## Owner clarification — mixed registration and collection channels
 
@@ -198,3 +199,35 @@ A later actual 390px editor check exposed a real overflow hidden by the outer sc
 After rebuilding and reloading the same browser tab at an actual 390px viewport, the host section measured 358px at left16, the fieldset 316px with minimum0, the input 282px at left54 and the Overview track358px. The Save hosts button stayed within left37/right143. Document scroll width remained390px. Keyboard Tab moved to host type with a visible focus ring. Root inspected `event-hosts-editor-mobile-focus-fixed.png`; the earlier `event-hosts-editor-mobile-focus.png` records the failing state. Viewport override was reset after verification. This supplements, rather than replaces, the separate public-page light/dark checks above. Physical-phone and expanded-text acceptance remain unverified.
 
 The two affected frontend suites passed18 tests again; production build, Pint and diff whitespace checks passed. No backend, permission, acceptance-data or database changes were made for this layout correction.
+
+## Import local browser acceptance — 8 November 2026
+
+The existing isolated acceptance database and logged-mail configuration were used, separately from automated test databases. A synthetic future published event received a three-row CSV: one externally paid admission declaring GHS 200, one free admission, and an exact duplicate of the first row. The real Guests interface showed two valid rows and one duplicate. Confirmation created two registrations and skipped the duplicate. Reopening the saved preview and confirming it also exercised retained operation-key handling.
+
+Immediately after import, both admissions were confirmed with no email proof or attendance recorded. Their native amount total was zero. The ledger row count remained unchanged at 24, and no invitation existed until the explicit send action. Staff reviewed and selected only the synthetic paid attendee, then queued one invitation. One local worker delivered it to logged mail; no message was sent to a real recipient. Following that logged signed link opened the single-registration ticket with the external-payment label and working Q&A screen. The PDF download was verified as a valid one-page A4 document. Scoped access did not enable offline storage without the separate required proof.
+
+The completed import modal was checked at actual 390px and 1280px viewport widths. Narrow light and dark layouts had no document overflow, and keyboard navigation reached labelled row-selection controls with visible focus. Evidence is saved in the chat visualization directory as `event-import-completed-mobile-light.png`, `event-import-completed-mobile-dark.png` and `event-import-completed-desktop.png`. Temporary viewport overrides were reset.
+
+These checks do not establish a physical-phone QR scan, expanded-text layout, or a browser walkthrough of every existing programme, poll, survey, badge and certificate workflow. Relevant automated regressions remain the evidence for unchanged capabilities. No real CSV, production import, live invitation, payment, merge or deployment was performed.
+
+
+## Final capacity safety ruling
+
+Imports reserve capacity for existing native registrations before creating any admission. After an event has imported history, native signup, approval, promotion and checkout availability use the same conservative claims within the original ticket pool (or event capacity when there are no ticket types). A newly created native registration records checkout admission guard version 1; ordinary gateway and offline starts reread registration then event under short locks and require a current pending payment before any provider HTTP. Imported history continues to apply after imported attendees cancel. Native captured-payment, refund, ledger, payout and tenant quota policies are unchanged; no new payment-review or refund product is included.
+
+Legacy checkout starts did not persist an intent/reference. Consequently, historical positive-money native cancelled/rejected registrations and legacy/unknown-version paid waitlists conservatively retain capacity claims. New guarded waitlists do not reserve places. The marker avoids an unsafe timestamp cutoff because old and new rows can share the same second. These reservations have no invented expiry, and cancelling/refunding historical money does not prove an old link is closed. Staff must review such history with the platform or increase actual capacity if appropriate. Future intent-aware cleanup is separate work. The pending-only checkout-start guard also closes invalid legacy waitlisted/cancelled/rejected starts on ordinary events.
+
+Fresh protected global Superadmin authority is accepted consistently by HTTP actions and workers without requiring a tenant pivot. Queued work rechecks that role from the landlord null-team role records; revocation stops admission and invitation delivery. No email-based privilege shortcut is used.
+
+
+## Import implementation self-review
+
+The author paused after implementation to reassess overlooked cases, dependencies, money separation, edge cases, dead code, test coverage and every changed touchpoint. Independent review corrected stored-preview submission keys, CSV formula escaping and invitation recipient revision checks; rendered acceptance exposed an initial preview status default that is now refreshed before presentation. A final capacity review replaced an unsafe hold-only payment proposal with conservative admission claims and the explicit native checkout guard marker. No new refund, payout or payment-review product remains.
+
+Touchpoints: AGENTS.md records import provenance, claims, original money separation, invitation durability and retention; Guests links to the workflow; existing update-event/read-finance permissions are rechecked, with fresh protected global Superadmin authority supported. No new permissions, dependencies, seed data, environment variables or service configuration are required. No project memory file applies. Source and transient errors are encrypted/private, upload source files are not retained, and thirty-day cleanup keeps registration financial provenance.
+
+UI review: discoverability, empty states, permission gates, errors, resumable progress and explicit recipient review are present. Existing console primitives provide labels, keyboard focus and dark mode; root recorded actual rendered 390px light/dark acceptance without horizontal viewport overflow. Root also exercised two admissions plus one duplicate, separate external declaration/native zero amounts, no ledger or check-in changes, an explicitly selected single logged invitation, scoped signed ticket access, ticket PDF and Q&A workspace. Actual-phone QR scanning and unconfigured activity/badge/certificate flows are not claimed as completed acceptance.
+
+Verification: final affected PHP target 94/94 tests, 387 assertions; full PHPStan zero errors; focused import/guest/ticket UI 13/13 tests; previous bounded frontend rerun 135/135 tests; all five PostgreSQL contention scenarios passed in the broader 162-test gate. That gate's one outdated report-column expectation was corrected to assert the four additional source columns. Pint, build and whitespace checks passed. The default highly parallel frontend attempt was discarded for resource-related timing failures; the identified files all passed with two workers. No broad failing tests were hidden or unrelated source changed.
+
+Known trade-offs: legacy positive-money cancelled/rejected registrations and unguarded/unknown-version paid waitlists retain claims because historical checkout intent closure cannot be proved. New guarded waitlists do not consume claims, even when created in the same second as old rows. Staff must review legacy links with the platform or increase actual capacity where appropriate; there is no invented expiry or implicit undo. Complete deployment of the checkout guard across web/queue processes before any separately authorised live import. SMTP uncertainty remains visible and is never automatically resent. Merge, deployment, real attendee imports and live invitation delivery remain separately authorised operations.

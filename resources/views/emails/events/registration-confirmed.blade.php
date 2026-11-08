@@ -3,6 +3,10 @@
 
 Your registration for **{{ $event->name }}** is confirmed.
 
+@if ($registration->isImported())
+{{ $registration->admissionPaymentLabel() }}. This admission was imported by the organiser. MiConvener did not collect or verify any external payment. This is your ticket, not a payment receipt.
+@endif
+
 - **When:** {{ $event->starts_at->timezone($event->timezone)->format('l, F j, Y \a\t g:i A') }} ({{ $event->timezone }})
 - **Where:** {{ $event->location_type === 'virtual' ? $event->virtual_link : $event->address }}
 - **Ticket code:** {{ $registration->ticket_code }}

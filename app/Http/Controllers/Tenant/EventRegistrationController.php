@@ -122,7 +122,7 @@ final class EventRegistrationController extends Controller
                 return response()->json(['message' => 'A cancelled registration cannot be approved.'], 422);
             }
 
-            if (($registrationModel->member_benefit_required || app(\App\Services\Events\MemberBenefitLifecycle::class)->sharesInventory($eventModel)) && $registrationModel->status !== EventRegistration::STATUS_PENDING_PAYMENT) {
+            if (($registrationModel->member_benefit_required || app(\App\Services\Events\MemberBenefitLifecycle::class)->sharesInventory($eventModel) || app(\App\Services\Events\AdmissionClaims::class)->applies($eventModel)) && $registrationModel->status !== EventRegistration::STATUS_PENDING_PAYMENT) {
                 return response()->json(['message' => 'This member registration must be approved or promoted before its payment can issue a ticket.'], 422);
             }
 
@@ -154,7 +154,7 @@ final class EventRegistrationController extends Controller
                 $platformFee = app(\App\Services\Events\MemberBenefitQuotes::class)->pricing($registrationModel)['fees']['platform_fee'];
             }
 
-            if (app(\App\Services\Events\MemberBenefitLifecycle::class)->sharesInventory($eventModel) && ! app(\App\Services\Events\MemberBenefitLifecycle::class)->hasCapacity($registrationModel)) {
+            if ((app(\App\Services\Events\MemberBenefitLifecycle::class)->sharesInventory($eventModel) || app(\App\Services\Events\AdmissionClaims::class)->applies($eventModel)) && ! app(\App\Services\Events\MemberBenefitLifecycle::class)->hasCapacity($registrationModel)) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'No place is available. Keep this payment evidence for organiser review.']);
             }
 
@@ -424,6 +424,11 @@ final class EventRegistrationController extends Controller
                 $registrationModel->fill(['member_benefit_access_version' => $registrationModel->member_benefit_access_version + 1, 'member_benefit_identity' => null, 'member_benefit_quote_id' => null, 'email_verified_at' => null]);
             }
 
+            if ($registrationModel->isImported() && $emailChanged) {
+                $registrationModel->email_verified_at = null;
+                $registrationModel->rotateTicketCredentials();
+            }
+
             $previousEmail = $registrationModel->email;
             $registrationModel->update($request->validated());
 
@@ -452,7 +457,7 @@ final class EventRegistrationController extends Controller
             ->whereNull('consumed_at')
             ->update(['consumed_at' => now()]);
 
-        if ($registration->hasVerifiedEmail()) {
+        if ($registration->isImported() || $registration->hasVerifiedEmail()) {
             return;
         }
 
