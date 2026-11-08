@@ -18,12 +18,15 @@ use Throwable;
 
 final class AttendeeImportInvitations
 {
-    /** @param list<string> $ids */
-    public function select(EventAttendeeImport $import, string $operationKey, array $ids): void
+    /**
+     * @param  list<string>  $ids
+     * @param  array<string,string>  $revisions
+     */
+    public function select(EventAttendeeImport $import, string $operationKey, array $ids, array $revisions): void
     {
         sort($ids);
         $digest = hash('sha256', json_encode($ids, JSON_THROW_ON_ERROR));
-        $import->getConnection()->transaction(function () use ($import, $operationKey, $ids, $digest): void {
+        $import->getConnection()->transaction(function () use ($import, $operationKey, $ids, $digest, $revisions): void {
             EventAttendeeImport::query()->lockForUpdate()->findOrFail($import->id);
             $event = Event::query()->where('tenant_id', $import->tenant_id)->findOrFail($import->event_id);
             abort_unless($event->isPublished() && ($event->ends_at ?? $event->starts_at)->isFuture(), 409, 'Publish the event before sending access invitations.');
@@ -38,6 +41,7 @@ final class AttendeeImportInvitations
             abort_unless($registrations->count() === count($ids), 422, 'Choose only confirmed attendees created by this import.');
             $db->table('event_attendee_import_invite_runs')->insert(['import_id' => $import->id, 'operation_key' => $operationKey, 'selection_digest' => $digest, 'created_at' => now(), 'updated_at' => now()]);
             foreach ($registrations as $registration) {
+                abort_unless(isset($revisions[$registration->id]) && hash_equals($registration->memberBenefitRecipientToken(), $revisions[$registration->id]), 409, 'Attendee details changed after review. Refresh this result and review the current recipients before sending.');
                 EventAttendeeImportInvitation::query()->firstOrCreate(['import_id' => $import->id, 'registration_id' => $registration->id], ['tenant_id' => $import->tenant_id, 'recipient' => $registration->email]);
             }
         });
@@ -78,7 +82,7 @@ final class AttendeeImportInvitations
             $context->setTenant($tenant);
             setPermissionsTeamId($tenant->id);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
-            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status !== User::STATUS_ACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event) || ! $event->isPublished() || ($event->ends_at ?? $event->starts_at)->isPast()) {
+            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status === User::STATUS_INACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event) || ! $event->isPublished() || ($event->ends_at ?? $event->starts_at)->isPast()) {
                 $candidate->update(['status' => 'failed', 'message' => 'Restore staff event permission and publication before retrying.']);
 
                 return;

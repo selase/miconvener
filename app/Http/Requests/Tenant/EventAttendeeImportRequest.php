@@ -28,7 +28,7 @@ final class EventAttendeeImportRequest extends FormRequest
         return match ($this->route()->getActionMethod()) {
             'preview' => ['file' => ['required', 'file', 'max:5120'], 'source_namespace' => ['sometimes', 'string', 'max:100', 'regex:/^[a-zA-Z0-9_.-]+$/'], 'mapping' => ['sometimes', 'array:full_name,email,phone,ticket_type,external_reference,payment_status,external_amount,currency'], 'mapping.*' => ['nullable', 'string', 'max:100'], 'ticket_mapping' => ['sometimes', 'array', 'max:2000'], 'ticket_mapping.*' => ['nullable', 'uuid']],
             'confirm' => ['operation_key' => ['required', 'uuid'], 'rows' => ['required', 'array', 'min:1', 'max:2000'], 'rows.*' => ['required', 'uuid', 'distinct']],
-            'invite' => ['operation_key' => ['required', 'uuid'], 'registrations' => ['required', 'array', 'min:1', 'max:2000'], 'registrations.*' => ['required', 'uuid', 'distinct']],
+            'invite' => ['operation_key' => ['required', 'uuid'], 'registrations' => ['required', 'array', 'min:1', 'max:2000'], 'registrations.*' => ['required', 'uuid', 'distinct'], 'revisions' => ['required', 'array', 'max:2000'], 'revisions.*' => ['required', 'string', 'size:64']],
             default => [],
         };
     }

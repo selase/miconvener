@@ -25,12 +25,13 @@ beforeEach(function (): void {
     $this->url = "http://{$this->host}/events/{$this->event->id}/attendee-imports";
     Mail::fake();
     Queue::fake();
+    $this->invitationRevisions = fn (string $id): array => collect($this->getJson($this->url.'/'.$id, ['HTTP_HOST' => $this->host])->json('rows'))->whereNotNull('registration_id')->pluck('invitation_revision', 'registration_id')->all();
     $this->preview = fn (string $csv, array $extra = []) => $this->postJson($this->url.'/preview', ['file' => UploadedFile::fake()->createWithContent('attendees.csv', $csv), ...$extra], ['HTTP_HOST' => $this->host]);
 });
 
 test('private CSV preview freezes canonical rows with strict declared money and no admission or mail', function (): void {
     $response = ($this->preview)("\xEF\xBB\xBFfull_name,email,payment_status,external_amount,currency\r\n\"Ada, One\",ADA@example.test,paid_elsewhere,12.34,GHS\r\n");
-    $response->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertJsonPath('rows.0.data.email', 'ada@example.test')->assertJsonPath('rows.0.data.external_amount', 1234)->assertJsonPath('rows.0.status', 'valid');
+    $response->assertOk()->assertJsonPath('status', 'preview')->assertHeader('Cache-Control', 'no-store, private')->assertJsonPath('rows.0.data.email', 'ada@example.test')->assertJsonPath('rows.0.data.external_amount', 1234)->assertJsonPath('rows.0.status', 'valid');
     expect(EventRegistration::count())->toBe(0);
     Mail::assertNothingSent();
 });
@@ -137,7 +138,7 @@ test('invitations require publication explicit selected recipients and replay fr
     $this->postJson($this->url.'/'.$preview['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => array_column($preview['rows'], 'id')], ['HTTP_HOST' => $this->host])->assertOk();
     app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
     $registrations = EventRegistration::orderBy('email')->get();
-    $body = ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registrations[0]->id]];
+    $body = ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registrations[0]->id], 'revisions' => ($this->invitationRevisions)($preview['id'])];
     $this->postJson($this->url.'/'.$preview['id'].'/invite', $body, ['HTTP_HOST' => $this->host])->assertConflict();
     $this->event->update(['status' => 'published']);
     $this->postJson($this->url.'/'.$preview['id'].'/invite', $body, ['HTTP_HOST' => $this->host])->assertOk()->assertJsonPath('invitations.pending', 1);
@@ -157,7 +158,7 @@ test('invitation worker stops after email change without mailing the old or new 
     $this->postJson($this->url.'/'.$preview['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$preview['rows'][0]['id']]], ['HTTP_HOST' => $this->host])->assertOk();
     app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
     $registration = EventRegistration::firstOrFail();
-    $this->postJson($this->url.'/'.$preview['id'].'/invite', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registration->id]], ['HTTP_HOST' => $this->host])->assertOk();
+    $this->postJson($this->url.'/'.$preview['id'].'/invite', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registration->id], 'revisions' => ($this->invitationRevisions)($preview['id'])], ['HTTP_HOST' => $this->host])->assertOk();
     $registration->update(['email' => 'other@example.test']);
     $invitation = App\Models\EventAttendeeImportInvitation::firstOrFail();
     app(App\Services\Events\AttendeeImportInvitations::class)->deliver($invitation->id);
@@ -274,7 +275,7 @@ test('uncertain invitation transport is retained and never replayed automaticall
     $this->postJson($this->url.'/'.$preview['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$preview['rows'][0]['id']]], ['HTTP_HOST' => $this->host]);
     app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
     $registration = EventRegistration::first();
-    $this->postJson($this->url.'/'.$preview['id'].'/invite', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registration->id]], ['HTTP_HOST' => $this->host]);
+    $this->postJson($this->url.'/'.$preview['id'].'/invite', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registration->id], 'revisions' => ($this->invitationRevisions)($preview['id'])], ['HTTP_HOST' => $this->host]);
     $invitation = App\Models\EventAttendeeImportInvitation::first();
     Mail::shouldReceive('to')->once()->andReturnSelf();
     Mail::shouldReceive('send')->once()->andThrow(new RuntimeException('SMTP outcome unknown'));
@@ -312,4 +313,26 @@ test('queued imports stop when the organisation is deactivated', function (): vo
     $this->tenant->update(['status' => App\Enum\TenantStatusEnum::DEACTIVATED]);
     app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
     expect(EventRegistration::count())->toBe(0)->and(App\Models\EventAttendeeImport::find($preview['id'])->status)->toBe('stopped');
+});
+
+test('all guest exports escape imported formula names while keeping integer money numeric', function (): void {
+    EventRegistration::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'full_name' => '=1+1', 'registration_source' => 'external_import', 'admission_payment_source' => 'paid_elsewhere', 'external_amount' => 1234, 'external_currency' => 'GHS']);
+    foreach (["http://{$this->host}/events/{$this->event->id}/guests/export", "http://{$this->host}/events/{$this->event->id}/reports/registrations"] as $url) {
+        $response = $this->get($url, ['HTTP_HOST' => $this->host])->assertOk();
+        expect($response->streamedContent())->toContain("'=1+1");
+    }
+});
+
+test('invitation selection rejects recipient changes after staff review', function (): void {
+    $this->event->update(['status' => 'published']);
+    $preview = ($this->preview)("full_name,email\nAda,ada@example.test")->json();
+    $this->postJson($this->url.'/'.$preview['id'].'/confirm', ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'rows' => [$preview['rows'][0]['id']]], ['HTTP_HOST' => $this->host]);
+    app(App\Services\Events\AttendeeImport::class)->process($preview['id']);
+    $registration = EventRegistration::firstOrFail();
+    $view = $this->getJson($this->url.'/'.$preview['id'], ['HTTP_HOST' => $this->host])->assertOk()->assertJsonPath('rows.0.invitation_recipient', 'ada@example.test')->json();
+    $registration->update(['email' => 'changed@example.test']);
+    $body = ['operation_key' => (string) Illuminate\Support\Str::uuid(), 'registrations' => [$registration->id], 'revisions' => [$registration->id => $view['rows'][0]['invitation_revision']]];
+    $this->postJson($this->url.'/'.$preview['id'].'/invite', $body, ['HTTP_HOST' => $this->host])->assertConflict();
+    expect(App\Models\EventAttendeeImportInvitation::count())->toBe(0);
+    $this->getJson($this->url.'/'.$preview['id'], ['HTTP_HOST' => $this->host])->assertOk()->assertJsonPath('rows.0.invitation_recipient', 'changed@example.test');
 });
