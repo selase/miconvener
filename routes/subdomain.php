@@ -589,6 +589,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::patch('events/{event}/visibility', [EventController::class, 'updateVisibility'])->name('tenant.events.visibility');
     Route::patch('events/{event}/community-prompts', [EventController::class, 'updateCommunityPrompts'])->name('tenant.events.community-prompts');
+    Route::patch('events/{event}/registration-visibility', [EventController::class, 'updateRegistrationVisibility'])->name('tenant.events.registration-visibility');
     Route::get('events/{event}/speakers/{speaker}/portal-link', [EventSpeakerController::class, 'portalLink'])->name('tenant.events.speakers.portal-link');
     Route::post('events/{event}/speakers/{speaker}/invite', [EventSpeakerController::class, 'invite'])->name('tenant.events.speakers.invite');
 

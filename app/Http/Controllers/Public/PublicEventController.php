@@ -373,6 +373,8 @@ final class PublicEventController extends Controller
             ->firstOrFail();
         $eventModel->setRelation('tenant', $tenant);
 
+        abort_unless($eventModel->show_registration, 403, 'Registration is not available on this page.');
+
         $activeTicketTypes = $eventModel->ticketTypes->where('is_active', true);
         $usesTicketTypes = $activeTicketTypes->isNotEmpty();
         $settings = $eventModel->effectiveRegistrationSettings();
@@ -757,6 +759,7 @@ final class PublicEventController extends Controller
             'going_count' => $event->isPrivate() ? null : $event->registrations()->confirmed()->whereNotNull('ticket_code')->count(),
             'plan_your_visit_content' => $event->plan_your_visit_content,
             'registration_settings' => $event->effectiveRegistrationSettings(),
+            'show_registration' => (bool) $event->show_registration,
             'capacity_reservation_note' => app(\App\Services\Events\AdmissionClaims::class)->applies($event) ? 'Places may be reserved while existing registrations or payment links are being reviewed.' : null,
             'form_fields' => $event->formFields()->ordered()->get()->map(fn (EventFormField $f): array => [
                 'id' => $f->id,

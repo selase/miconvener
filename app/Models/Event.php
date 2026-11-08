@@ -109,6 +109,7 @@ final class Event extends Model
      */
     protected $attributes = [
         'public_attendee_profiles' => false,
+        'show_registration' => true,
         'members_only' => false,
         'visibility' => self::VISIBILITY_PUBLIC,
         'event_category' => self::CATEGORY_GENERAL,
@@ -144,6 +145,7 @@ final class Event extends Model
         'hero_image_path',
         'visibility',
         'show_community_prompts',
+        'show_registration',
         'speaker_slide_policy',
         'plan_your_visit_content',
         'store_listing_id',
@@ -206,6 +208,7 @@ final class Event extends Model
         'show_contributor_amounts' => 'boolean',
         'allow_goodwill_messages' => 'boolean',
         'show_community_prompts' => 'boolean',
+        'show_registration' => 'boolean',
         'is_recurring' => 'boolean',
         'recurrence_days' => 'array',
         'recurrence_interval' => 'integer',

@@ -27,7 +27,9 @@ final class EventSocialCard
         ];
 
         if ($event->isPrivate()) {
-            $card['description'] = 'You are invited. Open the link to register.';
+            $card['description'] = $event->show_registration
+                ? 'You are invited. Open the link to register.'
+                : 'You are invited. Open the link for event information.';
 
             return $card;
         }

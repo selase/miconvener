@@ -72,6 +72,19 @@ const org = {
 };
 
 describe('public event presentation', { timeout: 30000 }, () => {
+    it('hides registration and its prompts while preserving event details and ticket recovery', () => {
+        window.history.replaceState({}, '', '?attendee_area=register');
+        try {
+            render(<Show event={{ ...event, show_registration: false }} org={org} />);
+            expect(document.getElementById('register-section')).toBeNull();
+            expect(screen.queryByText('Register now')).toBeNull();
+            expect(screen.queryByText('Registration closed')).toBeNull();
+            expect(screen.getByText('A real conference')).toBeTruthy();
+            expect(screen.getByText('Already registered? Find my ticket')).toBeTruthy();
+        } finally {
+            window.history.replaceState({}, '', '/');
+        }
+    });
     it('refreshes activity availability only while visible and online and stops after leaving', () => {
         vi.useFakeTimers();
         const visible = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);

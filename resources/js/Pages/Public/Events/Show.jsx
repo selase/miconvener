@@ -2102,7 +2102,7 @@ export default function Show({
                             </div>
                         )}
                     </section>
-                    {needsRegistration && (
+                    {needsRegistration && event.show_registration !== false && (
                         <div
                             role="status"
                             className="mb-6 border-l-2 border-accent bg-accent/5 p-5 text-sm text-ink-secondary"
@@ -2125,7 +2125,9 @@ export default function Show({
                         </div>
                     )}
                     <LiveEventAccess participation={participation} />
-                    <div className="grid min-w-0 gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:gap-x-12">
+                    <div
+                        className={`grid min-w-0 gap-x-10 gap-y-6 xl:gap-x-12 ${event.show_registration !== false ? 'lg:grid-cols-[minmax(0,1fr)_300px]' : ''}`}
+                    >
                         <header className="min-w-0 lg:col-start-1 lg:row-start-1">
                             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
                                 {isPrivate && <Lock className="h-3 w-3" />}
@@ -2206,10 +2208,13 @@ export default function Show({
                                 )}
                             </div>
                         </header>
-                        <div className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-                            <RegistrationPanel event={event} />
-                        </div>
+                        {event.show_registration !== false && (
+                            <div className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+                                <RegistrationPanel event={event} />
+                            </div>
+                        )}
                         <main className="min-w-0 lg:col-start-1 lg:row-start-2">
+                            {event.show_registration === false && <FindMyTicket event={event} />}
                             <nav
                                 aria-label="Event sections"
                                 className="mb-7 flex max-w-full gap-6 overflow-x-auto border-b border-border"

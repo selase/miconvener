@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\UpdateEventRegistrationVisibilityRequest;
 use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventRegistration;
@@ -313,6 +314,20 @@ final class EventController extends Controller
                 ? 'This event page invites visitors to follow the organiser and see its membership options.'
                 : 'This event page no longer shows follow or membership options.',
         ]);
+    }
+
+    public function updateRegistrationVisibility(UpdateEventRegistrationVisibilityRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $eventModel = $this->resolveEvent($this->getTenant(), $event);
+        $showRegistration = (bool) $request->validated('show_registration');
+
+        $eventModel->getConnection()->transaction(function () use ($eventModel, $showRegistration): void {
+            Event::query()->whereKey($eventModel->id)->lockForUpdate()->firstOrFail()
+                ->update(['show_registration' => $showRegistration]);
+        });
+
+        return response()->json(['show_registration' => $showRegistration]);
     }
 
     public function destroy(Request $request, string $subdomain, string $event): JsonResponse|RedirectResponse
@@ -963,6 +978,7 @@ final class EventController extends Controller
             'status' => $event->status,
             'visibility' => $event->visibility,
             'show_community_prompts' => $event->showsCommunityPrompts(),
+            'show_registration' => (bool) $event->show_registration,
             'speaker_slide_policy' => $event->speaker_slide_policy ?? Event::SPEAKER_POLICY_AFTER,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),
