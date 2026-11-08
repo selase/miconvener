@@ -25,7 +25,7 @@ if ($input['action'] === 'import') {
 } else {
     $host = $event->tenant->slug.'.miconvener.test';
     if ($input['action'] === 'cancel') {
-        Illuminate\Support\Facades\Auth::loginUsingId($input['actor']);
+        Illuminate\Support\Facades\Auth::guard()->setUser(App\Models\User::findOrFail($input['actor']));
         $request = Request::create('http://'.$host.'/events/'.$event->id.'/registrations/'.$input['registration'].'/cancel', 'POST', [], [], [], ['HTTP_HOST' => $host, 'HTTP_ACCEPT' => 'application/json']);
     } elseif ($input['action'] === 'verify') {
         $request = Request::create($input['url'], 'GET', [], [], [], ['HTTP_HOST' => $host]);
