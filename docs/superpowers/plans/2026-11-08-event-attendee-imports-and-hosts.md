@@ -181,3 +181,12 @@ Add acceptance tests for a single event with imported paid-elsewhere attendees, 
 
 
 Host verification: 52 affected HTTP tests / 350 assertions passed (`EventHostsTest`, `EventVisibilityTest`, `CommunityPromptsSwitchTest`, `EventWorkspaceTest`, `EventStaffAssignmentTest`); 18 affected frontend tests passed (`EventHosts`, `eventPagePresentation`); full PHPStan passed with 1 GiB limit; Pint, production build and diff whitespace checks passed. Only the dedicated host test database was used for these backend tests. An overlapping verification attempt was discarded and rerun serially after resetting that dedicated schema. A broad frontend attempt was stopped after timeouts outside this slice; no full-suite pass is claimed. Live browser acceptance is being handled independently and is not included in these counts.
+
+
+## Host independent review and local browser acceptance — 8 November 2026
+
+Independent reviewer found no remaining P1/P2 blockers on `97acba68`. The explicit index host eager load was verified. The earlier N+1 concern was not reproduced because global automatic eager loading already applies; explicit loading removes reliance on that setting.
+
+Root applied only the host migration to the pre-existing local acceptance database `miconvener_acceptance_codex_20261102` (mail logged), separately from the host regression database. Using the existing synthetic staff fixture and synthetic event, the actual Overview editor saved an individual and organisation host and displayed “Hosts saved.” The public byline and host section displayed both; the managing organisation section retained its separate identity. Public layout measured exactly 390px client/scroll width in light and dark themes, and screenshots were visually inspected. Temporary viewport override was reset. The console editor was checked at its actual 1280px width; no 390px console-editor claim is made. Physical-phone and expanded-text acceptance remain unverified. No production data, real attendee, payment or live email was involved.
+
+Evidence lives under the chat visualization directory as `event-hosts-local-acceptance.png`, `event-hosts-mobile-acceptance.png` and `event-hosts-mobile-dark-acceptance.png`.
