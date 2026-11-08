@@ -225,7 +225,9 @@ it('requires explicit acceptance before paying a seller-issued quote', async () 
         ok: true,
         json: async () => ({ order: quoted, verified_until: Date.now() / 1000 + 3600 }),
     });
-    render(<StoreOrders orderId={order.id} />);
+    await act(async () => {
+        render(<StoreOrders orderId={order.id} />);
+    });
     const pay = await screen.findByRole('button', { name: 'Continue to payment' });
     expect(pay.disabled).toBe(true);
     expect(screen.getByText('Seven working days')).toBeTruthy();
