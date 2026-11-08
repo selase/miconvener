@@ -113,6 +113,9 @@ test('competing batches with one identity create only one ticket', function (): 
 test('import never takes an existing registration lock while verification or cancellation waits for its event', function (string $action): void {
     $event = Event::factory()->published()->create(['tenant_id' => $this->tenant->id, 'capacity' => 10]);
     $existing = EventRegistration::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $event->id, 'email' => 'existing@example.test']);
+    if ($action === 'cancel') {
+        EventRegistration::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $event->id, 'email' => 'waiting@example.test', 'status' => EventRegistration::STATUS_WAITLISTED, 'waitlist_position' => 1, 'ticket_code' => null, 'qr_token' => null]);
+    }
     $batch = importRaceBatch($event, $this->actor, 'import@example.test');
     $url = Illuminate\Support\Facades\URL::temporarySignedRoute('public.events.registrations.verify', now()->addHour(), ['subdomain' => $this->tenant->slug, 'event' => $event->slug, 'registration' => $existing->id]);
     runImportRace($event, [['event' => $event->id, 'action' => $action, 'registration' => $existing->id, 'actor' => (string) $this->actor->id, 'url' => $url], ['event' => $event->id, 'action' => 'import', 'import' => $batch]]);

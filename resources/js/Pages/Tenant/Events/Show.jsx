@@ -213,7 +213,7 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
     );
 }
 
-function GuestsTab({ event, registrations }) {
+export function GuestsTab({ event, registrations }) {
     const canImport = Boolean(usePage().props.auth?.can?.update_event);
     const reload = () => router.reload({ only: ['registrations'] });
     const [editing, setEditing] = useState(null);
@@ -381,9 +381,13 @@ function GuestsTab({ event, registrations }) {
                                                     declared
                                                 </span>
                                             )}
-                                            <span className="block">
-                                                Refund external money through the original provider.
-                                            </span>
+                                            {registration.admission_payment_label ===
+                                                'Paid elsewhere' && (
+                                                <span className="block">
+                                                    Refund external money through the original
+                                                    provider.
+                                                </span>
+                                            )}
                                         </span>
                                     ) : registration.offline_payment_status ===
                                       'pending_verification' ? (
