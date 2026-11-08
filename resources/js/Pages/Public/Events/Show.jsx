@@ -1,3 +1,4 @@
+import EventHostCredits from './EventHostCredits';
 import PublicAttendeeStrip from './Components/PublicAttendeeStrip';
 import MemberBenefitVerification from './MemberBenefitVerification';
 import FollowControl from '@/Pages/Public/Community/FollowControl';
@@ -2040,33 +2041,41 @@ export default function Show({
                         aria-label="Event organiser"
                         className="relative flex flex-wrap items-center gap-3 pb-6 pt-5"
                     >
-                        {org.logo_url ? (
-                            <img
-                                src={org.logo_url}
-                                alt=""
-                                className="h-11 w-11 shrink-0 border border-border bg-white object-contain p-1"
-                            />
+                        {event.hosts?.length > 0 ? (
+                            <EventHostCredits hosts={event.hosts} byline />
                         ) : (
-                            <div
-                                aria-hidden="true"
-                                className="flex h-11 w-11 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
-                            >
-                                {org.name?.slice(0, 1)}
-                            </div>
+                            <>
+                                {org.logo_url ? (
+                                    <img
+                                        src={org.logo_url}
+                                        alt=""
+                                        className="h-11 w-11 shrink-0 border border-border bg-white object-contain p-1"
+                                    />
+                                ) : (
+                                    <div
+                                        aria-hidden="true"
+                                        className="flex h-11 w-11 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
+                                    >
+                                        {org.name?.slice(0, 1)}
+                                    </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <span className="block text-[10px] text-ink-tertiary">
+                                        Hosted by
+                                    </span>
+                                    <a
+                                        href="#event-organiser"
+                                        className="text-[13px] font-medium hover:text-accent"
+                                    >
+                                        {org.name}
+                                    </a>
+                                </div>
+                            </>
                         )}
-                        <div className="min-w-0 flex-1">
-                            <span className="block text-[10px] text-ink-tertiary">Hosted by</span>
-                            <a
-                                href="#event-organiser"
-                                className="text-[13px] font-medium hover:text-accent"
-                            >
-                                {org.name}
-                            </a>
-                        </div>
                         {community?.followingEnabled && (
                             <details className="group">
                                 <summary className="cursor-pointer list-none border border-border bg-surface px-4 py-2 text-xs text-ink [&::-webkit-details-marker]:hidden">
-                                    + Follow
+                                    + Follow {org.name}
                                 </summary>
                                 <div className="absolute inset-x-0 top-full z-20 border border-border bg-surface p-5 shadow-lg sm:inset-x-auto sm:right-0 sm:w-80">
                                     <FollowControl
@@ -2080,7 +2089,10 @@ export default function Show({
                             </details>
                         )}
                         {Object.keys(org.links || {}).length > 0 && (
-                            <div className="w-full sm:w-auto">
+                            <div className="w-full" aria-label={`${org.name} social links`}>
+                                <span className="text-[10px] text-ink-tertiary">
+                                    Managed by {org.name}
+                                </span>
                                 <OrganiserLinks links={org.links} />
                             </div>
                         )}
@@ -2346,12 +2358,20 @@ export default function Show({
                                     </p>
                                 </section>
                             )}
+                            {event.hosts?.length > 0 && (
+                                <section
+                                    className="border-t border-border py-8"
+                                    aria-label="Event hosts"
+                                >
+                                    <EventHostCredits hosts={event.hosts} />
+                                </section>
+                            )}
                             <section
                                 id="event-organiser"
                                 className="scroll-mt-6 border-t border-border py-8"
                             >
                                 <p className="mb-5 text-xs uppercase tracking-[0.12em] text-ink-tertiary">
-                                    Your organiser
+                                    Managing organisation
                                 </p>
                                 <div className="flex items-start gap-4">
                                     {org.logo_url ? (
@@ -2387,7 +2407,7 @@ export default function Show({
                                         onClick={() => setDialog('contact')}
                                         className="mt-4 border border-border px-4 py-2.5 text-xs font-medium hover:border-accent hover:text-accent"
                                     >
-                                        Contact organiser
+                                        Contact {org.name}
                                     </button>
                                 )}
                                 {community && (
@@ -2396,7 +2416,7 @@ export default function Show({
                                             href={community.organisation.about_url}
                                             className="inline-block text-sm text-accent underline underline-offset-4"
                                         >
-                                            Organisation page and membership options
+                                            About {org.name} and membership options
                                         </a>
                                     </div>
                                 )}

@@ -355,3 +355,47 @@ describe('public event presentation', { timeout: 30000 }, () => {
         expect(screen.queryByRole('link', { name: 'Add to calendar' })).toBeNull();
     });
 });
+
+it('credits all event hosts while naming the managing organisation on support and follow controls', () => {
+    render(
+        <Show
+            event={{
+                ...event,
+                hosts: [
+                    {
+                        id: 'a',
+                        name: 'Ada Host',
+                        type: 'individual',
+                        website_url: 'https://host.example',
+                    },
+                    { id: 'b', name: 'Conference Friends', type: 'organisation' },
+                ],
+            }}
+            org={org}
+            community={{
+                followingEnabled: true,
+                organisation: { name: org.name, about_url: '/about' },
+                identity: null,
+                following: false,
+                followUrl: '/follow',
+                signInUrl: '/sign-in',
+            }}
+        />
+    );
+    const byline = screen.getByRole('region', { name: 'Event organiser' });
+    expect(within(byline).getByText('Ada Host')).toBeTruthy();
+    expect(within(byline).getByText('Conference Friends')).toBeTruthy();
+    expect(within(byline).getByText('+ Follow Our organisation')).toBeTruthy();
+    const hosts = screen.getByRole('region', { name: 'Event hosts' });
+    expect(
+        within(hosts)
+            .getAllByRole('listitem')
+            .map((item) => item.textContent)
+    ).toEqual(['Ada Host', 'Conference Friends']);
+    expect(screen.getByRole('button', { name: 'Contact Our organisation' })).toBeTruthy();
+    expect(
+        screen
+            .getByRole('link', { name: 'About Our organisation and membership options' })
+            .getAttribute('href')
+    ).toBe('/about');
+});
