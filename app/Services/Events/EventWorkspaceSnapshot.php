@@ -199,9 +199,9 @@ final class EventWorkspaceSnapshot
         $ticketTypes = $event->ticketTypes()->where('is_active', true)->count();
         $items[] = [
             'key' => 'tickets',
-            'label' => $event->isFree() && $ticketTypes === 0 ? 'Free to attend' : 'Tickets on sale',
-            'done' => $event->isFree() || $ticketTypes > 0 || $event->ticket_price > 0,
-            'detail' => $ticketTypes > 0 ? $ticketTypes.' ticket '.($ticketTypes === 1 ? 'type' : 'types') : 'no ticket types',
+            'label' => ! $event->show_registration ? 'Registration hidden' : ($event->isFree() && $ticketTypes === 0 ? 'Free to attend' : 'Tickets on sale'),
+            'done' => ! $event->show_registration || $event->isFree() || $ticketTypes > 0 || $event->ticket_price > 0,
+            'detail' => ! $event->show_registration ? 'event information only' : ($ticketTypes > 0 ? $ticketTypes.' ticket '.($ticketTypes === 1 ? 'type' : 'types') : 'no ticket types'),
             'section' => $can('tickets') ? 'tickets' : null,
         ];
 

@@ -4,7 +4,7 @@ const PRINT_SIZE = 1200;
 const QUIET_ZONE = 80;
 
 function fileStem(event) {
-    return `${event.slug ?? 'event'}-register-qr`;
+    return `${event.slug ?? 'event'}-${event.show_registration === false ? 'event' : 'register'}-qr`;
 }
 
 function saveBlob(blob, filename) {
@@ -63,12 +63,16 @@ export default function ShareQrCard({ event, qr }) {
         <div className="mt-4 flex flex-wrap items-center gap-5 border border-border p-4">
             <img
                 src={qr}
-                alt={`QR code that opens the registration page for ${event.name}`}
+                alt={`QR code that opens the ${event.show_registration === false ? 'event' : 'registration'} page for ${event.name}`}
                 className="size-36 bg-white p-2"
             />
             <div className="min-w-0 flex-1 space-y-3">
                 <div>
-                    <h4 className="text-sm font-semibold text-ink">Scan to register</h4>
+                    <h4 className="text-sm font-semibold text-ink">
+                        {event.show_registration === false
+                            ? 'Scan to view event'
+                            : 'Scan to register'}
+                    </h4>
                     <p className="text-sm text-ink-secondary">
                         Put this on a poster, flyer or slide. Scanning it opens your public event
                         page.

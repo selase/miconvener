@@ -67,6 +67,28 @@ function formatAmount(amount, currency) {
 }
 
 function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl, publicQr }) {
+    const canManageEvent = Boolean(usePage().props.auth?.can?.update_event);
+    const [showRegistration, setShowRegistration] = useState(event.show_registration ?? true);
+    const [savingRegistration, setSavingRegistration] = useState(false);
+    const [registrationError, setRegistrationError] = useState('');
+    const changeRegistrationVisibility = async (next) => {
+        setSavingRegistration(true);
+        setRegistrationError('');
+        try {
+            const response = await csrfFetch(
+                route('tenant.events.registration-visibility', { event: event.id }),
+                { method: 'PATCH', body: JSON.stringify({ show_registration: next }) }
+            );
+            if (!response.ok) throw new Error('Unable to save');
+            const result = await response.json();
+            setShowRegistration(result.show_registration);
+            router.reload({ only: ['overview'] });
+        } catch {
+            setRegistrationError('Could not change registration visibility. Please try again.');
+        } finally {
+            setSavingRegistration(false);
+        }
+    };
     const [visibility, setVisibilityState] = useState(event.visibility ?? 'public');
 
     // Persisted immediately: a host toggling this is making a confidentiality
@@ -155,7 +177,10 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
             <div>
                 <h3 className="mb-2 text-sm font-semibold text-ink">Public event page</h3>
                 <CopyField value={publicUrl} />
-                <ShareQrCard event={event} qr={publicQr} />
+                <ShareQrCard
+                    event={{ ...event, show_registration: showRegistration }}
+                    qr={publicQr}
+                />
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                     <SegmentedControl
                         value={visibility}
@@ -172,6 +197,33 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
                     </p>
                 </div>
             </div>
+
+            {canManageEvent && (
+                <div>
+                    <label className="flex max-w-xl items-start gap-3 text-sm text-ink">
+                        <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4"
+                            checked={showRegistration}
+                            disabled={savingRegistration}
+                            onChange={(e) => changeRegistrationVisibility(e.target.checked)}
+                        />
+                        <span>
+                            Show registration on the event page
+                            <span className="mt-1 block text-xs text-ink-secondary">
+                                Turn this off to hide the form and stop new public registrations,
+                                without a closed message. Existing tickets and attendee access stay
+                                available. Publishing is a separate action.
+                            </span>
+                        </span>
+                    </label>
+                    {registrationError && (
+                        <p role="alert" className="mt-2 text-sm text-danger">
+                            {registrationError}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div>
                 <label className="flex max-w-xl items-start gap-3 text-sm text-ink">
