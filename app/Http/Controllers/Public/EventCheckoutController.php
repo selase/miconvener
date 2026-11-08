@@ -48,6 +48,8 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        abort_if($registrationModel->isImported(), 422, 'This is imported admission, not a MiConvener payment receipt. Open your attendee ticket instead.');
+
         if ($registrationModel->member_benefit_required) {
             $registrationModel->setRelation('event', Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($registrationModel->event_id));
             abort_unless($registrationModel->event->slug === $event && $this->canClaimWorkspace($registrationModel), 403);
@@ -153,6 +155,8 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        abort_if($registrationModel->isImported(), 422, 'Imported admission has no MiConvener admission payment to collect. External payments remain with the original provider.');
+
         if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
             throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);
         }
@@ -181,6 +185,8 @@ final class EventCheckoutController extends Controller
         $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
             ->where('id', $registration)
             ->firstOrFail();
+
+        abort_if($registrationModel->isImported(), 422, 'Imported admission has no MiConvener admission payment to collect. External payments remain with the original provider.');
 
         if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
             throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);

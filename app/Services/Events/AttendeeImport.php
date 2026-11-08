@@ -19,11 +19,14 @@ final class AttendeeImport
 {
     public const array HEADERS = ['full_name', 'email', 'phone', 'ticket_type', 'external_reference', 'payment_status', 'external_amount', 'currency'];
 
-    /** @param array<string,string|null> $mapping @param array<string,string|null> $ticketMapping */
+    /**
+     * @param  array<string,string|null>  $mapping
+     * @param  array<string,string|null>  $ticketMapping
+     */
     public function preview(Event $event, User $actor, UploadedFile $file, array $mapping = [], array $ticketMapping = [], string $source = 'csv'): EventAttendeeImport
     {
         $raw = file_get_contents($file->getRealPath());
-        if (! is_string($raw) || mb_strlen($raw) > 5 * 1024 * 1024 || ! mb_check_encoding($raw, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $raw)) {
+        if (! is_string($raw) || mb_strlen($raw, '8bit') > 5 * 1024 * 1024 || ! mb_check_encoding($raw, 'UTF-8') || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $raw)) {
             $this->invalid('Use a UTF-8 CSV text file no larger than 5 MiB.');
         }
         $records = $this->parse(preg_replace('/^\xEF\xBB\xBF/', '', $raw) ?? $raw);
@@ -166,6 +169,7 @@ final class AttendeeImport
         sort($rowIds);
         $digest = hash('sha256', json_encode($rowIds, JSON_THROW_ON_ERROR));
         $import = $candidate->getConnection()->transaction(function () use ($candidate, $operationKey, $rowIds, $digest): EventAttendeeImport {
+            $event = Event::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->event_id);
             $import = EventAttendeeImport::withoutGlobalScopes()->lockForUpdate()->findOrFail($candidate->id);
             if ($import->confirmed_at !== null) {
                 abort_unless($import->operation_key === $operationKey && hash_equals($import->selection_digest, $digest), 409, 'This import was already confirmed with different selections.');
@@ -173,6 +177,8 @@ final class AttendeeImport
                 return $import;
             }
             abort_if($import->expires_at->isPast(), 410, 'This preview expired. Upload and preview the CSV again.');
+            abort_unless(in_array($event->status, [Event::STATUS_DRAFT, Event::STATUS_PUBLISHED], true) && ! $event->trashed() && ($event->ends_at ?? $event->starts_at)->isFuture(), 409, 'This event ended, was cancelled or is unavailable.');
+            abort_if(EventAttendeeImport::withoutGlobalScopes()->where('tenant_id', $import->tenant_id)->where('event_id', $import->event_id)->where('operation_key', $operationKey)->where('id', '!=', $import->id)->exists(), 409, 'This operation key belongs to another preview.');
             $selected = $import->rows()->whereIn('id', $rowIds)->get();
             abort_unless($selected->count() === count($rowIds) && $selected->every(fn ($row): bool => $row->status === 'valid'), 422, 'Select only valid rows from this preview.');
             $import->rows()->whereIn('id', $rowIds)->update(['selected' => true, 'status' => 'pending']);
@@ -220,7 +226,7 @@ final class AttendeeImport
             $context->setTenant($tenant);
             setPermissionsTeamId($tenant->id);
             $actor->unsetRelation('roles')->unsetRelation('permissions');
-            if (! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event)) {
+            if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $actor->status !== User::STATUS_ACTIVE || ! $tenant->users()->whereKey($actor->id)->exists() || ! $actor->can('update event') || ! EventStaffScope::canAccessEvent($actor, $event)) {
                 $import->update(['status' => 'stopped', 'message' => 'The initiating staff member no longer has event import permission. Restore access and resume.']);
 
                 return;
@@ -255,7 +261,7 @@ final class AttendeeImport
                             abort_unless($ticket !== null && ! $ticket->isInviteOnly() && hash_equals($data['ticket_revision'], hash('sha256', json_encode($ticket->only(['name', 'is_active', 'capacity', 'access_code', 'member_price']), JSON_THROW_ON_ERROR))), 409, 'Ticket settings changed. Create a fresh preview.');
                         }
                         $count = $locked->registrations()->confirmed();
-                        $capacity = $ticket?->capacity ?? ($ticket === null ? $locked->capacity : null);
+                        $capacity = $ticket === null ? $locked->capacity : $ticket->capacity;
                         if ($ticket !== null) {
                             $count->where('ticket_type_id', $ticket->id);
                         }
@@ -302,7 +308,21 @@ final class AttendeeImport
         }
     }
 
-    /** @param array<string,mixed> $data @return array{?string,string} */
+    public function purge(): void
+    {
+        EventAttendeeImportRow::withoutGlobalScopes()->where('created_at', '<', now()->subDays(30))->whereNotNull('data')->update(['data' => null, 'errors' => null]);
+        EventAttendeeImport::withoutGlobalScopes()->where('status', 'preview')->where('expires_at', '<', now())->update(['status' => 'expired', 'message' => 'Preview expired. Upload a fresh CSV.']);
+    }
+
+    public function recover(): void
+    {
+        EventAttendeeImport::withoutGlobalScopes()->whereNotNull('confirmed_at')->whereIn('status', ['queued', 'running'])->where('updated_at', '<', now()->subMinutes(5))->limit(100)->get()->each(fn ($import) => $this->dispatch($import));
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @return array{?string,string}
+     */
     public function existing(Event $event, array $data, string $source): array
     {
         $matches = EventRegistration::withoutGlobalScopes()->where('tenant_id', $event->tenant_id)->where('event_id', $event->id)->where(function ($query) use ($data, $source): void {
@@ -331,7 +351,7 @@ final class AttendeeImport
         $state = 'start';
         $line = 1;
         $recordLine = 1;
-        $length = mb_strlen($raw);
+        $length = mb_strlen($raw, '8bit');
         for ($i = 0; $i <= $length; $i++) {
             $char = $i === $length ? "\n" : $raw[$i];
             if ($state === 'quoted') {
@@ -375,7 +395,7 @@ final class AttendeeImport
                 $state = 'text';
                 $cell .= $char;
             }
-            if (mb_strlen($cell) > 4096) {
+            if (mb_strlen($cell, '8bit') > 4096) {
                 $this->invalid('Keep every cell within 4,096 bytes.');
             }
         }

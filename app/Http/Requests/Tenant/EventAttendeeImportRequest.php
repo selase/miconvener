@@ -22,6 +22,7 @@ final class EventAttendeeImportRequest extends FormRequest
         return EventStaffScope::canAccessEvent($this->user(), $event);
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return match ($this->route()->getActionMethod()) {

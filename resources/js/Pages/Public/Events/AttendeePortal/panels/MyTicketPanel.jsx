@@ -194,6 +194,13 @@ export default function MyTicketPanel({
                 <div className="min-w-0 flex-1 text-left wrap-anywhere sm:basis-64">
                     <h2 className="text-lg font-medium text-ink">{registration.full_name}</h2>
                     <p className="text-sm text-ink-secondary">{event.name}</p>
+                    {registration.registration_source === 'external_import' && (
+                        <p className="mt-3 text-sm text-ink-secondary">
+                            {registration.admission_payment_label}. MiConvener did not collect or
+                            verify this external payment. Contact the organiser or original provider
+                            about external refunds.
+                        </p>
+                    )}
                     <dl className="mt-4 space-y-2 text-[13px]">
                         {[
                             ['Entry code', registration.ticket_code],

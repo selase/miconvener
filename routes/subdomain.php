@@ -185,10 +185,14 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('events/{event}/contributions/export', [EventController::class, 'exportContributions'])->name('tenant.events.contributions.export');
     Route::patch('events/{event}/contributions/settings', [EventController::class, 'updateContributionSettings'])->name('tenant.events.contributions.settings');
     Route::patch('events/{event}/contributions/{contribution}/toggle-approval', [EventController::class, 'toggleContributionApproval'])->name('tenant.events.contributions.toggle-approval');
+    Route::get('events/{event}/attendee-imports', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'index'])->name('tenant.events.attendee-imports.index');
     Route::get('events/{event}/attendee-imports/template', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'template'])->name('tenant.events.attendee-imports.template');
     Route::post('events/{event}/attendee-imports/{import}/confirm', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'confirm'])->name('tenant.events.attendee-imports.confirm');
     Route::post('events/{event}/attendee-imports/{import}/resume', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'resume'])->name('tenant.events.attendee-imports.resume');
+    Route::post('events/{event}/attendee-imports/{import}/invite', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'invite'])->name('tenant.events.attendee-imports.invite');
+    Route::post('events/{event}/attendee-imports/{import}/retry-invitations', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'retryInvitations'])->name('tenant.events.attendee-imports.retry-invitations');
     Route::post('events/{event}/attendee-imports/preview', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'preview'])->name('tenant.events.attendee-imports.preview');
+    Route::get('events/{event}/attendee-imports/{import}/export', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'export'])->name('tenant.events.attendee-imports.export');
     Route::get('events/{event}/attendee-imports/{import}', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'show'])->name('tenant.events.attendee-imports.show');
     Route::post('events/{event}/registrations/{registration}/approve', [EventRegistrationController::class, 'approve'])->name('tenant.events.registrations.approve');
     Route::post('events/{event}/registrations/{registration}/reject', [EventRegistrationController::class, 'reject'])->name('tenant.events.registrations.reject');

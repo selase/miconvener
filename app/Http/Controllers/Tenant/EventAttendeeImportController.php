@@ -14,6 +14,21 @@ use Illuminate\Http\JsonResponse;
 
 final class EventAttendeeImportController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $response = $next($request);
+            $response->headers->set('Cache-Control', 'private, no-store');
+
+            return $response;
+        });
+    }
+
+    public function index(EventAttendeeImportRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        return response()->json(['imports' => EventAttendeeImport::query()->where('tenant_id', app(TenantContext::class)->getTenant()?->id)->where('event_id', $event)->where('user_id', $request->user()->id)->latest()->limit(10)->get(['id', 'status', 'created_at'])])->header('Cache-Control', 'private, no-store');
+    }
+
     public function template(EventAttendeeImportRequest $request, string $subdomain, string $event): \Illuminate\Http\Response
     {
         return response(implode(',', AttendeeImport::HEADERS)."\r\n", 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="attendees.csv"', 'Cache-Control' => 'private, no-store']);
@@ -45,6 +60,40 @@ final class EventAttendeeImportController extends Controller
         return $this->result($batch->fresh(), $request);
     }
 
+    public function invite(EventAttendeeImportRequest $request, string $subdomain, string $event, string $import, \App\Services\Events\AttendeeImportInvitations $service): JsonResponse
+    {
+        $batch = $this->find($request, $event, $import);
+        $service->select($batch, $request->validated('operation_key'), $request->validated('registrations'));
+
+        return $this->result($batch, $request);
+    }
+
+    public function retryInvitations(EventAttendeeImportRequest $request, string $subdomain, string $event, string $import, \App\Services\Events\AttendeeImportInvitations $service): JsonResponse
+    {
+        $batch = $this->find($request, $event, $import);
+        $service->dispatchPending($batch->id);
+
+        return $this->result($batch, $request);
+    }
+
+    public function export(EventAttendeeImportRequest $request, string $subdomain, string $event, string $import): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $batch = $this->find($request, $event, $import);
+
+        return response()->streamDownload(function () use ($batch): void {
+            $handle = fopen('php://output', 'wb');
+            fputcsv($handle, ['Line', 'Status', 'Name', 'Email', 'Errors'], escape: '');
+            $batch->rows()->chunk(100, function ($rows) use ($handle): void {
+                foreach ($rows as $row) {
+                    $data = $row->data;
+                    $cells = [$row->line, $row->status, $data['full_name'] ?? '', $data['email'] ?? '', implode(' ', $row->errors ?? [])];
+                    fputcsv($handle, array_map(fn ($value): string => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'".$value : (string) $value, $cells), escape: '');
+                }
+            });
+            fclose($handle);
+        }, 'attendee-import-results.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
+    }
+
     private function find(EventAttendeeImportRequest $request, string $event, string $import): EventAttendeeImport
     {
         return EventAttendeeImport::query()->where('tenant_id', app(TenantContext::class)->getTenant()?->id)->where('event_id', $event)->where('user_id', $request->user()->id)->findOrFail($import);
@@ -65,6 +114,6 @@ final class EventAttendeeImportController extends Controller
             return ['id' => $row->id, 'line' => $row->line, 'status' => $row->status, 'data' => $data, 'errors' => $row->errors, 'registration_id' => $row->registration_id];
         });
 
-        return response()->json(['id' => $import->id, 'status' => $import->status, 'expires_at' => $import->expires_at, 'message' => $import->message, 'rows' => $rows, 'counts' => $rows->countBy('status')])->header('Cache-Control', 'private, no-store');
+        return response()->json(['id' => $import->id, 'status' => $import->status, 'expires_at' => $import->expires_at, 'message' => $import->message, 'rows' => $rows, 'counts' => $rows->countBy('status'), 'invitations' => \App\Models\EventAttendeeImportInvitation::query()->where('import_id', $import->id)->get(['status'])->countBy('status')])->header('Cache-Control', 'private, no-store');
     }
 }

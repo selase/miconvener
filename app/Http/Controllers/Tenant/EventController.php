@@ -498,7 +498,7 @@ final class EventController extends Controller
 
         return response()->streamDownload(function () use ($eventModel): void {
             $handle = fopen('php://output', 'wb');
-            fputcsv($handle, ['Name', 'Email', 'Phone', 'Status', 'Ticket Code', 'Amount', 'Currency', 'Checked In At', 'Registered At']);
+            fputcsv($handle, ['Name', 'Email', 'Phone', 'Status', 'Ticket Code', 'MiConvener Amount', 'Currency', 'Checked In At', 'Registered At', 'Registration Source', 'Admission Payment', 'Declared External Amount (minor units)', 'External Currency']);
 
             $eventModel->registrations()->orderByDesc('created_at')->chunk(200, function ($registrations) use ($handle): void {
                 foreach ($registrations as $registration) {
@@ -512,6 +512,10 @@ final class EventController extends Controller
                         $registration->currency,
                         $registration->checked_in_at?->toIso8601String(),
                         $registration->created_at->toIso8601String(),
+                        $registration->registration_source,
+                        $registration->admissionPaymentLabel(),
+                        auth()->user()?->can('read finance') ? $registration->external_amount : null,
+                        auth()->user()?->can('read finance') ? $registration->external_currency : null,
                     ]);
                 }
             });
@@ -783,6 +787,10 @@ final class EventController extends Controller
                 'approval_note' => $registration->approval_note,
                 'ticket_code' => $registration->ticket_code,
                 'ticket_type_name' => $registration->ticketType?->name,
+                'registration_source' => $registration->registration_source,
+                'admission_payment_label' => $registration->admissionPaymentLabel(),
+                'external_amount' => auth()->user()?->can('read finance') ? $registration->external_amount : null,
+                'external_currency' => auth()->user()?->can('read finance') ? $registration->external_currency : null,
                 'amount' => $registration->amount,
                 'platform_fee_amount' => $registration->platform_fee_amount,
                 'currency' => $registration->currency,

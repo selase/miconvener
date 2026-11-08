@@ -1,3 +1,4 @@
+import AttendeeImportPanel from './AttendeeImportPanel';
 import PublicProfilesPanel from './panels/PublicProfilesPanel';
 import MemberPaymentReviewPanel from './MemberPaymentReviewPanel';
 import MemberBenefitsPanel from './MemberBenefitsPanel';
@@ -212,6 +213,7 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
 }
 
 function GuestsTab({ event, registrations }) {
+    const canImport = Boolean(usePage().props.auth?.can?.update_event);
     const reload = () => router.reload({ only: ['registrations'] });
     const [editing, setEditing] = useState(null);
     const [verifyingOffline, setVerifyingOffline] = useState(null);
@@ -322,6 +324,12 @@ function GuestsTab({ event, registrations }) {
                 </Button>
             </div>
 
+            {canImport && (
+                <div className="mb-4">
+                    <AttendeeImportPanel event={event} onImported={reload} />
+                </div>
+            )}
+
             {filteredRegistrations.length > 0 ? (
                 <Table>
                     <Thead>
@@ -360,8 +368,24 @@ function GuestsTab({ event, registrations }) {
                                     </StatusPill>
                                 </Td>
                                 <Td>
-                                    {registration.offline_payment_status ===
-                                    'pending_verification' ? (
+                                    {registration.registration_source === 'external_import' ? (
+                                        <span className="text-xs text-ink-muted">
+                                            {registration.admission_payment_label}
+                                            {registration.external_amount != null && (
+                                                <span className="block">
+                                                    {registration.external_currency}{' '}
+                                                    {(registration.external_amount / 100).toFixed(
+                                                        2
+                                                    )}{' '}
+                                                    declared
+                                                </span>
+                                            )}
+                                            <span className="block">
+                                                Refund external money through the original provider.
+                                            </span>
+                                        </span>
+                                    ) : registration.offline_payment_status ===
+                                      'pending_verification' ? (
                                         <button
                                             type="button"
                                             onClick={() => setVerifyingOffline(registration)}

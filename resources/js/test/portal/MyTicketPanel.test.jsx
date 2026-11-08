@@ -179,3 +179,19 @@ it('mounts the optional profile editor only when the server advertises availabil
         expect.objectContaining({ cache: 'no-store' })
     );
 });
+
+it('labels imported paid elsewhere admission without a platform receipt claim', () => {
+    render(
+        <MyTicketPanel
+            event={event}
+            registration={{
+                ...registration,
+                registration_source: 'external_import',
+                admission_payment_label: 'Paid elsewhere',
+            }}
+        />
+    );
+    expect(screen.getByText(/Paid elsewhere/)).toBeTruthy();
+    expect(screen.getByText(/did not collect or verify/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /payment receipt/i })).toBeNull();
+});

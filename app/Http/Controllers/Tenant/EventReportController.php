@@ -35,7 +35,11 @@ final class EventReportController extends Controller
         'ticket_type' => 'Ticket type',
         'ticket_code' => 'Ticket code',
         'seat' => 'Seat',
-        'amount' => 'Amount',
+        'registration_source' => 'Registration source',
+        'admission_payment_source' => 'Admission payment source',
+        'external_amount' => 'Declared external amount (minor units)',
+        'external_currency' => 'External currency',
+        'amount' => 'MiConvener amount',
         'platform_fee' => 'Platform fee',
         'currency' => 'Currency',
         'checked_in_at' => 'Checked in at',
@@ -53,7 +57,7 @@ final class EventReportController extends Controller
     /**
      * @var string[]
      */
-    private const array DEFAULT_REGISTRATION_COLUMNS = ['name', 'email', 'status', 'ticket_type', 'ticket_code', 'checked_in_at'];
+    private const array DEFAULT_REGISTRATION_COLUMNS = ['name', 'email', 'status', 'ticket_type', 'ticket_code', 'checked_in_at', 'registration_source', 'admission_payment_source'];
 
     public function index(string $subdomain, string $event): JsonResponse
     {
@@ -79,6 +83,7 @@ final class EventReportController extends Controller
                 'forum_threads' => $eventModel->forumThreads()->count(),
                 'poll_responses' => EventPollResponse::whereIn('poll_id', $eventModel->polls()->pluck('id'))->count(),
             ],
+            'payment_summary' => auth()->user()?->can('read finance') ? $this->paymentSummary($eventModel) : null,
             'available_columns' => $availableColumns,
             'default_columns' => self::DEFAULT_REGISTRATION_COLUMNS,
         ]);
@@ -499,6 +504,10 @@ final class EventReportController extends Controller
             'ticket_type' => $registration->ticketType?->name,
             'ticket_code' => $registration->ticket_code,
             'seat' => $seatLabel,
+            'registration_source' => $registration->registration_source,
+            'admission_payment_source' => $registration->admissionPaymentLabel(),
+            'external_amount' => auth()->user()?->can('read finance') ? $registration->external_amount : null,
+            'external_currency' => auth()->user()?->can('read finance') ? $registration->external_currency : null,
             'amount' => $registration->amount,
             'platform_fee' => $registration->platform_fee_amount,
             'currency' => $registration->currency,
@@ -506,6 +515,17 @@ final class EventReportController extends Controller
             'created_at' => $registration->created_at->toIso8601String(),
             default => '',
         };
+    }
+
+    /** @return array<string,list<array{currency:string,amount:int}>> */
+    private function paymentSummary(Event $event): array
+    {
+        $native = $event->registrations()->confirmed()->where('registration_source', 'native')->where('amount', '>', 0)->selectRaw('currency, sum(amount) as total')->groupBy('currency')->orderBy('currency')->toBase()->get();
+        $external = $event->registrations()->confirmed()->where('admission_payment_source', 'paid_elsewhere')->whereNotNull('external_amount')->selectRaw('external_currency as currency, sum(external_amount) as total')->groupBy('external_currency')->orderBy('external_currency')->toBase()->get();
+        $contributions = $event->contributions()->reorder()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->selectRaw('currency, sum(amount) as total')->groupBy('currency')->orderBy('currency')->toBase()->get();
+        $payload = fn ($rows): array => $rows->map(fn ($row): array => ['currency' => (string) $row->currency, 'amount' => (int) $row->total])->all();
+
+        return ['native' => $payload($native), 'external' => $payload($external), 'contributions' => $payload($contributions)];
     }
 
     private function findEvent(string $tenantId, string $eventId): Event
