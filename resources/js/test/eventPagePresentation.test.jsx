@@ -72,6 +72,61 @@ const org = {
 };
 
 describe('public event presentation', { timeout: 30000 }, () => {
+    it('keeps a neutral contact entry point when the managing organisation is hidden', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    show_managing_organisation: false,
+                    social_links_mode: 'hidden',
+                    contact_email: 'conference@example.org',
+                }}
+                org={org}
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Contact event team' }));
+        expect(screen.getByRole('link', { name: 'conference@example.org' }).href).toBe(
+            'mailto:conference@example.org'
+        );
+        expect(screen.queryByText('Managing organisation')).toBeNull();
+    });
+    it('hides managing credits and tenant socials while keeping the named event hosts', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    hosts: [{ id: 'host', name: 'University host', type: 'organisation' }],
+                    show_managing_organisation: false,
+                    social_links_mode: 'hidden',
+                    social_links: {},
+                }}
+                org={org}
+            />
+        );
+        expect(screen.queryByText('Managing organisation')).toBeNull();
+        expect(screen.queryByText('Managed by Our organisation')).toBeNull();
+        expect(screen.queryByRole('link', { name: 'Instagram' })).toBeNull();
+        expect(screen.getAllByText('University host').length).toBeGreaterThan(0);
+    });
+    it('uses only the event-specific social links and never labels them as managed by the tenant', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    show_managing_organisation: false,
+                    social_links_mode: 'event',
+                    social_links: { linkedin: 'https://linkedin.com/posts/event-123' },
+                }}
+                org={org}
+            />
+        );
+        expect(screen.getByRole('link', { name: 'LinkedIn' }).href).toBe(
+            'https://linkedin.com/posts/event-123'
+        );
+        expect(screen.queryByRole('link', { name: 'Instagram' })).toBeNull();
+        expect(screen.getByText('Event links')).toBeTruthy();
+        expect(screen.queryByText('Our organisation')).toBeNull();
+    });
     it('hides registration and its prompts while preserving event details and ticket recovery', () => {
         window.history.replaceState({}, '', '?attendee_area=register');
         try {

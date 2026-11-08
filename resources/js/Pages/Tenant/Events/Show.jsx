@@ -1,4 +1,5 @@
 import EventHostsPanel from './EventHostsPanel';
+import EventPublicBrandingPanel from './EventPublicBrandingPanel';
 import AttendeeImportPanel from './AttendeeImportPanel';
 import PublicProfilesPanel from './panels/PublicProfilesPanel';
 import MemberPaymentReviewPanel from './MemberPaymentReviewPanel';
@@ -628,6 +629,7 @@ export default function Show({
                     event={event}
                     canEdit={canManageEvent}
                 />
+                <EventPublicBrandingPanel key={event.id} event={event} canEdit={canManageEvent} />
                 {page.auth?.can?.manage_public_attendee_profiles && (
                     <PublicProfilesPanel eventId={event.id} />
                 )}

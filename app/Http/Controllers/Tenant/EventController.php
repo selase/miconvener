@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\UpdateEventPublicBrandingRequest;
 use App\Http\Requests\Tenant\UpdateEventRegistrationVisibilityRequest;
 use App\Libraries\Helper;
 use App\Models\Event;
@@ -314,6 +315,21 @@ final class EventController extends Controller
                 ? 'This event page invites visitors to follow the organiser and see its membership options.'
                 : 'This event page no longer shows follow or membership options.',
         ]);
+    }
+
+    public function updatePublicBranding(UpdateEventPublicBrandingRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $eventModel = $this->resolveEvent($this->getTenant(), $event);
+        $data = $request->validated();
+        $result = $eventModel->getConnection()->transaction(function () use ($eventModel, $data): array {
+            $locked = Event::query()->whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
+            $locked->update($data);
+
+            return $locked->only(['show_managing_organisation', 'social_links_mode', 'social_links']);
+        });
+
+        return response()->json($result);
     }
 
     public function updateRegistrationVisibility(UpdateEventRegistrationVisibilityRequest $request, string $subdomain, string $event): JsonResponse
@@ -979,6 +995,9 @@ final class EventController extends Controller
             'visibility' => $event->visibility,
             'show_community_prompts' => $event->showsCommunityPrompts(),
             'show_registration' => (bool) $event->show_registration,
+            'show_managing_organisation' => (bool) $event->show_managing_organisation,
+            'social_links_mode' => $event->social_links_mode,
+            'social_links' => $event->social_links ?? [],
             'speaker_slide_policy' => $event->speaker_slide_policy ?? Event::SPEAKER_POLICY_AFTER,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),

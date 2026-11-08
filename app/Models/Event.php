@@ -101,6 +101,10 @@ final class Event extends Model
         self::SPEAKER_POLICY_AFTER,
     ];
 
+    public const array SOCIAL_LINK_KEYS = ['website', 'instagram', 'x', 'facebook', 'linkedin', 'youtube'];
+
+    public const array SOCIAL_LINK_MODES = ['organisation', 'event', 'hidden'];
+
     protected $connection = 'landlord';
 
     /**
@@ -108,6 +112,8 @@ final class Event extends Model
      * an unsaved instance answers isPrivate() correctly rather than null.
      */
     protected $attributes = [
+        'show_managing_organisation' => true,
+        'social_links_mode' => 'organisation',
         'public_attendee_profiles' => false,
         'show_registration' => true,
         'members_only' => false,
@@ -146,6 +152,9 @@ final class Event extends Model
         'visibility',
         'show_community_prompts',
         'show_registration',
+        'show_managing_organisation',
+        'social_links_mode',
+        'social_links',
         'speaker_slide_policy',
         'plan_your_visit_content',
         'store_listing_id',
@@ -209,6 +218,8 @@ final class Event extends Model
         'allow_goodwill_messages' => 'boolean',
         'show_community_prompts' => 'boolean',
         'show_registration' => 'boolean',
+        'show_managing_organisation' => 'boolean',
+        'social_links' => 'array',
         'is_recurring' => 'boolean',
         'recurrence_days' => 'array',
         'recurrence_interval' => 'integer',
@@ -230,6 +241,26 @@ final class Event extends Model
     public static function uploadDisk(): string
     {
         return config('app.env') === 'production' ? 's3' : 'public';
+    }
+
+    /** @return array<string, string> */
+    public function publicSocialLinks(): array
+    {
+        $source = match ($this->social_links_mode) {
+            'organisation' => $this->tenant?->publicEventProfile()['links'] ?? [],
+            'event' => $this->social_links ?? [],
+            default => [],
+        };
+        $links = [];
+        foreach (self::SOCIAL_LINK_KEYS as $key) {
+            $url = $source[$key] ?? null;
+            if (is_string($url) && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array(mb_strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+                $links[$key] = $url;
+            }
+        }
+
+        return $links;
     }
 
     /** @return HasMany<EventHost, $this> */
