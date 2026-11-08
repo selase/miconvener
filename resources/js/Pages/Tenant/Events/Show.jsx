@@ -541,7 +541,7 @@ export default function Show({
     // One entry per section in the server's menu (App\Services\Events\EventSections).
     const panels = {
         overview: () => (
-            <div className="grid gap-6">
+            <div className="grid grid-cols-1 gap-6">
                 <OverviewNow event={event} overview={overview} />
                 <EventHostsPanel
                     key={`${event.id}-${event.hosts_version}`}

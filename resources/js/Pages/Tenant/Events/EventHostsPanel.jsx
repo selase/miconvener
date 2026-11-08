@@ -80,7 +80,7 @@ export default function EventHostsPanel({ event, canEdit }) {
             )}
             {canEdit ? (
                 <form onSubmit={save} className="mt-5 space-y-5">
-                    <fieldset disabled={busy || stale} className="space-y-5">
+                    <fieldset disabled={busy || stale} className="min-w-0 space-y-5">
                         {hosts.map((host, i) => (
                             <div
                                 key={host.id ?? host.key}
