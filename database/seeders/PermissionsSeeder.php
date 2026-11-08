@@ -50,6 +50,8 @@ final class PermissionsSeeder extends Seeder
          * only genuinely new ones, and never hands back a permission an
          * administrator removed from a built-in role on purpose.
          */
+        app(RoleSeeder::class)->ensureRoles(['Event Organiser']);
+
         foreach (RolePermissions::assign($created) as $missingRole) {
             $this->command?->warn("Built-in role [{$missingRole}] was not found; its new permissions were not granted.");
         }

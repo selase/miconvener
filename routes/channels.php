@@ -22,7 +22,7 @@ Broadcast::channel('event.{eventId}.sessions', function ($user, string $eventId)
     }
 
     return (string) $user->tenant_id === (string) $event->tenant_id
-        && App\Services\Events\EventStaffScope::canAccessEvent($user, $event);
+        && App\Services\Events\EventStaffScope::canListenToEvent($user, $event);
 });
 
 /**
@@ -37,5 +37,5 @@ Broadcast::channel('event.{eventId}.service-requests', function ($user, string $
     }
 
     return (string) $user->tenant_id === (string) $event->tenant_id
-        && App\Services\Events\EventStaffScope::canAccessEvent($user, $event);
+        && App\Services\Events\EventStaffScope::canListenToEvent($user, $event);
 });

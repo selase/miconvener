@@ -19,6 +19,55 @@ use Illuminate\Validation\Rule;
 
 final class EventSpeakerController extends Controller
 {
+    public function indexProfiles(string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('read event');
+        $eventModel = $this->profileEvent($event);
+
+        return response()->json($eventModel->speakers()->orderBy('name')->get()->map(fn (Speaker $speaker): array => $this->profilePayload($speaker)));
+    }
+
+    public function storeProfile(\App\Http\Requests\Tenant\EventSpeakerProfileRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $eventModel = $this->profileEvent($event);
+        $data = $request->safe()->except(['photo']);
+        if ($request->hasFile('photo')) {
+            $data['photo_path'] = \App\Libraries\Helper::processUploadedFile($request, 'photo', 'speaker', 'speakers', config('app.env') === 'production' ? 's3' : 'public');
+        }
+        $speaker = $eventModel->getConnection()->transaction(function () use ($eventModel, $data): Speaker {
+            $speaker = Speaker::create([...$data, 'tenant_id' => $eventModel->tenant_id]);
+            $eventModel->speakers()->attach($speaker->id, ['id' => (string) Str::uuid(), 'tenant_id' => $eventModel->tenant_id, 'role' => 'speaker', 'portal_token' => Str::random(40)]);
+
+            return $speaker;
+        });
+
+        return response()->json($this->profilePayload($speaker), 201);
+    }
+
+    public function updateProfile(\App\Http\Requests\Tenant\EventSpeakerProfileRequest $request, string $subdomain, string $event, string $speaker): JsonResponse
+    {
+        $eventModel = $this->profileEvent($event);
+        $speakerModel = $eventModel->getConnection()->transaction(function () use ($request, $eventModel, $speaker): Speaker {
+            $speakerModel = $eventModel->speakers()->where('speakers.id', $speaker)->lockForUpdate()->firstOrFail();
+            if ($speakerModel->eventSpeakers()->where('event_id', '!=', $eventModel->id)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['speaker' => 'This profile is shared with another event. Ask an organisation administrator to update it.']);
+            }
+            $data = $request->safe()->except(['photo']);
+            if ($request->hasFile('photo')) {
+                $previousPhoto = $speakerModel->photo_path;
+                $data['photo_path'] = \App\Libraries\Helper::processUploadedFile($request, 'photo', 'speaker', 'speakers', config('app.env') === 'production' ? 's3' : 'public');
+                if ($previousPhoto) {
+                    \App\Libraries\Helper::deleteFile($previousPhoto, config('app.env') === 'production' ? 's3' : 'public');
+                }
+            }
+            $speakerModel->update($data);
+
+            return $speakerModel;
+        });
+
+        return response()->json($this->profilePayload($speakerModel));
+    }
+
     public function store(Request $request, string $subdomain, string $event): JsonResponse
     {
         $this->authorize('update event');
@@ -130,6 +179,20 @@ final class EventSpeakerController extends Controller
             'message' => "Invitation sent to {$speakerModel->email}.",
             'last_invited_at' => $pivot->last_invited_at->toIso8601String(),
         ]);
+    }
+
+    private function profileEvent(string $event): Event
+    {
+        $eventModel = Event::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($event);
+        abort_unless(\App\Services\Events\EventStaffScope::canAccessEvent(request()->user(), $eventModel), 404);
+
+        return $eventModel;
+    }
+
+    /** @return array<string, mixed> */
+    private function profilePayload(Speaker $speaker): array
+    {
+        return [...$speaker->only(['id', 'name', 'email', 'title', 'organization', 'bio', 'website_url', 'linkedin_url', 'twitter_url']), 'photo_url' => $speaker->photoUrl()];
     }
 
     private function getTenant()

@@ -9,10 +9,13 @@ use App\Models\Event;
 use App\Models\EventOperationPillar;
 use App\Models\EventOperationTask;
 use App\Models\User;
+use App\Services\Events\EventStaffScope;
+use App\Services\Events\EventTeamScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 final class EventOperationController extends Controller
 {
@@ -22,10 +25,10 @@ final class EventOperationController extends Controller
 
         EventOperationPillar::seedDefaultsForEvent($event);
 
-        $pillars = $event->operationPillars()
+        $pillars = EventOperationPillar::query()->where('event_id', $event->id)->orderBy('sort_order')
             ->with([
-                'tasks' => function ($query): void {
-                    $query->with(['owner:id,first_name,last_name,email', 'dependencyTask:id,title,status'])
+                'tasks' => function ($query) use ($request, $event): void {
+                    $query->with(['owner' => fn ($query) => $query->select(['id', 'first_name', 'last_name', 'email'])->when(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id), fn ($query) => $query->whereIn('id', $this->allowedOwnerIds($request, $event))), 'dependencyTask:id,title,status'])
                         ->orderBy('due_date')
                         ->orderBy('created_at');
                 },
@@ -45,8 +48,25 @@ final class EventOperationController extends Controller
             'pillars_count' => $pillars->count(),
         ];
 
+        $canManageBudgets = ! EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id);
+        if (! $canManageBudgets) {
+            unset($summary['total_estimated_budget'], $summary['total_actual_budget']);
+        }
+        foreach ($pillars as $pillar) {
+            $canDeletePillar = true;
+            foreach ($pillar->tasks as $task) {
+                $canDeleteTask = $canManageBudgets || ((int) $task->getRawOriginal('estimated_budget') === 0 && (int) $task->getRawOriginal('actual_budget') === 0);
+                $task->setAttribute('can_delete', $canDeleteTask);
+                $canDeletePillar = $canDeletePillar && $canDeleteTask;
+                if (! $canManageBudgets) {
+                    $task->makeHidden(['estimated_budget', 'actual_budget']);
+                }
+            }
+            $pillar->setAttribute('can_delete', $canDeletePillar);
+        }
+
         $teamMembers = $event->tenant?->users()
-            ? $event->tenant->users()->select('users.id', 'users.first_name', 'users.last_name', 'users.email')->get()->map(fn ($u) => [
+            ? $event->tenant->users()->when(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id), fn ($query) => $query->whereIn('users.id', $this->allowedOwnerIds($request, $event)))->select('users.id', 'users.first_name', 'users.last_name', 'users.email')->get()->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
@@ -56,6 +76,7 @@ final class EventOperationController extends Controller
         return response()->json([
             'pillars' => $pillars,
             'summary' => $summary,
+            'can_manage_budgets' => $canManageBudgets,
             'team_members' => $teamMembers,
         ]);
     }
@@ -93,12 +114,14 @@ final class EventOperationController extends Controller
 
         return response()->json([
             'message' => 'Pillar created successfully.',
-            'pillar' => $pillar->load('tasks'),
+            'pillar' => $pillar->load('tasks')->setAttribute('can_delete', true),
         ], 201);
     }
 
     public function updatePillar(Request $request, string $subdomain, Event $event, EventOperationPillar $pillar): JsonResponse
     {
+        abort_unless((string) $pillar->event_id === (string) $event->id, 404);
+
         Gate::authorize('update event-operation');
 
         $validated = $request->validate([
@@ -112,13 +135,17 @@ final class EventOperationController extends Controller
 
         return response()->json([
             'message' => 'Pillar updated successfully.',
-            'pillar' => $pillar,
+            'pillar' => $pillar->setAttribute('can_delete', ! EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) || ! $this->pillarHasRecordedBudget($pillar)),
         ]);
     }
 
     public function destroyPillar(Request $request, string $subdomain, Event $event, EventOperationPillar $pillar): JsonResponse
     {
+        abort_unless((string) $pillar->event_id === (string) $event->id, 404);
+
         Gate::authorize('delete event-operation');
+
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) && $this->pillarHasRecordedBudget($pillar), 403, 'Ask an organisation administrator to remove a record with financial values.');
 
         $pillar->delete();
 
@@ -133,7 +160,7 @@ final class EventOperationController extends Controller
 
         $validated = $request->validate([
             'pillars' => ['required', 'array'],
-            'pillars.*.id' => ['required', 'uuid', 'exists:landlord.event_operation_pillars,id'],
+            'pillars.*.id' => ['required', 'uuid', Rule::exists('landlord.event_operation_pillars', 'id')->where('event_id', $event->id)],
             'pillars.*.sort_order' => ['required', 'integer'],
         ]);
 
@@ -151,17 +178,17 @@ final class EventOperationController extends Controller
         Gate::authorize('create event-operation');
 
         $validated = $request->validate([
-            'pillar_id' => ['required', 'uuid', 'exists:landlord.event_operation_pillars,id'],
+            'pillar_id' => ['required', 'uuid', Rule::exists('landlord.event_operation_pillars', 'id')->where('event_id', $event->id)],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'owner_id' => ['nullable', 'integer', 'exists:users,id'],
+            'owner_id' => ['nullable', 'integer', EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? Rule::in($this->allowedOwnerIds($request, $event)) : 'exists:users,id'],
             'owner_name' => ['nullable', 'string', 'max:255'],
             'due_date' => ['nullable', 'date'],
             'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
             'status' => ['nullable', 'string', 'in:not_started,in_progress,blocked,done'],
-            'dependency_task_id' => ['nullable', 'uuid', 'exists:landlord.event_operation_tasks,id'],
-            'estimated_budget' => ['nullable', 'numeric', 'min:0'],
-            'actual_budget' => ['nullable', 'numeric', 'min:0'],
+            'dependency_task_id' => ['nullable', 'uuid', Rule::exists('landlord.event_operation_tasks', 'id')->where('event_id', $event->id)],
+            'estimated_budget' => [EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? 'prohibited' : 'nullable', 'numeric', 'min:0'],
+            'actual_budget' => [EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? 'prohibited' : 'nullable', 'numeric', 'min:0'],
         ]);
 
         $ownerName = $validated['owner_name'] ?? null;
@@ -173,7 +200,8 @@ final class EventOperationController extends Controller
         $status = $validated['status'] ?? EventOperationTask::STATUS_NOT_STARTED;
         $completedAt = $status === EventOperationTask::STATUS_DONE ? now() : null;
 
-        $task = $event->operationTasks()->create([
+        $task = EventOperationTask::query()->create([
+            'event_id' => $event->id,
             'tenant_id' => $event->tenant_id,
             'pillar_id' => $validated['pillar_id'],
             'title' => $validated['title'],
@@ -191,26 +219,28 @@ final class EventOperationController extends Controller
 
         return response()->json([
             'message' => 'Task created successfully.',
-            'task' => $task->load(['owner:id,first_name,last_name,email', 'dependencyTask:id,title,status']),
+            'task' => $this->taskPayload($request, $event, $task->refresh()),
         ], 201);
     }
 
     public function updateTask(Request $request, string $subdomain, Event $event, EventOperationTask $task): JsonResponse
     {
+        abort_unless((string) $task->event_id === (string) $event->id, 404);
+
         Gate::authorize('update event-operation');
 
         $validated = $request->validate([
-            'pillar_id' => ['sometimes', 'required', 'uuid', 'exists:landlord.event_operation_pillars,id'],
+            'pillar_id' => ['sometimes', 'required', 'uuid', Rule::exists('landlord.event_operation_pillars', 'id')->where('event_id', $event->id)],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'owner_id' => ['nullable', 'integer', 'exists:users,id'],
+            'owner_id' => ['nullable', 'integer', EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? Rule::in($this->allowedOwnerIds($request, $event)) : 'exists:users,id'],
             'owner_name' => ['nullable', 'string', 'max:255'],
             'due_date' => ['nullable', 'date'],
             'priority' => ['nullable', 'string', 'in:low,medium,high,urgent'],
             'status' => ['nullable', 'string', 'in:not_started,in_progress,blocked,done'],
-            'dependency_task_id' => ['nullable', 'uuid', 'exists:landlord.event_operation_tasks,id'],
-            'estimated_budget' => ['nullable', 'numeric', 'min:0'],
-            'actual_budget' => ['nullable', 'numeric', 'min:0'],
+            'dependency_task_id' => ['nullable', 'uuid', Rule::exists('landlord.event_operation_tasks', 'id')->where('event_id', $event->id)],
+            'estimated_budget' => [EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? 'prohibited' : 'nullable', 'numeric', 'min:0'],
+            'actual_budget' => [EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? 'prohibited' : 'nullable', 'numeric', 'min:0'],
         ]);
 
         if (array_key_exists('owner_id', $validated)) {
@@ -242,12 +272,14 @@ final class EventOperationController extends Controller
 
         return response()->json([
             'message' => 'Task updated successfully.',
-            'task' => $task->fresh()->load(['owner:id,first_name,last_name,email', 'dependencyTask:id,title,status']),
+            'task' => $this->taskPayload($request, $event, $task->refresh()),
         ]);
     }
 
     public function updateTaskStatus(Request $request, string $subdomain, Event $event, EventOperationTask $task): JsonResponse
     {
+        abort_unless((string) $task->event_id === (string) $event->id, 404);
+
         Gate::authorize('update event-operation');
 
         $validated = $request->validate([
@@ -264,18 +296,47 @@ final class EventOperationController extends Controller
 
         return response()->json([
             'message' => 'Task status updated.',
-            'task' => $task->fresh()->load(['owner:id,first_name,last_name,email', 'dependencyTask:id,title,status']),
+            'task' => $this->taskPayload($request, $event, $task->refresh()),
         ]);
     }
 
     public function destroyTask(Request $request, string $subdomain, Event $event, EventOperationTask $task): JsonResponse
     {
+        abort_unless((string) $task->event_id === (string) $event->id, 404);
+
         Gate::authorize('delete event-operation');
+
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) && ((int) $task->estimated_budget !== 0 || (int) $task->actual_budget !== 0), 403, 'Ask an organisation administrator to remove a record with financial values.');
 
         $task->delete();
 
         return response()->json([
             'message' => 'Task deleted successfully.',
         ]);
+    }
+
+    private function pillarHasRecordedBudget(EventOperationPillar $pillar): bool
+    {
+        return EventOperationTask::query()->where('pillar_id', $pillar->id)
+            ->where(fn ($query) => $query->where('estimated_budget', '!=', 0)->orWhere('actual_budget', '!=', 0))->exists();
+    }
+
+    private function taskPayload(Request $request, Event $event, EventOperationTask $task): EventOperationTask
+    {
+        $organiser = EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id);
+        $task->load([
+            'owner' => fn ($query) => $query->select(['id', 'first_name', 'last_name', 'email'])->when($organiser, fn ($query) => $query->whereIn('id', $this->allowedOwnerIds($request, $event))),
+            'dependencyTask:id,title,status',
+        ]);
+
+        $task->setAttribute('can_delete', ! $organiser || ((int) $task->estimated_budget === 0 && (int) $task->actual_budget === 0));
+
+        return $organiser ? $task->makeHidden(['estimated_budget', 'actual_budget']) : $task;
+    }
+
+    /** @return list<int|string> */
+    private function allowedOwnerIds(Request $request, Event $event): array
+    {
+        return EventTeamScope::eligibleIds($request->user(), $event, $event->operationTasks()->whereNotNull('owner_id')->pluck('owner_id'));
     }
 }

@@ -16,7 +16,8 @@ export default function TeamFormModal({ mode, onClose, user, roles, statuses, ev
     });
 
     const chosenRole = roles.find((role) => String(role.id) === String(data.role));
-    const isEventStaff = chosenRole?.name === 'Event Staff';
+    const isEventScoped = chosenRole?.event_scoped === true;
+    const isEventOrganiser = isEventScoped && chosenRole?.name === 'Event Organiser';
 
     const toggleEvent = (eventId, checked) =>
         setData(
@@ -51,12 +52,17 @@ export default function TeamFormModal({ mode, onClose, user, roles, statuses, ev
                     roleLocked={mode === 'edit' && user?.can_change_role === false}
                 />
 
-                {isEventStaff && events.length > 0 && (
+                {isEventScoped && (
                     <fieldset>
-                        <legend className="text-sm font-medium text-ink">Events they work</legend>
+                        <legend className="text-sm font-medium text-ink">
+                            {isEventOrganiser
+                                ? 'Events they organise and manage'
+                                : 'Events they work'}
+                        </legend>
                         <p className="mt-1 text-xs text-ink-secondary">
-                            Leave all unticked to let them work every event. Tick events to limit
-                            them to just those.
+                            {isEventOrganiser
+                                ? 'Choose the events they can organise and manage. No events selected means no event access.'
+                                : 'Leave all unticked to let them work every event. Tick events to limit them to just those.'}
                         </p>
                         <div className="mt-2 max-h-56 space-y-2 overflow-y-auto border border-border p-3">
                             {events.map((event) => (

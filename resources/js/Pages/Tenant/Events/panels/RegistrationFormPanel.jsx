@@ -30,9 +30,10 @@ const FIELD_TYPES = [
     { value: 'number', label: 'Number' },
 ];
 
-export default function RegistrationFormPanel({ event, onChange }) {
+export default function RegistrationFormPanel({ event, onChange, canManageEventMoney = true }) {
     const [loading, setLoading] = useState(true);
     const [fields, setFields] = useState([]);
+    const [canEditFields, setCanEditFields] = useState(canManageEventMoney);
     const [settings, setSettings] = useState({
         collect_phone: true,
         require_phone: false,
@@ -86,6 +87,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
             if (res.ok) {
                 const data = await res.json();
                 setFields(data.form_fields || []);
+                setCanEditFields(data.can_edit_fields !== false);
                 setSettings(data.registration_settings || {});
             }
         } finally {
@@ -472,11 +474,17 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             attach pricing or conditional rules.
                         </p>
                     </div>
-                    <Button icon={Plus} onClick={openCreateModal}>
+                    <Button icon={Plus} onClick={openCreateModal} disabled={!canEditFields}>
                         Add Custom Field
                     </Button>
                 </div>
 
+                {!canEditFields && !loading && (
+                    <p className="mt-3 text-sm text-ink-secondary">
+                        An organisation administrator manages these questions because they affect
+                        ticket prices.
+                    </p>
+                )}
                 {loading ? (
                     <div className="py-8 text-center text-xs text-ink-secondary">
                         Loading form fields...
@@ -489,7 +497,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             You can define custom questions, attendance types (In-Person / Virtual),
                             roles (Doctor, Nurse, Student), and attach conditional pricing.
                         </p>
-                        <Button icon={Plus} onClick={openCreateModal}>
+                        <Button icon={Plus} onClick={openCreateModal} disabled={!canEditFields}>
                             Add First Custom Field
                         </Button>
                     </div>
@@ -562,7 +570,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     <button
                                         type="button"
                                         onClick={() => handleMoveField(idx, -1)}
-                                        disabled={idx === 0}
+                                        disabled={!canEditFields || idx === 0}
                                         className="p-1.5 text-ink-secondary hover:text-ink disabled:opacity-30"
                                         title="Move Up"
                                     >
@@ -571,7 +579,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     <button
                                         type="button"
                                         onClick={() => handleMoveField(idx, 1)}
-                                        disabled={idx === fields.length - 1}
+                                        disabled={!canEditFields || idx === fields.length - 1}
                                         className="p-1.5 text-ink-secondary hover:text-ink disabled:opacity-30"
                                         title="Move Down"
                                     >
@@ -579,6 +587,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     </button>
                                     <button
                                         type="button"
+                                        disabled={!canEditFields}
                                         onClick={() => openEditModal(field)}
                                         className="p-1.5 text-ink-secondary hover:text-accent ml-1"
                                         title="Edit Field"
@@ -587,6 +596,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     </button>
                                     <button
                                         type="button"
+                                        disabled={!canEditFields}
                                         onClick={() => setDeleteTarget(field)}
                                         className="p-1.5 text-ink-secondary hover:text-danger-fg"
                                         title="Delete Field"
@@ -866,6 +876,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                                     step="0.01"
                                                     min="0"
                                                     placeholder="Price (opt)"
+                                                    disabled={!canManageEventMoney}
                                                     value={opt.price}
                                                     onChange={(e) =>
                                                         updateOptionRow(

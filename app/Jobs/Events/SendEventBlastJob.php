@@ -23,12 +23,18 @@ final class SendEventBlastJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public function __construct(public EventBlast $blast) {}
+    public bool $requiresScopedActor = false;
+
+    public function __construct(public EventBlast $blast)
+    {
+        $actor = $blast->sentBy;
+        $this->requiresScopedActor = $actor !== null && \App\Services\Events\EventStaffScope::isEventOrganiser($actor, (string) $blast->tenant_id);
+    }
 
     public function handle(): void
     {
         $this->blast->refresh();
-        if ($this->blast->status === EventBlast::STATUS_CANCELLED || $this->blast->scheduled_at?->isFuture()) {
+        if (! app(EventAnnouncementDelivery::class)->canDispatchBlast($this->blast, $this->requiresScopedActor) || $this->blast->status === EventBlast::STATUS_CANCELLED || $this->blast->scheduled_at?->isFuture()) {
             return;
         }
         $event = $this->blast->event;
@@ -39,10 +45,10 @@ final class SendEventBlastJob implements ShouldQueue
         EventBlast::audienceQuery($event, $this->blast->audience)->chunkById(100, function ($registrations) use ($tenant, $claims, $preferences, $delivery, $event): void {
             $smsIds = [];
             foreach ($registrations as $registration) {
-                if ($this->blast->fresh()->status === EventBlast::STATUS_CANCELLED) {
+                if (! $delivery->canDispatchBlast($this->blast, $this->requiresScopedActor) || $this->blast->fresh()->status === EventBlast::STATUS_CANCELLED) {
                     return;
                 }
-                $delivery->queueEmail($this->blast, $registration);
+                $delivery->queueEmail($this->blast, $registration, $this->requiresScopedActor);
                 $phone = $preferences->normalise('sms', (string) $registration->phone);
                 if (! $this->blast->send_sms || $phone === null || ! $preferences->allowsMarketing($tenant, 'sms', $phone)) {
                     continue;
@@ -54,7 +60,7 @@ final class SendEventBlastJob implements ShouldQueue
                     ['name' => $registration->full_name, 'email' => $registration->email, 'phone' => $phone], EventNotificationLog::CHANNEL_SMS,
                     ['subject' => $this->blast->subject, 'body' => $this->blast->subject.': '.$this->blast->body], $this->blast);
                 if ($claim !== null) {
-                    $claim->update(['metadata' => array_merge($claim->metadata ?? [], ['registration_id' => $registration->id])]);
+                    $claim->update(['metadata' => array_merge($claim->metadata ?? [], ['registration_id' => $registration->id, 'requires_scoped_actor' => $this->requiresScopedActor])]);
                     $smsIds[] = $claim->id;
                 }
             }
@@ -62,6 +68,9 @@ final class SendEventBlastJob implements ShouldQueue
                 SendSmsBatchJob::dispatch($this->blast->tenant_id, $ids);
             }
         });
+        if (! $delivery->canDispatchBlast($this->blast, $this->requiresScopedActor)) {
+            return;
+        }
         EventBlast::withoutGlobalScopes()->whereKey($this->blast->id)->where('status', '!=', EventBlast::STATUS_CANCELLED)
             ->update(['status' => EventBlast::STATUS_SENT, 'sent_at' => now()]);
     }

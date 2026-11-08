@@ -30,15 +30,24 @@ function formatMoney(amount, currency) {
     return amount > 0 ? `${currency} ${(amount / 100).toFixed(2)}` : 'Free';
 }
 
-export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
+export default function Index({
+    events,
+    stats,
+    recentlyDeletedEvents = [],
+    canManageEventMoney = true,
+}) {
     const [modal, setModal] = useState(null);
     const [deleting, setDeleting] = useState(null);
     const [forcePurging, setForcePurging] = useState(null);
 
     const handleRestore = (delEvent) => {
-        router.post(route('tenant.events.restore', { event: delEvent.id }), {}, {
-            preserveScroll: true,
-        });
+        router.post(
+            route('tenant.events.restore', { event: delEvent.id }),
+            {},
+            {
+                preserveScroll: true,
+            }
+        );
     };
 
     return (
@@ -46,9 +55,11 @@ export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
             <PageHeader
                 title="Events"
                 actions={
-                    <Button icon={Plus} onClick={() => setModal({ mode: 'create' })}>
-                        New event
-                    </Button>
+                    canManageEventMoney ? (
+                        <Button icon={Plus} onClick={() => setModal({ mode: 'create' })}>
+                            New event
+                        </Button>
+                    ) : null
                 }
             />
 
@@ -72,15 +83,17 @@ export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
                             {stats.total_registered.toLocaleString()}
                         </div>
                     </div>
-                    <div className="rounded-lg border border-border p-4">
-                        <div className="text-xs text-ink-secondary">Collected this year</div>
-                        <div className="mt-1 text-2xl font-semibold text-ink">
-                            {formatMoney(stats.collected_this_year, 'GHS')}
+                    {canManageEventMoney && (
+                        <div className="rounded-lg border border-border p-4">
+                            <div className="text-xs text-ink-secondary">Collected this year</div>
+                            <div className="mt-1 text-2xl font-semibold text-ink">
+                                {formatMoney(stats.collected_this_year, 'GHS')}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
-                {recentlyDeletedEvents?.length > 0 && (
+                {canManageEventMoney && recentlyDeletedEvents?.length > 0 && (
                     <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 p-5">
                         <div className="mb-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -90,7 +103,8 @@ export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
                                 </h3>
                             </div>
                             <span className="text-xs font-medium text-amber-800">
-                                {recentlyDeletedEvents.length} event{recentlyDeletedEvents.length > 1 ? 's' : ''} in recovery
+                                {recentlyDeletedEvents.length} event
+                                {recentlyDeletedEvents.length > 1 ? 's' : ''} in recovery
                             </span>
                         </div>
                         <div className="space-y-2">
@@ -175,13 +189,18 @@ export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
                                             >
                                                 <Pencil className="h-4 w-4" strokeWidth={1.75} />
                                             </button>
-                                            <button
-                                                onClick={() => setDeleting(event)}
-                                                title="Delete event"
-                                                className="text-ink-secondary hover:text-danger-fg"
-                                            >
-                                                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
-                                            </button>
+                                            {canManageEventMoney && (
+                                                <button
+                                                    onClick={() => setDeleting(event)}
+                                                    title="Delete event"
+                                                    className="text-ink-secondary hover:text-danger-fg"
+                                                >
+                                                    <Trash2
+                                                        className="h-4 w-4"
+                                                        strokeWidth={1.75}
+                                                    />
+                                                </button>
+                                            )}
                                         </div>
                                     </Td>
                                 </Tr>
@@ -202,8 +221,16 @@ export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
                             <tr>
                                 <td colSpan={6}>
                                     <TableEmpty
-                                        title="No events yet"
-                                        description="Create your first event to start collecting registrations."
+                                        title={
+                                            canManageEventMoney
+                                                ? 'No events yet'
+                                                : 'No assigned events'
+                                        }
+                                        description={
+                                            canManageEventMoney
+                                                ? 'Create your first event to start collecting registrations.'
+                                                : 'Ask an organisation administrator to assign an event to you.'
+                                        }
                                     />
                                 </td>
                             </tr>

@@ -64,6 +64,7 @@ export default function OperationsPanel({ event }) {
     const [loadError, setLoadError] = useState(null);
     const [pillars, setPillars] = useState([]);
     const [summary, setSummary] = useState(null);
+    const [canManageBudgets, setCanManageBudgets] = useState(false);
     const [teamMembers, setTeamMembers] = useState([]);
     const [activePillarFilter, setActivePillarFilter] = useState('all');
     const [search, setSearch] = useState('');
@@ -106,6 +107,7 @@ export default function OperationsPanel({ event }) {
                 const data = await res.json();
                 setPillars(data.pillars || []);
                 setSummary(data.summary || null);
+                setCanManageBudgets(data.can_manage_budgets !== false);
                 setTeamMembers(data.team_members || []);
             } else {
                 setLoadError(
@@ -235,6 +237,11 @@ export default function OperationsPanel({ event }) {
                     : 0,
                 actual_budget: taskForm.actual_budget ? parseFloat(taskForm.actual_budget) : 0,
             };
+
+            if (!canManageBudgets) {
+                delete payload.estimated_budget;
+                delete payload.actual_budget;
+            }
 
             const res = await csrfFetch(url, {
                 method,
@@ -397,24 +404,26 @@ export default function OperationsPanel({ event }) {
                         </p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                Budget Variance
-                            </span>
-                            <DollarSign className="w-4 h-4 text-emerald-500" />
+                    {canManageBudgets && (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    Budget Variance
+                                </span>
+                                <DollarSign className="w-4 h-4 text-emerald-500" />
+                            </div>
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-2xl font-black text-slate-900 dark:text-white">
+                                    {event.currency || 'USD'}{' '}
+                                    {(summary.total_actual_budget / 100).toFixed(2)}
+                                </span>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">
+                                Est: {event.currency || 'USD'}{' '}
+                                {(summary.total_estimated_budget / 100).toFixed(2)}
+                            </p>
                         </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-slate-900 dark:text-white">
-                                {event.currency || 'USD'}{' '}
-                                {(summary.total_actual_budget / 100).toFixed(2)}
-                            </span>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-500">
-                            Est: {event.currency || 'USD'}{' '}
-                            {(summary.total_estimated_budget / 100).toFixed(2)}
-                        </p>
-                    </div>
+                    )}
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
@@ -573,7 +582,12 @@ export default function OperationsPanel({ event }) {
                                             <button
                                                 onClick={() => setDeletePillarTarget(pillar)}
                                                 className="p-1 text-slate-400 hover:text-rose-600 transition"
-                                                title="Delete custom pillar"
+                                                disabled={pillar.can_delete === false}
+                                                title={
+                                                    pillar.can_delete === false
+                                                        ? 'Ask an organisation administrator to remove a record with financial values.'
+                                                        : 'Delete custom pillar'
+                                                }
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
@@ -617,6 +631,12 @@ export default function OperationsPanel({ event }) {
                                                             <button
                                                                 onClick={() =>
                                                                     setDeleteTaskTarget(task)
+                                                                }
+                                                                disabled={task.can_delete === false}
+                                                                title={
+                                                                    task.can_delete === false
+                                                                        ? 'Ask an organisation administrator to remove a record with financial values.'
+                                                                        : 'Delete task'
                                                                 }
                                                                 className="text-slate-400 hover:text-rose-600 p-0.5"
                                                             >
@@ -694,10 +714,12 @@ export default function OperationsPanel({ event }) {
                                 </div>
 
                                 {/* Pillar Footer / Budget summary */}
-                                <div className="p-2.5 bg-slate-100/60 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 flex items-center justify-between">
-                                    <span>Spend: {(pillarAct / 100).toFixed(0)}</span>
-                                    <span>Budget: {(pillarEst / 100).toFixed(0)}</span>
-                                </div>
+                                {canManageBudgets && (
+                                    <div className="p-2.5 bg-slate-100/60 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 flex items-center justify-between">
+                                        <span>Spend: {(pillarAct / 100).toFixed(0)}</span>
+                                        <span>Budget: {(pillarEst / 100).toFixed(0)}</span>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -714,7 +736,9 @@ export default function OperationsPanel({ event }) {
                                 <th className="p-3.5">Due Date</th>
                                 <th className="p-3.5">Priority</th>
                                 <th className="p-3.5">Status</th>
-                                <th className="p-3.5 text-right">Budget (Est / Act)</th>
+                                {canManageBudgets && (
+                                    <th className="p-3.5 text-right">Budget (Est / Act)</th>
+                                )}
                                 <th className="p-3.5 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -777,10 +801,12 @@ export default function OperationsPanel({ event }) {
                                                 <option value="done">🟢 Done</option>
                                             </select>
                                         </td>
-                                        <td className="p-3.5 text-right font-mono">
-                                            {(task.estimated_budget / 100).toFixed(2)} /{' '}
-                                            {(task.actual_budget / 100).toFixed(2)}
-                                        </td>
+                                        {canManageBudgets && (
+                                            <td className="p-3.5 text-right font-mono">
+                                                {(task.estimated_budget / 100).toFixed(2)} /{' '}
+                                                {(task.actual_budget / 100).toFixed(2)}
+                                            </td>
+                                        )}
                                         <td className="p-3.5 text-right space-x-1">
                                             <button
                                                 onClick={() => openEditTask(task)}
@@ -790,6 +816,12 @@ export default function OperationsPanel({ event }) {
                                             </button>
                                             <button
                                                 onClick={() => setDeleteTaskTarget(task)}
+                                                disabled={task.can_delete === false}
+                                                title={
+                                                    task.can_delete === false
+                                                        ? 'Ask an organisation administrator to remove a record with financial values.'
+                                                        : 'Delete task'
+                                                }
                                                 className="p-1 text-slate-400 hover:text-rose-600"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1016,36 +1048,41 @@ export default function OperationsPanel({ event }) {
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                Estimated Budget ({event.currency || 'USD'})
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={taskForm.estimated_budget}
-                                onChange={(e) =>
-                                    setTaskForm({ ...taskForm, estimated_budget: e.target.value })
-                                }
-                            />
+                    {canManageBudgets && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    Estimated Budget ({event.currency || 'USD'})
+                                </label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={taskForm.estimated_budget}
+                                    onChange={(e) =>
+                                        setTaskForm({
+                                            ...taskForm,
+                                            estimated_budget: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    Actual Budget Spend ({event.currency || 'USD'})
+                                </label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={taskForm.actual_budget}
+                                    onChange={(e) =>
+                                        setTaskForm({ ...taskForm, actual_budget: e.target.value })
+                                    }
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                Actual Budget Spend ({event.currency || 'USD'})
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={taskForm.actual_budget}
-                                onChange={(e) =>
-                                    setTaskForm({ ...taskForm, actual_budget: e.target.value })
-                                }
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                         <Button type="button" onClick={() => setTaskModalOpen(false)}>

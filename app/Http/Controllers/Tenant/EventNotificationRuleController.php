@@ -9,6 +9,7 @@ use App\Jobs\Notifications\DispatchNotificationRuleJob;
 use App\Models\Event;
 use App\Models\EventNotificationRule;
 use App\Models\TenantNotificationSetting;
+use App\Services\Events\EventStaffScope;
 use App\Services\Notifications\AutomatedNotificationDispatcher;
 use App\Services\Notifications\NotificationGatewayService;
 use App\Support\PhoneNumber;
@@ -17,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 final class EventNotificationRuleController extends Controller
 {
@@ -24,11 +26,13 @@ final class EventNotificationRuleController extends Controller
     {
         Gate::authorize('read notification-rule');
 
+        $organiser = EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id);
         $rules = $event->notificationRules()
+            ->when($organiser, fn ($query) => $query->where('target_role', '!=', 'organizer')->where('target_audience', '!=', 'organizers'))
             ->latest('created_at')
             ->get();
 
-        $settings = TenantNotificationSetting::forTenant($event->tenant_id);
+        $settings = $organiser ? null : TenantNotificationSetting::forTenant($event->tenant_id);
 
         // Build audience options (standard + ticket types + dynamic cohorts)
         $audiences = [
@@ -38,6 +42,10 @@ final class EventNotificationRuleController extends Controller
             ['key' => 'speakers', 'label' => 'All Speakers & Presenters', 'role' => 'speaker'],
             ['key' => 'organizers', 'label' => 'Host Organizing Committee', 'role' => 'organizer'],
         ];
+
+        if ($organiser) {
+            $audiences = array_filter($audiences, fn (array $audience): bool => $audience['key'] !== 'organizers');
+        }
 
         foreach ($event->ticketTypes()->get(['id', 'name']) as $type) {
             $audiences[] = [
@@ -56,6 +64,7 @@ final class EventNotificationRuleController extends Controller
         }
 
         $recentLogs = $event->notificationLogs()
+            ->when($organiser, fn ($query) => $query->whereIn('rule_id', $rules->pluck('id'))->select(['id', 'rule_id', 'recipient_name', 'recipient_email', 'recipient_phone', 'channel', 'status', 'sent_at', 'created_at']))
             ->latest('created_at')
             ->limit(25)
             ->get();
@@ -88,6 +97,8 @@ final class EventNotificationRuleController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $this->validateOrganiserAudience($request, $event, $validated);
+
         $rule = $event->notificationRules()->create([
             'tenant_id' => $event->tenant_id,
             'name' => $validated['name'],
@@ -111,6 +122,9 @@ final class EventNotificationRuleController extends Controller
 
     public function update(Request $request, string $subdomain, Event $event, EventNotificationRule $rule): JsonResponse
     {
+        abort_unless((string) $rule->event_id === (string) $event->id, 404);
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) && ($rule->target_role === 'organizer' || $rule->target_audience === 'organizers'), 403);
+
         Gate::authorize('update notification-rule');
 
         $validated = $request->validate([
@@ -128,6 +142,8 @@ final class EventNotificationRuleController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $this->validateOrganiserAudience($request, $event, $validated + ['target_role' => $rule->target_role, 'target_audience' => $rule->target_audience]);
+
         $rule->update($validated);
 
         return response()->json([
@@ -138,6 +154,9 @@ final class EventNotificationRuleController extends Controller
 
     public function destroy(Request $request, string $subdomain, Event $event, EventNotificationRule $rule): JsonResponse
     {
+        abort_unless((string) $rule->event_id === (string) $event->id, 404);
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) && ($rule->target_role === 'organizer' || $rule->target_audience === 'organizers'), 403);
+
         Gate::authorize('delete notification-rule');
 
         $rule->delete();
@@ -149,6 +168,9 @@ final class EventNotificationRuleController extends Controller
 
     public function toggle(Request $request, string $subdomain, Event $event, EventNotificationRule $rule): JsonResponse
     {
+        abort_unless((string) $rule->event_id === (string) $event->id, 404);
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) && ($rule->target_role === 'organizer' || $rule->target_audience === 'organizers'), 403);
+
         Gate::authorize('update notification-rule');
 
         $rule->update(['is_active' => ! $rule->is_active]);
@@ -161,6 +183,9 @@ final class EventNotificationRuleController extends Controller
 
     public function dispatchNow(Request $request, string $subdomain, Event $event, EventNotificationRule $rule, AutomatedNotificationDispatcher $dispatcher): JsonResponse
     {
+        abort_unless((string) $rule->event_id === (string) $event->id, 404);
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) && ($rule->target_role === 'organizer' || $rule->target_audience === 'organizers'), 403);
+
         Gate::authorize('create notification-rule');
 
         // Resolving the list is one query and is worth doing here so the host
@@ -236,6 +261,7 @@ final class EventNotificationRuleController extends Controller
     public function updateSettings(Request $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('manage notification-settings');
+        abort_if(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id), 403);
 
         $validated = $request->validate([
             'sms_enabled' => ['required', 'boolean'],
@@ -251,6 +277,26 @@ final class EventNotificationRuleController extends Controller
             'message' => 'Tenant notification and billing settings updated.',
             'settings' => $settings->fresh(),
         ]);
+    }
+
+    /** @param array<string, mixed> $values */
+    private function validateOrganiserAudience(Request $request, Event $event, array $values): void
+    {
+        if (! EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id)) {
+            return;
+        }
+
+        $audience = (string) $values['target_audience'];
+        $role = (string) $values['target_role'];
+        $valid = $role === 'speaker' && $audience === 'speakers';
+        if ($role === 'attendee') {
+            $valid = in_array($audience, ['all', 'confirmed', 'checked_in'], true)
+                || (str_starts_with($audience, 'ticket_type:') && $event->ticketTypes()->whereKey(mb_substr($audience, 12))->exists())
+                || (str_starts_with($audience, 'group:') && $event->participantGroups()->whereKey(mb_substr($audience, 6))->exists());
+        }
+        if (! $valid) {
+            throw ValidationException::withMessages(['target_audience' => 'Choose an attendee or speaker audience from this event.']);
+        }
     }
 
     /**

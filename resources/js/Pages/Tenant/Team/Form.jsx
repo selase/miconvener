@@ -1,8 +1,13 @@
+import { cloneElement, useId } from 'react';
+
 function Field({ label, error, hint, children }) {
+    const id = useId();
     return (
         <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
-            {children}
+            <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-ink">
+                {label}
+            </label>
+            {cloneElement(children, { id })}
             {hint && !error && <p className="mt-1 text-sm text-ink-secondary">{hint}</p>}
             {error && <p className="mt-1 text-sm text-danger-fg">{error}</p>}
         </div>

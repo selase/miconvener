@@ -11,6 +11,13 @@ use Illuminate\Validation\Validator;
 
 final class UpdateEventCommercialTermsRequest extends FormRequest
 {
+    public const array PROTECTED_MONEY_FIELDS = [
+        'ticket_price', 'currency', 'member_ticket_price', 'fee_bearer', 'venue_booking_id',
+        'allow_offline_payments', 'offline_payment_instructions', 'offline_payment_bank_name',
+        'offline_payment_account_name', 'offline_payment_account_number',
+        'offline_payment_momo_number', 'offline_payment_momo_network',
+    ];
+
     public function authorize(): bool
     {
         return $this->user()?->can('update event') ?? false;
@@ -43,5 +50,21 @@ final class UpdateEventCommercialTermsRequest extends FormRequest
     public function messages(): array
     {
         return ['currency.size' => 'Use a three-letter currency code.', 'ticket_price.min' => 'The standard ticket price cannot be negative.'];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        if (! $tenant || ! $this->user() || ! \App\Services\Events\EventStaffScope::isEventOrganiser($this->user(), (string) $tenant->id)) {
+            return;
+        }
+        $event = Event::query()->where('tenant_id', $tenant->id)->findOrFail($this->route('event'));
+        foreach (self::PROTECTED_MONEY_FIELDS as $field) {
+            $stored = $event->getAttribute($field);
+            if ($this->exists($field) && ! (($this->input($field) === null || $this->input($field) === '') && $stored === null) && (string) $this->input($field) !== (string) $stored) {
+                throw \Illuminate\Validation\ValidationException::withMessages([$field => 'Only an organisation administrator can change payment settings.']);
+            }
+        }
+        $this->merge(['ticket_price' => $event->ticket_price, 'currency' => $event->currency]);
     }
 }

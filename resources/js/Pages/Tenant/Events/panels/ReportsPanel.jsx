@@ -35,7 +35,7 @@ const OTHER_EXPORTS = [
     },
 ];
 
-export default function ReportsPanel({ event }) {
+export default function ReportsPanel({ event, canManageEventMoney = true }) {
     const [data, setData] = useState(null);
     const [cols, setCols] = useState([]);
 
@@ -159,7 +159,10 @@ export default function ReportsPanel({ event }) {
             <div className="mt-5 border border-border p-4">
                 <b className="text-sm font-medium text-ink">Everything else you can export</b>
                 <div className="mt-3 flex flex-wrap gap-2">
-                    {OTHER_EXPORTS.map((x) => (
+                    {OTHER_EXPORTS.filter(
+                        (item) =>
+                            canManageEventMoney || !['settlement', 'audit-log'].includes(item.key)
+                    ).map((x) => (
                         <a
                             key={x.key}
                             href={route(x.route, { event: event.id })}

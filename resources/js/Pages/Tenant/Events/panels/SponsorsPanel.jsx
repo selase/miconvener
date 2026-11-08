@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
@@ -159,7 +160,12 @@ function SponsorCard({ event, sponsor, onChange }) {
                 <button
                     onClick={remove}
                     className="text-ink-secondary hover:text-danger-fg"
-                    title="Remove sponsor"
+                    disabled={sponsor.can_delete === false}
+                    title={
+                        sponsor.can_delete === false
+                            ? 'Ask an organisation administrator to remove a record with financial values.'
+                            : 'Remove sponsor'
+                    }
                 >
                     <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                 </button>
@@ -169,7 +175,7 @@ function SponsorCard({ event, sponsor, onChange }) {
     );
 }
 
-function NewSponsorForm({ event, onChange }) {
+function NewSponsorForm({ event, onChange, canManageAmounts }) {
     const [form, setForm] = useState({
         name: '',
         tier: 'supporting',
@@ -191,7 +197,8 @@ function NewSponsorForm({ event, onChange }) {
         if (form.booth) body.append('booth', form.booth);
         if (form.contact_name) body.append('contact_name', form.contact_name);
         if (form.contact_email) body.append('contact_email', form.contact_email);
-        if (form.amount) body.append('amount', Math.round(Number(form.amount) * 100));
+        if (canManageAmounts && form.amount)
+            body.append('amount', Math.round(Number(form.amount) * 100));
         if (form.logo) body.append('logo', form.logo);
 
         await csrfFetchFormData(route('tenant.events.sponsors.store', { event: event.id }), body);
@@ -246,14 +253,16 @@ function NewSponsorForm({ event, onChange }) {
                     value={form.contact_email}
                     onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
                 />
-                <Input
-                    label="Sponsorship amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                />
+                {canManageAmounts && (
+                    <Input
+                        label="Sponsorship amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.amount}
+                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                )}
             </div>
             <div className="mt-3.5">
                 <label className="mb-1.5 block text-sm font-medium text-ink">Logo</label>
@@ -278,6 +287,7 @@ function NewSponsorForm({ event, onChange }) {
 }
 
 export default function SponsorsPanel({ event }) {
+    const canManageAmounts = usePage().props.auth?.eventOrganiser !== true;
     const [sponsors, setSponsors] = useState(null);
 
     const load = () => {
@@ -316,12 +326,15 @@ export default function SponsorsPanel({ event }) {
                     <div className="text-xs text-ink-secondary">Sponsors</div>
                     <div className="mt-1 text-xl font-semibold text-ink">{sponsors.length}</div>
                 </div>
-                <div className="bg-surface p-4">
-                    <div className="text-xs text-ink-secondary">Sponsorship income</div>
-                    <div className="mt-1 text-xl font-semibold text-accent">
-                        {formatMoney(income, event.currency)}
+                {canManageAmounts && (
+                    <div className="bg-surface p-4">
+                        <div className="text-xs text-ink-secondary">Sponsorship income</div>
+                        <div className="mt-1 text-xl font-semibold text-accent">
+                            {formatMoney(income, event.currency)}
+                        </div>
                     </div>
-                </div>
+                )}
+
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Promises kept</div>
                     <div className="mt-1 text-xl font-semibold text-ink">
@@ -351,7 +364,7 @@ export default function SponsorsPanel({ event }) {
                 <p className="mb-5 text-sm text-ink-secondary">No sponsors yet.</p>
             )}
 
-            <NewSponsorForm event={event} onChange={load} />
+            <NewSponsorForm event={event} onChange={load} canManageAmounts={canManageAmounts} />
         </div>
     );
 }

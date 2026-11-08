@@ -44,6 +44,8 @@ final class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                'eventOrganiser' => $tenant !== null && $request->user() instanceof \App\Models\User
+                    && \App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), (string) $tenant->id),
                 // Hides owner-only navigation and actions; every route still
                 // checks the permission itself.
                 'can' => [

@@ -18,8 +18,20 @@ final class RoleSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->ensureRoles();
+    }
+
+    /**
+     * @param  list<string>|null  $names
+     */
+    public function ensureRoles(?array $names = null): void
+    {
         foreach ($this->roles() as $role) {
-            $model = Role::query()->updateOrCreate(['name' => $role['name']], $role);
+            if ($names !== null && ! in_array($role['name'], $names, true)) {
+                continue;
+            }
+
+            $model = Role::query()->firstOrCreate(['name' => $role['name'], 'tenant_id' => null, 'guard_name' => 'web'], $role);
 
             // A built-in role added after launch has none of its permissions
             // on an existing database: the permissions seeder only grants the
@@ -65,6 +77,13 @@ final class RoleSeeder extends Seeder
                 'uuid' => Str::uuid(),
                 'name' => 'Event Staff',
                 'slug' => str()->slug('Event Staff', '_'),
+                'guard_name' => 'web',
+            ],
+
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'Event Organiser',
+                'slug' => 'event_organiser',
                 'guard_name' => 'web',
             ],
 

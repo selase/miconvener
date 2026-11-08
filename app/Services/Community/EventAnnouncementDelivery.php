@@ -28,8 +28,35 @@ final class EventAnnouncementDelivery
 {
     public function __construct(private MessagingPreferences $preferences, private EmailAllowance $email, private SmsAllowance $sms, private CommunitySmsBudget $budget, private AnnouncementTransport $transport) {}
 
-    public function queueEmail(EventBlast $blast, EventRegistration $registration): void
+    public function canDispatchBlast(EventBlast $blast, bool $requiresScopedActor = false): bool
     {
+        $actor = \App\Models\User::withoutGlobalScopes()->find($blast->sent_by);
+        $scoped = $actor !== null && \App\Services\Events\EventStaffScope::isEventOrganiser($actor, (string) $blast->tenant_id);
+        if (! $requiresScopedActor && ! $scoped) {
+            return true;
+        }
+        $tenant = Tenant::query()->find($blast->tenant_id);
+        $event = \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $blast->tenant_id)->find($blast->event_id);
+        if ($actor === null || $actor->status === \App\Models\User::STATUS_INACTIVE || $tenant === null || $tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE || $event === null || $event->trashed()
+            || (! $actor->isGlobalSuperAdmin() && ! $tenant->users()->whereKey($actor->id)->exists())) {
+            return false;
+        }
+        $previousTeam = getPermissionsTeamId();
+        try {
+            setPermissionsTeamId($tenant->id);
+            $actor->unsetRelation('roles')->unsetRelation('permissions');
+
+            return $actor->can('update event') && \App\Services\Events\EventStaffScope::canAccessEvent($actor, $event);
+        } finally {
+            setPermissionsTeamId($previousTeam);
+        }
+    }
+
+    public function queueEmail(EventBlast $blast, EventRegistration $registration, bool $requiresScopedActor = false): void
+    {
+        if (! $this->canDispatchBlast($blast, $requiresScopedActor)) {
+            return;
+        }
         $tenant = $blast->tenant;
         $address = $this->preferences->normalise('email', (string) $registration->email);
         if ($tenant === null || $address === null) {
@@ -68,7 +95,7 @@ final class EventAnnouncementDelivery
             return;
         }
         try {
-            $this->transport->email($address, new EventBlastMail($blast, $registration->full_name, $claim->recipient_id, $claim->id));
+            $this->transport->email($address, new EventBlastMail($blast, $registration->full_name, $claim->recipient_id, $claim->id, $requiresScopedActor));
             EventBlastEmailClaim::query()->whereKey($claim->id)->where('status', 'reserved')->update(['status' => 'queued']);
         } catch (Throwable) {
             $claim->update(['status' => 'unknown', 'reason' => 'queue_outcome_unknown']);
@@ -86,7 +113,7 @@ final class EventAnnouncementDelivery
         }
         $claim = $mail->claimId === null ? null : EventBlastEmailClaim::query()->where('tenant_id', $tenant->id)->find($mail->claimId);
         if ($claim === null) {
-            return $this->preferences->allowsMarketing($tenant, 'email', $address) ? $send() : null;
+            return $this->canDispatchBlast($mail->blast, $mail->requiresScopedActor) && $this->preferences->allowsMarketing($tenant, 'email', $address) ? $send() : null;
         }
         $ready = $this->email->withLock($tenant, function () use ($tenant, $mail, $address, $claim): bool {
             $locked = EventBlastEmailClaim::query()->lockForUpdate()->findOrFail($claim->id);
@@ -94,7 +121,7 @@ final class EventAnnouncementDelivery
                 return false;
             }
             $blast = EventBlast::withoutGlobalScopes()->find($mail->blast->id);
-            $eligible = $blast !== null && $blast->event !== null && $blast->status !== EventBlast::STATUS_CANCELLED && $this->preferences->allowsMarketing($tenant, 'email', $address)
+            $eligible = $blast !== null && $this->canDispatchBlast($blast, $mail->requiresScopedActor) && $blast->event !== null && $blast->status !== EventBlast::STATUS_CANCELLED && $this->preferences->allowsMarketing($tenant, 'email', $address)
                 && EventBlast::audienceQuery($blast->event, $blast->audience)->whereRaw('lower(trim(email)) = ?', [$address])->exists();
             if (! $eligible) {
                 if ($locked->credit_receipt_id !== null) {
@@ -218,7 +245,7 @@ final class EventAnnouncementDelivery
     {
         $address = $this->preferences->normalise('sms', (string) $row->recipient_phone);
         $blast = EventBlast::withoutGlobalScopes()->where('tenant_id', $tenant->id)->find($row->source_id);
-        if ($address === null || $blast === null || $blast->event === null || $blast->status === EventBlast::STATUS_CANCELLED
+        if ($address === null || $blast === null || ! $this->canDispatchBlast($blast, (bool) ($row->metadata['requires_scoped_actor'] ?? false)) || $blast->event === null || $blast->status === EventBlast::STATUS_CANCELLED
             || ! TenantNotificationSetting::forTenant($tenant->id)->canSend('sms') || ! $this->preferences->allowsMarketing($tenant, 'sms', $address)) {
             return false;
         }

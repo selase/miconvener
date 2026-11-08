@@ -15,7 +15,6 @@ use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\PermissionCeiling;
-use App\Services\Events\EventStaffScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +62,7 @@ final class UserController extends Controller
                 && $user->id !== auth()->id(),
             // Your own role is never yours to change.
             'can_change_role' => $user->id !== auth()->id(),
-            // Events an Event Staff member works; empty means every event.
+            // Empty assignments grant all events to Event Staff and none to Event Organisers.
             'event_ids' => ($assignments->get($user->id) ?? collect())->pluck('event_id')->map(fn (mixed $id): string => (string) $id)->values()->all(),
         ]);
 
@@ -97,7 +96,7 @@ final class UserController extends Controller
 
         $validated = $request->validated();
 
-        $role = Role::findById($validated['role']);
+        $role = Role::query()->whereKey($validated['role'])->firstOrFail();
 
         DB::transaction(function () use ($validated, $tenant, $role): void {
             $password = Helper::generateRandomPassword();
@@ -115,7 +114,7 @@ final class UserController extends Controller
             $user->assignRole($role);
             $user->tenants()->attach($tenant->id);
 
-            if ($role->name === EventStaffScope::ROLE) {
+            if ($role->isEventScoped()) {
                 $this->syncEventAssignments($user, (string) $tenant->id, $validated['event_ids'] ?? []);
             }
 
@@ -156,12 +155,12 @@ final class UserController extends Controller
             'status' => $validated['status'],
         ]);
 
-        $role = Role::findById($validated['role']);
+        $role = Role::query()->whereKey($validated['role'])->firstOrFail();
 
         setPermissionsTeamId($tenant->id);
         $user->syncRoles([$role]);
 
-        $this->syncEventAssignments($user, (string) $tenant->id, $role->name === EventStaffScope::ROLE
+        $this->syncEventAssignments($user, (string) $tenant->id, $role->isEventScoped()
             ? ($validated['event_ids'] ?? [])
             : []);
 
@@ -203,7 +202,7 @@ final class UserController extends Controller
 
     /**
      * Replace the events a member is assigned to. Called with an empty list
-     * for anyone who isn't Event Staff, so a limit never lingers unseen after
+     * for anyone without a system event-scoped role, so a limit never lingers unseen after
      * a role change.
      *
      * @param  list<string>  $eventIds
@@ -228,7 +227,7 @@ final class UserController extends Controller
     }
 
     /**
-     * @return array<int, array{id: int, name: string}>
+     * @return array<int, array{id: int, name: string, event_scoped: bool}>
      */
     private function availableRoles(): array
     {
@@ -252,6 +251,7 @@ final class UserController extends Controller
         return $roles->map(fn ($role): array => [
             'id' => $role->id,
             'name' => $role->name,
+            'event_scoped' => $role->isEventScoped(),
         ])->values()->all();
     }
 

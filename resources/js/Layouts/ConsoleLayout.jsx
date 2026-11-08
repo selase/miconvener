@@ -103,6 +103,7 @@ export default function ConsoleLayout({ children, compact = false }) {
     const groups = visibleGroups(NAV_GROUPS, {
         features: tenant?.features ?? {},
         can: auth?.can ?? {},
+        eventOrganiser: auth?.eventOrganiser ?? false,
     });
     const [collapsed, setCollapsed] = useState(() =>
         typeof window === 'undefined'

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { usePage } from '@inertiajs/react';
 import {
     Trash2,
     Plus,
@@ -19,6 +20,7 @@ import { useToast } from '@/Components/Console/Toast';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 
 export default function SpeakersPanel({ event, speakers, onChange }) {
+    const scopedProfiles = usePage().props.canManageEventMoney === false;
     const [directory, setDirectory] = useState([]);
     const [selectedSpeakerId, setSelectedSpeakerId] = useState('');
     const [invitingId, setInvitingId] = useState(null);
@@ -49,10 +51,14 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
 
     useEffect(() => {
         loadDirectory();
-    }, []);
+    }, [event.id, scopedProfiles]);
 
     const loadDirectory = () => {
-        csrfFetch(route('tenant.speakers.index'))
+        csrfFetch(
+            scopedProfiles
+                ? route('tenant.events.speaker-profiles.index', { event: event.id })
+                : route('tenant.speakers.index')
+        )
             .then((r) => r.json())
             .then(setDirectory);
     };
@@ -103,7 +109,12 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
             if (newSpeaker.twitter_url) formData.append('twitter_url', newSpeaker.twitter_url);
             if (newPhoto) formData.append('photo', newPhoto);
 
-            const response = await csrfFetchFormData(route('tenant.speakers.store'), formData);
+            const response = await csrfFetchFormData(
+                scopedProfiles
+                    ? route('tenant.events.speaker-profiles.store', { event: event.id })
+                    : route('tenant.speakers.store'),
+                formData
+            );
             if (!response.ok) {
                 const err = await response.json();
                 toast?.(err.message || 'Failed to create speaker.');
@@ -113,10 +124,12 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
 
             const speaker = await response.json();
 
-            await csrfFetch(route('tenant.events.speakers.store', { event: event.id }), {
-                method: 'POST',
-                body: JSON.stringify({ speaker_id: speaker.id }),
-            });
+            if (!scopedProfiles) {
+                await csrfFetch(route('tenant.events.speakers.store', { event: event.id }), {
+                    method: 'POST',
+                    body: JSON.stringify({ speaker_id: speaker.id }),
+                });
+            }
 
             setDirectory((prev) => [...prev, speaker]);
             setNewSpeaker({
@@ -153,15 +166,24 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
             formData.append('name', editingSpeaker.name);
             formData.append('email', editingSpeaker.email);
             if (editingSpeaker.title) formData.append('title', editingSpeaker.title);
-            if (editingSpeaker.organization) formData.append('organization', editingSpeaker.organization);
+            if (editingSpeaker.organization)
+                formData.append('organization', editingSpeaker.organization);
             if (editingSpeaker.bio) formData.append('bio', editingSpeaker.bio);
-            if (editingSpeaker.website_url) formData.append('website_url', editingSpeaker.website_url);
-            if (editingSpeaker.linkedin_url) formData.append('linkedin_url', editingSpeaker.linkedin_url);
-            if (editingSpeaker.twitter_url) formData.append('twitter_url', editingSpeaker.twitter_url);
+            if (editingSpeaker.website_url)
+                formData.append('website_url', editingSpeaker.website_url);
+            if (editingSpeaker.linkedin_url)
+                formData.append('linkedin_url', editingSpeaker.linkedin_url);
+            if (editingSpeaker.twitter_url)
+                formData.append('twitter_url', editingSpeaker.twitter_url);
             if (editPhoto) formData.append('photo', editPhoto);
 
             const response = await csrfFetchFormData(
-                route('tenant.speakers.update', { speaker: editingSpeaker.id }),
+                scopedProfiles
+                    ? route('tenant.events.speaker-profiles.update', {
+                          event: event.id,
+                          speaker: editingSpeaker.id,
+                      })
+                    : route('tenant.speakers.update', { speaker: editingSpeaker.id }),
                 formData
             );
 
@@ -234,7 +256,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
             {/* Event Speakers List */}
             <div>
                 <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-ink">Event Speakers ({speakers.length})</h3>
+                    <h3 className="text-base font-semibold text-ink">
+                        Event Speakers ({speakers.length})
+                    </h3>
                 </div>
 
                 {speakers.length > 0 ? (
@@ -264,7 +288,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
 
                                     <div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-medium text-ink">{speaker.name}</span>
+                                            <span className="font-medium text-ink">
+                                                {speaker.name}
+                                            </span>
                                             {speaker.is_confirmed === true && (
                                                 <span className="inline-flex items-center gap-1 rounded bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
                                                     <CheckCircle className="h-3 w-3" /> Confirmed
@@ -275,15 +301,19 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                                     <XCircle className="h-3 w-3" /> Declined
                                                 </span>
                                             )}
-                                            {speaker.is_confirmed === null || speaker.is_confirmed === undefined ? (
+                                            {speaker.is_confirmed === null ||
+                                            speaker.is_confirmed === undefined ? (
                                                 <span className="inline-flex items-center gap-1 rounded bg-surface-alt px-2 py-0.5 text-[11px] font-medium text-ink-secondary">
-                                                    <Clock className="h-3 w-3" /> Pending confirmation
+                                                    <Clock className="h-3 w-3" /> Pending
+                                                    confirmation
                                                 </span>
                                             ) : null}
                                         </div>
 
                                         <div className="mt-0.5 text-xs text-ink-secondary">
-                                            {[speaker.title, speaker.organization].filter(Boolean).join(' • ') || 'No title specified'}
+                                            {[speaker.title, speaker.organization]
+                                                .filter(Boolean)
+                                                .join(' • ') || 'No title specified'}
                                         </div>
 
                                         <div className="mt-0.5 text-xs text-ink-tertiary">
@@ -291,7 +321,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                             {speaker.last_invited_at && (
                                                 <span className="ml-2">
                                                     • Last invited:{' '}
-                                                    {new Date(speaker.last_invited_at).toLocaleDateString(undefined, {
+                                                    {new Date(
+                                                        speaker.last_invited_at
+                                                    ).toLocaleDateString(undefined, {
                                                         month: 'short',
                                                         day: 'numeric',
                                                         hour: '2-digit',
@@ -308,7 +340,11 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                         type="button"
                                         onClick={() => sendInviteEmail(speaker.id)}
                                         disabled={invitingId === speaker.id || !speaker.email}
-                                        title={speaker.email ? 'Send portal invitation email' : 'Add email first to invite'}
+                                        title={
+                                            speaker.email
+                                                ? 'Send portal invitation email'
+                                                : 'Add email first to invite'
+                                        }
                                         className="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1.5 text-xs font-medium text-ink hover:border-accent hover:text-accent disabled:opacity-50"
                                     >
                                         {invitingId === speaker.id ? (
@@ -356,13 +392,15 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                     </div>
                 ) : (
                     <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-ink-secondary">
-                        No speakers attached to this event yet. Add from directory or create one below.
+                        {scopedProfiles
+                            ? 'No speakers attached to this event yet. Create one below.'
+                            : 'No speakers attached to this event yet. Add from directory or create one below.'}
                     </div>
                 )}
             </div>
 
             {/* Attach Existing Speaker */}
-            {available.length > 0 && (
+            {!scopedProfiles && available.length > 0 && (
                 <div className="rounded-lg border border-border bg-surface p-4">
                     <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-ink-secondary">
                         Add from Speaker Directory
@@ -376,7 +414,8 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 <option value="">Select a speaker from directory...</option>
                                 {available.map((s) => (
                                     <option key={s.id} value={s.id}>
-                                        {s.name} {s.title ? `(${s.title})` : ''} — {s.email || 'No email'}
+                                        {s.name} {s.title ? `(${s.title})` : ''} —{' '}
+                                        {s.email || 'No email'}
                                     </option>
                                 ))}
                             </Select>
@@ -390,7 +429,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
 
             {/* Create New Speaker Form */}
             <div className="rounded-lg border border-border bg-surface p-5">
-                <h3 className="mb-4 text-sm font-semibold text-ink">Create New Speaker & Add to Event</h3>
+                <h3 className="mb-4 text-sm font-semibold text-ink">
+                    Create New Speaker & Add to Event
+                </h3>
                 <form onSubmit={createAndAttach} className="space-y-4">
                     {/* Headshot Upload & Preview */}
                     <div className="flex items-center gap-4">
@@ -408,7 +449,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-ink">Headshot Photo</label>
+                            <label className="block text-xs font-medium text-ink">
+                                Headshot Photo
+                            </label>
                             <input
                                 ref={newPhotoInputRef}
                                 type="file"
@@ -416,7 +459,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 onChange={handleNewPhotoChange}
                                 className="mt-1 block text-xs text-ink-secondary file:mr-2 file:rounded file:border-0 file:bg-surface-alt file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-ink hover:file:bg-surface-hover"
                             />
-                            <p className="mt-0.5 text-[11px] text-ink-tertiary">JPEG, PNG, or WebP up to 3MB</p>
+                            <p className="mt-0.5 text-[11px] text-ink-tertiary">
+                                JPEG, PNG, or WebP up to 3MB
+                            </p>
                         </div>
                     </div>
 
@@ -432,7 +477,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                             label="Email Address"
                             type="email"
                             value={newSpeaker.email}
-                            onChange={(e) => setNewSpeaker({ ...newSpeaker, email: e.target.value })}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, email: e.target.value })
+                            }
                             required
                             placeholder="speaker@example.com"
                         />
@@ -442,19 +489,25 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                         <Input
                             label="Professional Title"
                             value={newSpeaker.title}
-                            onChange={(e) => setNewSpeaker({ ...newSpeaker, title: e.target.value })}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, title: e.target.value })
+                            }
                             placeholder="e.g. Keynote Speaker / Founder"
                         />
                         <Input
                             label="Organization / Affiliation"
                             value={newSpeaker.organization}
-                            onChange={(e) => setNewSpeaker({ ...newSpeaker, organization: e.target.value })}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, organization: e.target.value })
+                            }
                             placeholder="e.g. University of Ghana"
                         />
                     </div>
 
                     <div>
-                        <label className="mb-1.5 block text-xs font-medium text-ink">Speaker Bio</label>
+                        <label className="mb-1.5 block text-xs font-medium text-ink">
+                            Speaker Bio
+                        </label>
                         <textarea
                             value={newSpeaker.bio}
                             onChange={(e) => setNewSpeaker({ ...newSpeaker, bio: e.target.value })}
@@ -469,21 +522,27 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                             label="Website URL"
                             type="url"
                             value={newSpeaker.website_url}
-                            onChange={(e) => setNewSpeaker({ ...newSpeaker, website_url: e.target.value })}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, website_url: e.target.value })
+                            }
                             placeholder="https://speaker.com"
                         />
                         <Input
                             label="LinkedIn Profile"
                             type="url"
                             value={newSpeaker.linkedin_url}
-                            onChange={(e) => setNewSpeaker({ ...newSpeaker, linkedin_url: e.target.value })}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, linkedin_url: e.target.value })
+                            }
                             placeholder="https://linkedin.com/in/..."
                         />
                         <Input
                             label="Twitter / X Profile"
                             type="url"
                             value={newSpeaker.twitter_url}
-                            onChange={(e) => setNewSpeaker({ ...newSpeaker, twitter_url: e.target.value })}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, twitter_url: e.target.value })
+                            }
                             placeholder="https://x.com/..."
                         />
                     </div>
@@ -525,7 +584,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 )}
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-ink">Change Headshot Photo</label>
+                                <label className="block text-xs font-medium text-ink">
+                                    Change Headshot Photo
+                                </label>
                                 <input
                                     ref={editPhotoInputRef}
                                     type="file"
@@ -533,7 +594,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                     onChange={handleEditPhotoChange}
                                     className="mt-1 block text-xs text-ink-secondary file:mr-2 file:rounded file:border-0 file:bg-surface-alt file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-ink hover:file:bg-surface-hover"
                                 />
-                                <p className="mt-0.5 text-[11px] text-ink-tertiary">JPEG, PNG, or WebP up to 3MB</p>
+                                <p className="mt-0.5 text-[11px] text-ink-tertiary">
+                                    JPEG, PNG, or WebP up to 3MB
+                                </p>
                             </div>
                         </div>
 
@@ -569,7 +632,10 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 label="Organization"
                                 value={editingSpeaker.organization || ''}
                                 onChange={(e) =>
-                                    setEditingSpeaker({ ...editingSpeaker, organization: e.target.value })
+                                    setEditingSpeaker({
+                                        ...editingSpeaker,
+                                        organization: e.target.value,
+                                    })
                                 }
                             />
                         </div>
@@ -592,7 +658,10 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 type="url"
                                 value={editingSpeaker.website_url || ''}
                                 onChange={(e) =>
-                                    setEditingSpeaker({ ...editingSpeaker, website_url: e.target.value })
+                                    setEditingSpeaker({
+                                        ...editingSpeaker,
+                                        website_url: e.target.value,
+                                    })
                                 }
                                 placeholder="https://"
                             />
@@ -601,7 +670,10 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 type="url"
                                 value={editingSpeaker.linkedin_url || ''}
                                 onChange={(e) =>
-                                    setEditingSpeaker({ ...editingSpeaker, linkedin_url: e.target.value })
+                                    setEditingSpeaker({
+                                        ...editingSpeaker,
+                                        linkedin_url: e.target.value,
+                                    })
                                 }
                                 placeholder="https://"
                             />
@@ -610,7 +682,10 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                                 type="url"
                                 value={editingSpeaker.twitter_url || ''}
                                 onChange={(e) =>
-                                    setEditingSpeaker({ ...editingSpeaker, twitter_url: e.target.value })
+                                    setEditingSpeaker({
+                                        ...editingSpeaker,
+                                        twitter_url: e.target.value,
+                                    })
                                 }
                                 placeholder="https://"
                             />

@@ -44,7 +44,7 @@ final class EventMaterialController extends Controller
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'session_id' => ['nullable', 'exists:event_sessions,id'],
+            'session_id' => ['nullable', \Illuminate\Validation\Rule::exists('event_sessions', 'id')->where('event_id', $eventModel->id)],
             'download_limit' => ['required', 'integer', 'min:1', 'max:100'],
             'release_at' => ['nullable', 'date'],
             'file' => ['required', 'file', 'max:20480'],

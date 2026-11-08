@@ -91,7 +91,7 @@ final class UpdateTeamMemberRequest extends FormRequest
                 },
             ],
             'status' => ['required', 'string'],
-            // The events an Event Staff member works; empty means every event.
+            // Empty grants all events to Event Staff and none to Event Organisers.
             'event_ids' => ['sometimes', 'array'],
             'event_ids.*' => [
                 'uuid',

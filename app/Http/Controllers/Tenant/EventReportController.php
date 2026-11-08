@@ -72,6 +72,7 @@ final class EventReportController extends Controller
         ]);
 
         $availableColumns = collect(self::REGISTRATION_COLUMNS)
+            ->when(\App\Services\Events\EventStaffScope::isEventOrganiser(request()->user(), (string) $tenant->id), fn ($columns) => $columns->except(['platform_fee', 'external_amount', 'external_currency']))
             ->map(fn (string $label, string $key): array => ['key' => $key, 'label' => $label])
             ->values()
             ->concat($customColumns);
@@ -83,7 +84,7 @@ final class EventReportController extends Controller
                 'forum_threads' => $eventModel->forumThreads()->count(),
                 'poll_responses' => EventPollResponse::whereIn('poll_id', $eventModel->polls()->pluck('id'))->count(),
             ],
-            'payment_summary' => auth()->user()?->can('read finance') ? $this->paymentSummary($eventModel) : null,
+            'payment_summary' => ! \App\Services\Events\EventStaffScope::isEventOrganiser(auth()->user(), (string) $this->getTenant()->id) && auth()->user()?->can('read finance') ? $this->paymentSummary($eventModel) : null,
             'available_columns' => $availableColumns,
             'default_columns' => self::DEFAULT_REGISTRATION_COLUMNS,
         ])->header('Cache-Control', 'private, no-store');
@@ -98,6 +99,9 @@ final class EventReportController extends Controller
         $formFields = $eventModel->formFields()->ordered()->get();
         $customKeyToLabel = $formFields->mapWithKeys(fn ($f): array => ['form_'.$f->field_key => $f->label])->all();
         $allPossibleColumns = array_merge(self::REGISTRATION_COLUMNS, self::OPTIONAL_COLUMNS, $customKeyToLabel);
+        if (\App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), (string) $tenant->id)) {
+            $allPossibleColumns = array_diff_key($allPossibleColumns, array_flip(['platform_fee', 'external_amount', 'external_currency']));
+        }
 
         $validated = $request->validate([
             'columns' => ['sometimes', 'array'],
@@ -510,8 +514,8 @@ final class EventReportController extends Controller
             'seat' => $seatLabel,
             'registration_source' => $registration->registration_source,
             'admission_payment_source' => $registration->admissionPaymentLabel(),
-            'external_amount' => auth()->user()?->can('read finance') ? $registration->external_amount : null,
-            'external_currency' => auth()->user()?->can('read finance') ? $registration->external_currency : null,
+            'external_amount' => ! \App\Services\Events\EventStaffScope::isEventOrganiser(auth()->user(), (string) $this->getTenant()->id) && auth()->user()?->can('read finance') ? $registration->external_amount : null,
+            'external_currency' => ! \App\Services\Events\EventStaffScope::isEventOrganiser(auth()->user(), (string) $this->getTenant()->id) && auth()->user()?->can('read finance') ? $registration->external_currency : null,
             'amount' => $registration->amount,
             'platform_fee' => $registration->platform_fee_amount,
             'currency' => $registration->currency,

@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $matched_at
+ */
 final class EventParticipantGroupMember extends Model
 {
     use BelongsToTenant;
@@ -27,16 +30,19 @@ final class EventParticipantGroupMember extends Model
         'matched_at',
     ];
 
+    /** @return BelongsTo<EventParticipantGroup, $this> */
     public function group(): BelongsTo
     {
         return $this->belongsTo(EventParticipantGroup::class, 'group_id');
     }
 
+    /** @return BelongsTo<EventRegistration, $this> */
     public function registration(): BelongsTo
     {
         return $this->belongsTo(EventRegistration::class, 'registration_id');
     }
 
+    /** @return BelongsTo<Event, $this> */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
