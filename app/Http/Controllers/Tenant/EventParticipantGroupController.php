@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventParticipantGroup;
+use App\Models\EventParticipantGroupMember;
 use App\Models\EventRegistration;
 use App\Services\Stratification\ParticipantStratificationService;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +31,7 @@ final class EventParticipantGroupController extends Controller
         $forms = $event->dynamicForms()->get(['id', 'title', 'schema']);
 
         return response()->json([
-            'groups' => $groups,
+            'groups' => $groups->map(fn (EventParticipantGroup $group): array|EventParticipantGroup => $this->groupPayload($request, $event, $group)),
             'meta' => [
                 'ticket_types' => $ticketTypes,
                 'sessions' => $sessions,
@@ -81,7 +82,7 @@ final class EventParticipantGroupController extends Controller
 
         return response()->json([
             'message' => 'Participant group created successfully.',
-            'group' => $group->fresh()->loadCount('members'),
+            'group' => $this->groupPayload($request, $event, $group->fresh()->loadCount('members')),
         ], 201);
     }
 
@@ -89,13 +90,35 @@ final class EventParticipantGroupController extends Controller
     {
         Gate::authorize('manage participant-groups');
 
-        $members = $group->members()
+        $members = EventParticipantGroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('event_id', $event->id)
+            ->where('tenant_id', $event->tenant_id)
             ->with(['registration.ticketType'])
             ->latest('matched_at')
             ->paginate(50);
+        if (\App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id)) {
+            $members->through(fn (EventParticipantGroupMember $member): array => [
+                'id' => $member->id,
+                'registration_id' => $member->registration_id,
+                'is_manual' => $member->is_manual,
+                'matched_at' => $member->matched_at?->toIso8601String(),
+                'registration' => $member->registration === null ? null : [
+                    'id' => $member->registration->id,
+                    'full_name' => $member->registration->full_name,
+                    'email' => $member->registration->email,
+                    'status' => $member->registration->status,
+                    'ticket_code' => $member->registration->ticket_code,
+                    'ticket_type' => $member->registration->ticketType === null ? null : [
+                        'id' => $member->registration->ticketType->id,
+                        'name' => $member->registration->ticketType->name,
+                    ],
+                ],
+            ]);
+        }
 
         return response()->json([
-            'group' => $group,
+            'group' => $this->groupPayload($request, $event, $group),
             'members' => $members,
         ]);
     }
@@ -121,7 +144,7 @@ final class EventParticipantGroupController extends Controller
 
         return response()->json([
             'message' => 'Participant group updated successfully.',
-            'group' => $group->fresh()->loadCount('members'),
+            'group' => $this->groupPayload($request, $event, $group->fresh()->loadCount('members')),
         ]);
     }
 
@@ -145,7 +168,7 @@ final class EventParticipantGroupController extends Controller
         return response()->json([
             'message' => "Group synced successfully: {$result['total_count']} members active ({$result['matched_count']} dynamic, {$result['manual_count']} manual).",
             'stats' => $result,
-            'group' => $group->fresh()->loadCount('members'),
+            'group' => $this->groupPayload($request, $event, $group->fresh()->loadCount('members')),
         ]);
     }
 
@@ -173,7 +196,7 @@ final class EventParticipantGroupController extends Controller
 
         return response()->json([
             'message' => "{$reg->full_name} added to {$group->name}.",
-            'group' => $group->fresh()->loadCount('members'),
+            'group' => $this->groupPayload($request, $event, $group->fresh()->loadCount('members')),
         ]);
     }
 
@@ -186,7 +209,7 @@ final class EventParticipantGroupController extends Controller
 
         return response()->json([
             'message' => 'Member removed from group.',
-            'group' => $group->fresh()->loadCount('members'),
+            'group' => $this->groupPayload($request, $event, $group->fresh()->loadCount('members')),
         ]);
     }
 
@@ -195,5 +218,15 @@ final class EventParticipantGroupController extends Controller
         Gate::authorize('manage participant-groups');
 
         return app(ParticipantStratificationService::class)->exportGroupCsv($group);
+    }
+
+    /** @return array<string, mixed>|EventParticipantGroup */
+    private function groupPayload(Request $request, Event $event, EventParticipantGroup $group): array|EventParticipantGroup
+    {
+        if (! \App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id)) {
+            return $group;
+        }
+
+        return array_intersect_key($group->attributesToArray(), array_flip(['id', 'name', 'slug', 'description', 'color', 'icon', 'type', 'criteria', 'member_count', 'members_count', 'created_at', 'updated_at']));
     }
 }

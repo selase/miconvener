@@ -23,7 +23,9 @@ vi.mock('@inertiajs/react', async (importOriginal) => ({
 
 const roles = [
     { id: 1, name: 'Org Admin' },
-    { id: 2, name: 'Event Staff' },
+    { id: 2, name: 'Event Staff', event_scoped: true },
+    { id: 3, name: 'Event Organiser', event_scoped: true },
+    { id: 4, name: 'Event Organiser', event_scoped: false },
 ];
 const events = [
     { id: 'e1', name: 'Health Summit', starts_at: '10 Oct 2026' },
@@ -53,6 +55,7 @@ describe('choosing the events an Event Staff member works', () => {
                 onClose={() => {}}
             />
         );
+        expect(screen.getByRole('combobox', { name: 'Role' })).toBeTruthy();
         expect(screen.queryByText('Events they work')).toBeNull();
         unmount();
 
@@ -85,4 +88,32 @@ describe('choosing the events an Event Staff member works', () => {
         expect(screen.getByLabelText(/Awards Gala/).checked).toBe(true);
         expect(screen.getByLabelText(/Health Summit/).checked).toBe(false);
     });
+});
+
+it('explains that an organiser without selections has no event access even with no events', () => {
+    render(
+        <TeamFormModal
+            mode="edit"
+            user={member(3)}
+            roles={roles}
+            statuses={['active']}
+            events={[]}
+            onClose={() => {}}
+        />
+    );
+    expect(screen.getByText(/No events selected means no event access/)).toBeTruthy();
+    expect(screen.queryByText(/work every event/)).toBeNull();
+});
+it('does not scope a custom role with the same name', () => {
+    render(
+        <TeamFormModal
+            mode="edit"
+            user={member(4)}
+            roles={roles}
+            statuses={['active']}
+            events={events}
+            onClose={() => {}}
+        />
+    );
+    expect(screen.queryByText(/No events selected means no event access/)).toBeNull();
 });

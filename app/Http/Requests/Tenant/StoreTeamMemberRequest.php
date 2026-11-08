@@ -65,7 +65,7 @@ final class StoreTeamMemberRequest extends FormRequest
             ],
             'status' => ['required', 'string'],
             'photo' => ['nullable', 'image', 'mimes:png,jpg,gif,svg', 'max:2048'],
-            // The events an Event Staff member works; empty means every event.
+            // Empty grants all events to Event Staff and none to Event Organisers.
             'event_ids' => ['sometimes', 'array'],
             'event_ids.*' => [
                 'uuid',

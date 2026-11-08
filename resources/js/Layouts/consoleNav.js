@@ -231,12 +231,14 @@ export function isGroupCollapsed({ hasLabel, collapsed, containsActive, compact 
  * The groups this person may see: items filtered by feature and permission,
  * and groups left with no items dropped.
  */
-export function visibleGroups(groups, { features = {}, can = {} } = {}) {
+export function visibleGroups(groups, { features = {}, can = {}, eventOrganiser = false } = {}) {
     return groups
         .map((group) => ({
             ...group,
             items: group.items.filter(
                 (item) =>
+                    (!eventOrganiser ||
+                        ['tenant.events.index', 'tenant.account'].includes(item.href)) &&
                     (!item.feature || features[item.feature]) &&
                     (!item.anyFeatures || item.anyFeatures.some((key) => features[key])) &&
                     (!item.permission || can[item.permission]) &&

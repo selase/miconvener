@@ -186,3 +186,13 @@ it('hides inactive empty Store navigation but retains authorised order and finan
         )
     ).toBeUndefined();
 });
+
+it('limits scoped organisers to assigned Events and their own account', () => {
+    expect(
+        visibleGroups(NAV_GROUPS, {
+            eventOrganiser: true,
+            can: { manage_billing: true, manage_venue: true },
+            features: { commerce_history: true },
+        }).flatMap((group) => group.items.map((item) => item.href))
+    ).toEqual(['tenant.events.index', 'tenant.account']);
+});

@@ -44,6 +44,8 @@ final class EventController extends Controller
         'contributions' => ['contributions'],
     ];
 
+    private ?bool $eventOrganiser = null;
+
     public function index(string $subdomain): Response
     {
         $this->authorize('read event');
@@ -66,15 +68,21 @@ final class EventController extends Controller
         $stats = [
             'events_this_year' => $allEvents->filter(fn (Event $e): bool => $e->starts_at->year === $now->year)->count(),
             'running_now' => $allEvents->filter(fn (Event $e): bool => $e->status === Event::STATUS_PUBLISHED && $e->starts_at->lte($now) && $e->ends_at->gte($now))->count(),
-            'total_registered' => (int) EventRegistration::where('tenant_id', $tenant->id)->confirmed()->count(),
+            'total_registered' => (int) EventRegistration::where('tenant_id', $tenant->id)->when($assignedOnly !== null, fn ($query) => $query->whereIn('event_id', $assignedOnly))->confirmed()->count(),
             'collected_this_year' => (int) EventRegistration::where('tenant_id', $tenant->id)
                 ->confirmed()
+                ->when($assignedOnly !== null, fn ($query) => $query->whereIn('event_id', $assignedOnly))
                 ->whereYear('created_at', $now->year)
                 ->sum('amount'),
         ];
 
+        if ($this->isEventOrganiser()) {
+            unset($stats['collected_this_year']);
+        }
+
         $recentlyDeletedEvents = Event::onlyTrashed()
             ->where('tenant_id', $tenant->id)
+            ->when($assignedOnly !== null, fn ($query) => $query->whereIn('id', $assignedOnly))
             ->where('purge_at', '>', $now)
             ->orderByDesc('deleted_at')
             ->get()
@@ -91,6 +99,7 @@ final class EventController extends Controller
 
         return Inertia::render('Tenant/Events/Index', [
             'events' => $events,
+            'canManageEventMoney' => ! $this->isEventOrganiser(),
             'stats' => $stats,
             'recentlyDeletedEvents' => $recentlyDeletedEvents,
         ]);
@@ -181,6 +190,11 @@ final class EventController extends Controller
         $eventModel = $this->resolveEvent($tenant, $event, ['ticketTypes']);
 
         $validated = $this->validateEvent($request);
+        if ($this->isEventOrganiser()) {
+            $validated = array_diff_key($validated, array_flip(\App\Http\Requests\Tenant\UpdateEventCommercialTermsRequest::PROTECTED_MONEY_FIELDS));
+            $validated['ticket_price'] = $eventModel->ticket_price;
+            $validated['currency'] = $eventModel->currency;
+        }
 
         // A takedown is MiConvener's to lift: while it stands the organiser
         // can still edit the event, but not republish it. Nor can anyone
@@ -256,6 +270,10 @@ final class EventController extends Controller
             if (empty($validated['contribution_title']) || $eventModel->contribution_title === $oldLexicon['contributions_title']) {
                 $validated['contribution_title'] = $newLexicon['contributions_title'];
             }
+        }
+
+        if ($this->isEventOrganiser()) {
+            $validated = array_diff_key($validated, array_flip(\App\Http\Requests\Tenant\UpdateEventCommercialTermsRequest::PROTECTED_MONEY_FIELDS));
         }
 
         $eventModel->update($validated);
@@ -546,8 +564,8 @@ final class EventController extends Controller
                         $registration->created_at->toIso8601String(),
                         $registration->registration_source,
                         $registration->admissionPaymentLabel(),
-                        auth()->user()?->can('read finance') ? $registration->external_amount : null,
-                        auth()->user()?->can('read finance') ? $registration->external_currency : null,
+                        ! $this->isEventOrganiser() && auth()->user()?->can('read finance') ? $registration->external_amount : null,
+                        ! $this->isEventOrganiser() && auth()->user()?->can('read finance') ? $registration->external_currency : null,
                     ]), escape: '');
                 }
             });
@@ -565,7 +583,7 @@ final class EventController extends Controller
         $filename = "{$eventModel->slug}-contributions.csv";
 
         $givingIds = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
-        $canFinance = auth()->user()->can('read finance');
+        $canFinance = ! $this->isEventOrganiser() && auth()->user()->can('read finance');
 
         return response()->streamDownload(function () use ($eventModel, $givingIds, $canFinance): void {
             $handle = fopen('php://output', 'wb');
@@ -731,25 +749,27 @@ final class EventController extends Controller
         $hasActiveGateway = $tenant->canAcceptPayments();
         $publicUrl = route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]);
         $givingLinks = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
-        $canReadGivingFinance = auth()->user()->can('read finance');
+        $canReadGivingFinance = ! $this->isEventOrganiser() && auth()->user()->can('read finance');
 
         return Inertia::render('Tenant/Events/Show', [
             'event' => [
                 ...$this->toPayload($eventModel),
                 // Set when MiConvener took the event down; the organiser sees why.
                 'takedown_reason' => $eventModel->taken_down_at !== null ? $eventModel->takedown_reason : null,
-                'platform_fee_percentage' => $eventModel->platform_fee_percentage,
-                'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
-                'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
-                'effective_fee_bearer' => $eventModel->effectiveFeeBearer(),
-                /**
-                 * What one ticket at the event's own price actually splits
-                 * into, so the organizer sees their net rather than inferring
-                 * it from a percentage.
-                 */
-                'fee_preview' => app(\App\Services\Finance\FeeCalculator::class)
-                    ->for($eventModel, (int) $eventModel->ticket_price)
-                    ->toArray(),
+                ...($this->isEventOrganiser() ? [] : [
+                    'platform_fee_percentage' => $eventModel->platform_fee_percentage,
+                    'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
+                    'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
+                    'effective_fee_bearer' => $eventModel->effectiveFeeBearer(),
+                    /**
+                     * What one ticket at the event's own price actually splits
+                     * into, so the organizer sees their net rather than inferring
+                     * it from a percentage.
+                     */
+                    'fee_preview' => app(\App\Services\Finance\FeeCalculator::class)
+                        ->for($eventModel, (int) $eventModel->ticket_price)
+                        ->toArray(),
+                ]),
             ],
             'registrations' => $section === 'guests' ? $this->registrationRows($eventModel) : [],
             'contributions' => $section === 'contributions' ? $eventModel->contributions()
@@ -784,7 +804,8 @@ final class EventController extends Controller
             ] : null,
             'stats' => $section === EventSections::OVERVIEW ? $this->overviewStats($eventModel) : null,
             'hasActiveGateway' => $hasActiveGateway,
-            'settlementMode' => $tenant->settlement_mode,
+            ...($this->isEventOrganiser() ? [] : ['settlementMode' => $tenant->settlement_mode]),
+            'canManageEventMoney' => ! $this->isEventOrganiser(),
             'publicUrl' => $publicUrl,
             'publicQr' => $section === EventSections::OVERVIEW ? QrCodeGenerator::svgDataUri($publicUrl, 1024) : null,
             'sections' => $sections->menuFor(request()->user(), $tenant, $eventModel),
@@ -808,7 +829,7 @@ final class EventController extends Controller
             ->get()
             ->map(fn (EventRegistration $registration): array => [
                 'member_benefit_required' => $registration->member_benefit_required,
-                'member_verification_url' => $registration->member_benefit_required ? route('public.events.checkout', ['subdomain' => $event->tenant->slug, 'event' => $event->slug, 'registration' => $registration->id, 'review' => 1]) : null,
+                'member_verification_url' => ! $this->isEventOrganiser() && $registration->member_benefit_required ? route('public.events.checkout', ['subdomain' => $event->tenant->slug, 'event' => $event->slug, 'registration' => $registration->id, 'review' => 1]) : null,
                 'member_payment_unresolved' => $registration->memberBenefitAttempts->contains(fn ($source): bool => ! in_array($source->state, ['failed', 'refunded'], true)),
                 'id' => $registration->id,
                 'full_name' => $registration->full_name,
@@ -821,17 +842,18 @@ final class EventController extends Controller
                 'ticket_type_name' => $registration->ticketType?->name,
                 'registration_source' => $registration->registration_source,
                 'admission_payment_label' => $registration->admissionPaymentLabel(),
-                'external_amount' => auth()->user()?->can('read finance') ? $registration->external_amount : null,
-                'external_currency' => auth()->user()?->can('read finance') ? $registration->external_currency : null,
+                'external_amount' => ! $this->isEventOrganiser() && auth()->user()?->can('read finance') ? $registration->external_amount : null,
+                'external_currency' => ! $this->isEventOrganiser() && auth()->user()?->can('read finance') ? $registration->external_currency : null,
                 'amount' => $registration->amount,
-                'platform_fee_amount' => $registration->platform_fee_amount,
+                ...($this->isEventOrganiser() ? [] : ['platform_fee_amount' => $registration->platform_fee_amount]),
+                'can_cancel_without_finance' => ! $this->isEventOrganiser() || \App\Services\Events\EventStaffScope::canCancelRegistration(request()->user(), $registration),
                 'currency' => $registration->currency,
                 'payment_method' => $registration->payment_method,
                 'offline_payment_status' => $registration->offline_payment_status,
-                'offline_payment_reference' => $registration->offline_payment_reference,
-                'offline_payment_notes' => $registration->offline_payment_notes,
-                'offline_payment_submitted_at' => $registration->offline_payment_submitted_at?->toIso8601String(),
-                'has_offline_proof' => filled($registration->offline_payment_proof_path),
+                ...($this->isEventOrganiser() ? [] : ['offline_payment_reference' => $registration->offline_payment_reference]),
+                ...($this->isEventOrganiser() ? [] : ['offline_payment_notes' => $registration->offline_payment_notes]),
+                ...($this->isEventOrganiser() ? [] : ['offline_payment_submitted_at' => $registration->offline_payment_submitted_at?->toIso8601String()]),
+                ...($this->isEventOrganiser() ? [] : ['has_offline_proof' => filled($registration->offline_payment_proof_path)]),
                 'seat_label' => $registration->seatAssignment?->seat_label,
                 'room_name' => $registration->seatAssignment?->room?->name,
                 'checked_in_at' => $registration->checked_in_at?->toIso8601String(),
@@ -857,8 +879,10 @@ final class EventController extends Controller
 
         return [
             'confirmed' => (int) ($totals->confirmed ?? 0),
-            'collected' => (int) ($totals->collected ?? 0),
-            'platform_fees' => (int) ($totals->platform_fees ?? 0),
+            ...($this->isEventOrganiser() ? [] : [
+                'collected' => (int) ($totals->collected ?? 0),
+                'platform_fees' => (int) ($totals->platform_fees ?? 0),
+            ]),
         ];
     }
 
@@ -976,12 +1000,15 @@ final class EventController extends Controller
         return $slug;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    private function isEventOrganiser(): bool
+    {
+        return $this->eventOrganiser ??= request()->user() instanceof \App\Models\User && \App\Services\Events\EventStaffScope::isEventOrganiser(request()->user(), (string) $this->getTenant()->id);
+    }
+
+    /** @return array<string, mixed> */
     private function toPayload(Event $event): array
     {
-        return [
+        $payload = [
             'hosts' => app(\App\Services\Events\EventHosts::class)->payload($event),
             'hosts_version' => (int) $event->hosts_version,
             'members_only' => $event->members_only, 'member_ticket_price' => $event->member_ticket_price,
@@ -1120,5 +1147,12 @@ final class EventController extends Controller
             'offline_payment_momo_number' => $event->offline_payment_momo_number,
             'offline_payment_momo_network' => $event->offline_payment_momo_network,
         ];
+        if ($this->isEventOrganiser()) {
+            foreach (['fee_bearer', 'contribution_fee_note', 'offline_payment_instructions', 'offline_payment_bank_name', 'offline_payment_account_name', 'offline_payment_account_number', 'offline_payment_momo_number', 'offline_payment_momo_network'] as $field) {
+                unset($payload[$field]);
+            }
+        }
+
+        return $payload;
     }
 }

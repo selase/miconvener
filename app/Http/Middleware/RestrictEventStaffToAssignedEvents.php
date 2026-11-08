@@ -6,17 +6,17 @@ namespace App\Http\Middleware;
 
 use App\Models\Event;
 use App\Models\User;
+use App\Services\Events\EventOrganiserAccess;
 use App\Services\Events\EventStaffScope;
 use App\Services\Tenancy\TenantContext;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Keeps Event Staff who have been assigned to particular events away from
- * every other event: any console route naming an event ({event}, by id or
- * slug) answers 404 for an event they don't work. One check here covers
- * every event page and action, so no route can be missed.
+ * Applies event assignments to pages, actions and nested bound resources.
+ * Scoped organisers additionally have only explicit nonfinancial event actions.
  */
 final class RestrictEventStaffToAssignedEvents
 {
@@ -26,7 +26,19 @@ final class RestrictEventStaffToAssignedEvents
         $tenant = app(TenantContext::class)->getTenant();
         $event = $request->route('event');
 
-        if (! $user instanceof User || $tenant === null || $event === null) {
+        if (! $user instanceof User || $tenant === null) {
+            return $next($request);
+        }
+
+        $organiser = EventStaffScope::isEventOrganiser($user, (string) $tenant->id);
+        if ($organiser && $request->routeIs('tenant.dashboard')) {
+            return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug]);
+        }
+        if ($event === null) {
+            if ($organiser && ! $request->routeIs('tenant.account', 'tenant.account.*')) {
+                abort_unless($request->routeIs('tenant.events.index'), 403);
+            }
+
             return $next($request);
         }
 
@@ -42,6 +54,20 @@ final class RestrictEventStaffToAssignedEvents
             || Event::query()->whereIn('id', $allowed)->where('slug', $reference)->exists();
 
         abort_unless($assigned, 404);
+        $eventId = in_array($reference, $allowed, true) ? $reference : (string) Event::query()
+            ->whereIn('id', $allowed)->where('slug', $reference)->value('id');
+        foreach ($request->route()->parameters() as $parameter) {
+            if ($parameter instanceof Model && array_key_exists('event_id', $parameter->getAttributes())) {
+                abort_unless((string) $parameter->getAttribute('event_id') === $eventId, 404);
+            }
+            if ($parameter instanceof \App\Models\EventAbstractReview) {
+                $abstract = $request->route('abstract');
+                abort_unless($abstract instanceof \App\Models\EventAbstract && (string) $parameter->abstract_id === (string) $abstract->id, 404);
+            }
+        }
+        if ($organiser) {
+            abort_unless(EventOrganiserAccess::allows($request->route()), 403);
+        }
 
         return $next($request);
     }

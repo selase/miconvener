@@ -232,6 +232,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/sessions/{session}/scan', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'scan'])->name('tenant.events.sessions.scan');
     Route::get('events/{event}/sessions/{session}/attendees', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'attendees'])->name('tenant.events.sessions.attendees');
 
+    Route::get('events/{event}/speaker-profiles', [EventSpeakerController::class, 'indexProfiles'])->name('tenant.events.speaker-profiles.index');
+    Route::post('events/{event}/speaker-profiles', [EventSpeakerController::class, 'storeProfile'])->name('tenant.events.speaker-profiles.store');
+    Route::put('events/{event}/speaker-profiles/{speaker}', [EventSpeakerController::class, 'updateProfile'])->name('tenant.events.speaker-profiles.update');
     Route::post('events/{event}/speakers', [EventSpeakerController::class, 'store'])->name('tenant.events.speakers.store');
     Route::delete('events/{event}/speakers/{speaker}', [EventSpeakerController::class, 'destroy'])->name('tenant.events.speakers.destroy');
 

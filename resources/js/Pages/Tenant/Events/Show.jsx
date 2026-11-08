@@ -67,7 +67,15 @@ function formatAmount(amount, currency) {
     return `${currency} ${(amount / 100).toFixed(2)}`;
 }
 
-function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl, publicQr }) {
+function OverviewTab({
+    event,
+    stats,
+    hasActiveGateway,
+    settlementMode,
+    publicUrl,
+    publicQr,
+    canManageEventMoney = true,
+}) {
     const canManageEvent = Boolean(usePage().props.auth?.can?.update_event);
     const [showRegistration, setShowRegistration] = useState(event.show_registration ?? true);
     const [savingRegistration, setSavingRegistration] = useState(false);
@@ -122,7 +130,7 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
 
     return (
         <div className="space-y-6">
-            {!event.is_free && !hasActiveGateway && (
+            {canManageEventMoney && !event.is_free && !hasActiveGateway && (
                 <div className="rounded-md bg-warning-bg px-4 py-3 text-sm text-warning-fg">
                     Connect a payment gateway under Settings → Payments before publishing this paid
                     event.
@@ -134,21 +142,28 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
                     <div className="text-xs text-ink-secondary">Registrations</div>
                     <div className="mt-1 text-2xl font-semibold text-ink">{confirmedCount}</div>
                 </div>
-                <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs text-ink-secondary">Collected</div>
-                    <div className="mt-1 text-2xl font-semibold text-ink">
-                        {formatAmount(revenue, event.currency)}
-                    </div>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs text-ink-secondary">
-                        Platform fee ({event.effective_platform_fee_percentage}%
-                        {event.effective_fee_bearer === 'attendee' ? ', paid by attendees' : ''})
-                    </div>
-                    <div className="mt-1 text-2xl font-semibold text-ink">
-                        {formatAmount(platformFees, event.currency)}
-                    </div>
-                </div>
+                {canManageEventMoney && (
+                    <>
+                        <div className="rounded-lg border border-border p-4">
+                            <div className="text-xs text-ink-secondary">Collected</div>
+                            <div className="mt-1 text-2xl font-semibold text-ink">
+                                {formatAmount(revenue, event.currency)}
+                            </div>
+                        </div>
+                        <div className="rounded-lg border border-border p-4">
+                            <div className="text-xs text-ink-secondary">
+                                Platform fee ({event.effective_platform_fee_percentage}%
+                                {event.effective_fee_bearer === 'attendee'
+                                    ? ', paid by attendees'
+                                    : ''}
+                                )
+                            </div>
+                            <div className="mt-1 text-2xl font-semibold text-ink">
+                                {formatAmount(platformFees, event.currency)}
+                            </div>
+                        </div>
+                    </>
+                )}
                 <div className="rounded-lg border border-border p-4">
                     <div className="text-xs text-ink-secondary">Capacity</div>
                     <div className="mt-1 text-2xl font-semibold text-ink">
@@ -169,11 +184,13 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
                 </p>
             )}
 
-            <p className="text-xs text-ink-secondary">
-                {settlementMode === 'platform_default'
-                    ? 'MiConvener collects payments for this event and pays out to your registered payout account. The platform fee above is deducted from what settles to you — see the Finance tab for the full breakdown.'
-                    : 'Money settles 100% to your own connected Paystack account. The platform fee shown above is what MiConvener separately invoices — it isn’t deducted automatically.'}
-            </p>
+            {canManageEventMoney && (
+                <p className="text-xs text-ink-secondary">
+                    {settlementMode === 'platform_default'
+                        ? 'MiConvener collects payments for this event and pays out to your registered payout account. The platform fee above is deducted from what settles to you — see the Finance tab for the full breakdown.'
+                        : 'Money settles 100% to your own connected Paystack account. The platform fee shown above is what MiConvener separately invoices — it isn’t deducted automatically.'}
+                </p>
+            )}
 
             <div>
                 <h3 className="mb-2 text-sm font-semibold text-ink">Public event page</h3>
@@ -266,7 +283,7 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
     );
 }
 
-export function GuestsTab({ event, registrations }) {
+export function GuestsTab({ event, registrations, canManageEventMoney = true }) {
     const canImport = Boolean(usePage().props.auth?.can?.update_event);
     const reload = () => router.reload({ only: ['registrations'] });
     const [editing, setEditing] = useState(null);
@@ -338,7 +355,7 @@ export function GuestsTab({ event, registrations }) {
                     >
                         Confirmed
                     </button>
-                    {pendingOfflineCount > 0 && (
+                    {canManageEventMoney && pendingOfflineCount > 0 && (
                         <button
                             type="button"
                             onClick={() => setActiveFilter('offline_pending')}
@@ -434,13 +451,14 @@ export function GuestsTab({ event, registrations }) {
                                                     declared
                                                 </span>
                                             )}
-                                            {registration.admission_payment_label ===
-                                                'Paid elsewhere' && (
-                                                <span className="block">
-                                                    Refund external money through the original
-                                                    provider.
-                                                </span>
-                                            )}
+                                            {canManageEventMoney &&
+                                                registration.admission_payment_label ===
+                                                    'Paid elsewhere' && (
+                                                    <span className="block">
+                                                        Refund external money through the original
+                                                        provider.
+                                                    </span>
+                                                )}
                                         </span>
                                     ) : registration.offline_payment_status ===
                                       'pending_verification' ? (
@@ -484,17 +502,20 @@ export function GuestsTab({ event, registrations }) {
                                 </Td>
                                 <Td align="right">
                                     <div className="flex items-center justify-end gap-3">
-                                        {registration.offline_payment_status ===
-                                            'pending_verification' && (
-                                            <button
-                                                onClick={() => setVerifyingOffline(registration)}
-                                                title="Inspect Slip & Verify"
-                                                className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-                                            >
-                                                <FileText className="h-3.5 w-3.5" />
-                                                Verify
-                                            </button>
-                                        )}
+                                        {canManageEventMoney &&
+                                            registration.offline_payment_status ===
+                                                'pending_verification' && (
+                                                <button
+                                                    onClick={() =>
+                                                        setVerifyingOffline(registration)
+                                                    }
+                                                    title="Inspect Slip & Verify"
+                                                    className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                                                >
+                                                    <FileText className="h-3.5 w-3.5" />
+                                                    Verify
+                                                </button>
+                                            )}
                                         <button
                                             onClick={() => setEditing(registration)}
                                             title="Edit"
@@ -522,14 +543,15 @@ export function GuestsTab({ event, registrations }) {
                                         )}
                                         {(registration.status === 'confirmed' ||
                                             registration.status === 'checked_in' ||
-                                            registration.status === 'waitlisted') && (
-                                            <button
-                                                onClick={() => act(registration, 'cancel')}
-                                                className="text-xs text-ink-secondary hover:text-danger-fg"
-                                            >
-                                                Cancel
-                                            </button>
-                                        )}
+                                            registration.status === 'waitlisted') &&
+                                            registration.can_cancel_without_finance !== false && (
+                                                <button
+                                                    onClick={() => act(registration, 'cancel')}
+                                                    className="text-xs text-ink-secondary hover:text-danger-fg"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            )}
                                     </div>
                                 </Td>
                             </Tr>
@@ -608,6 +630,7 @@ export default function Show({
     overview,
     contributions = [],
     contributionsStats = {},
+    canManageEventMoney = true,
 }) {
     const [editing, setEditing] = useState(false);
     const page = usePage().props;
@@ -638,27 +661,34 @@ export default function Show({
                     stats={stats}
                     hasActiveGateway={hasActiveGateway}
                     settlementMode={settlementMode}
+                    canManageEventMoney={canManageEventMoney}
                     publicUrl={publicUrl}
                     publicQr={publicQr}
                 />
             </div>
         ),
-        guests: () => <GuestsTab event={event} registrations={registrations} />,
+        guests: () => (
+            <GuestsTab
+                event={event}
+                registrations={registrations}
+                canManageEventMoney={canManageEventMoney}
+            />
+        ),
         tickets: () => (
             <div className="space-y-6">
                 <MemberBenefitsPanel
                     event={event}
                     enabled={event.member_benefits_enabled}
-                    canEdit={canManageEvent}
+                    canEdit={canManageEvent && canManageEventMoney}
                     onChange={reloadEvent}
                 />
                 <TicketTypesPanel
                     event={event}
                     ticketTypes={event.ticket_types}
-                    canEdit={canManageEvent}
+                    canEdit={canManageEvent && canManageEventMoney}
                     onChange={reloadEvent}
                 />
-                {event.has_member_benefit_history && (
+                {canManageEventMoney && event.has_member_benefit_history && (
                     <MemberPaymentReviewPanel event={event} canManage={canManageEvent} />
                 )}
             </div>
@@ -671,7 +701,13 @@ export default function Show({
             />
         ),
         'promo-codes': () => <PromoCodePanel event={event} onChange={reloadEvent} />,
-        'registration-form': () => <RegistrationFormPanel event={event} onChange={reloadEvent} />,
+        'registration-form': () => (
+            <RegistrationFormPanel
+                event={event}
+                onChange={reloadEvent}
+                canManageEventMoney={canManageEventMoney}
+            />
+        ),
         'attendee-groups': () => <StratificationPanel event={event} />,
         schedule: () => (
             <SchedulePanel
@@ -725,7 +761,7 @@ export default function Show({
         planning: () => <OperationsPanel event={event} />,
         sponsors: () => <SponsorsPanel event={event} />,
         finance: () => <FinancePanel event={event} />,
-        reports: () => <ReportsPanel event={event} />,
+        reports: () => <ReportsPanel event={event} canManageEventMoney={canManageEventMoney} />,
         certificates: () => <CertificatesPanel event={event} />,
     };
 

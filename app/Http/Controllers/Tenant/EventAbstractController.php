@@ -11,12 +11,15 @@ use App\Models\Event;
 use App\Models\EventAbstract;
 use App\Models\EventAbstractReview;
 use App\Models\User;
+use App\Services\Events\EventStaffScope;
+use App\Services\Events\EventTeamScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Throwable;
 
 final class EventAbstractController extends Controller
@@ -26,7 +29,7 @@ final class EventAbstractController extends Controller
         Gate::authorize('read abstract');
 
         $query = $event->abstracts()
-            ->with(['authors', 'reviews.reviewer', 'decider', 'sessions']);
+            ->with(['authors', 'reviews.reviewer' => fn ($query) => $query->when(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id), fn ($query) => $query->whereIn('id', $this->eligibleReviewerIds($request, $event))->select(['id', 'first_name', 'last_name', 'email'])), 'decider', 'sessions']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->query('status'));
@@ -62,7 +65,9 @@ final class EventAbstractController extends Controller
 
         // Potential reviewers in the tenant organization
         $reviewers = User::query()
-            ->where('tenant_id', $event->tenant_id)
+            ->when(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id),
+                fn ($query) => $query->whereIn('id', $this->eligibleReviewerIds($request, $event)),
+                fn ($query) => $query->where('tenant_id', $event->tenant_id))
             ->select(['id', 'first_name', 'last_name', 'email'])
             ->orderBy('first_name')
             ->get();
@@ -152,9 +157,11 @@ final class EventAbstractController extends Controller
 
     public function show(Request $request, string $subdomain, Event $event, EventAbstract $abstract): JsonResponse
     {
+        abort_unless((string) $abstract->event_id === (string) $event->id, 404);
+
         Gate::authorize('read abstract');
 
-        $abstract->load(['authors', 'reviews.reviewer', 'decider', 'sessions']);
+        $abstract->load(['authors', 'reviews.reviewer' => fn ($query) => $query->when(EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id), fn ($query) => $query->whereIn('id', $this->eligibleReviewerIds($request, $event))->select(['id', 'first_name', 'last_name', 'email'])), 'decider', 'sessions']);
 
         return response()->json([
             'abstract' => $abstract,
@@ -164,10 +171,12 @@ final class EventAbstractController extends Controller
 
     public function assignReviewer(Request $request, string $subdomain, Event $event, EventAbstract $abstract): JsonResponse
     {
+        abort_unless((string) $abstract->event_id === (string) $event->id, 404);
+
         Gate::authorize('assign abstract-reviewer');
 
         $validated = $request->validate([
-            'reviewer_id' => ['required', 'exists:users,id'],
+            'reviewer_id' => ['required', EventStaffScope::isEventOrganiser($request->user(), (string) $event->tenant_id) ? Rule::in($this->eligibleReviewerIds($request, $event)) : 'exists:users,id'],
         ]);
 
         $review = EventAbstractReview::query()->updateOrCreate([
@@ -191,6 +200,8 @@ final class EventAbstractController extends Controller
 
     public function removeReviewer(Request $request, string $subdomain, Event $event, EventAbstract $abstract, EventAbstractReview $review): JsonResponse
     {
+        abort_unless((string) $abstract->event_id === (string) $event->id, 404);
+
         Gate::authorize('assign abstract-reviewer');
 
         if ($review->abstract_id !== $abstract->id) {
@@ -211,6 +222,8 @@ final class EventAbstractController extends Controller
 
     public function recordDecision(Request $request, string $subdomain, Event $event, EventAbstract $abstract): JsonResponse|RedirectResponse
     {
+        abort_unless((string) $abstract->event_id === (string) $event->id, 404);
+
         Gate::authorize('decide abstract');
 
         $validated = $request->validate([
@@ -304,5 +317,13 @@ final class EventAbstractController extends Controller
             'success' => true,
             'message' => 'Bulk decisions updated successfully for '.count($abstracts).' abstracts.',
         ]);
+    }
+
+    /** @return list<int|string> */
+    private function eligibleReviewerIds(Request $request, Event $event): array
+    {
+        $existing = EventAbstractReview::query()->where('tenant_id', $event->tenant_id)->whereIn('abstract_id', $event->abstracts()->select('id'))->pluck('reviewer_id');
+
+        return EventTeamScope::eligibleIds($request->user(), $event, $existing);
     }
 }

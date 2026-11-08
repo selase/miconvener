@@ -27,6 +27,7 @@ final class Role extends SpatieRole
         'Org Superadmin',
         'Org Admin',
         'Event Staff',
+        'Event Organiser',
         'Platform Finance',
         'Platform Marketing',
     ];
@@ -39,6 +40,14 @@ final class Role extends SpatieRole
     public function isSystemRole(): bool
     {
         return in_array($this->name, self::SYSTEM_ROLES) && $this->tenant_id === null;
+    }
+
+    /**
+     * Whether this is a built-in role with event assignments.
+     */
+    public function isEventScoped(): bool
+    {
+        return $this->isSystemRole() && in_array($this->name, ['Event Staff', 'Event Organiser'], true);
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventSponsor;
 use App\Models\EventSponsorDeliverable;
+use App\Services\Events\EventStaffScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,7 @@ final class EventSponsorController extends Controller
             'booth' => ['nullable', 'string', 'max:64'],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_email' => ['nullable', 'email', 'max:255'],
-            'amount' => ['nullable', 'integer', 'min:0'],
+            'amount' => [EventStaffScope::isEventOrganiser($request->user(), (string) $tenant->id) ? 'prohibited' : 'nullable', 'integer', 'min:0'],
             'logo' => ['nullable', 'image', 'max:2048'],
         ]);
 
@@ -70,6 +71,8 @@ final class EventSponsorController extends Controller
         $eventModel = $this->findEvent($tenant->id, $event);
 
         $sponsorModel = $eventModel->sponsors()->where('id', $sponsor)->firstOrFail();
+        abort_if(EventStaffScope::isEventOrganiser(request()->user(), (string) $tenant->id) && (int) $sponsorModel->getAttribute('amount') !== 0, 403, 'Ask an organisation administrator to remove a record with financial values.');
+
         if ($sponsorModel->logo_path) {
             Helper::deleteFile($sponsorModel->logo_path, config('app.env') === 'production' ? 's3' : 'public');
         }
@@ -158,9 +161,10 @@ final class EventSponsorController extends Controller
      */
     private function payload(EventSponsor $sponsor): array
     {
-        return [
+        $payload = [
             'id' => $sponsor->id,
             'name' => $sponsor->name,
+            'can_delete' => ! EventStaffScope::isEventOrganiser(request()->user(), (string) $sponsor->tenant_id) || (int) $sponsor->amount === 0,
             'tier' => $sponsor->tier,
             'booth' => $sponsor->booth,
             'contact_name' => $sponsor->contact_name,
@@ -174,6 +178,12 @@ final class EventSponsorController extends Controller
                 'is_done' => $d->is_done,
             ])->values(),
         ];
+
+        if (EventStaffScope::isEventOrganiser(request()->user(), (string) $sponsor->tenant_id)) {
+            unset($payload['amount']);
+        }
+
+        return $payload;
     }
 
     private function findEvent(string $tenantId, string $eventId): Event

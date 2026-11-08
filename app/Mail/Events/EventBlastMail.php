@@ -27,7 +27,12 @@ final class EventBlastMail extends Mailable implements ShouldBeEncrypted, Should
 
     public int $tries = 1;
 
-    public function __construct(public EventBlast $blast, public string $recipientName, public string $recipientId, public ?string $claimId = null) {}
+    public bool $requiresScopedActor = false;
+
+    public function __construct(public EventBlast $blast, public string $recipientName, public string $recipientId, public ?string $claimId = null, bool $requiresScopedActor = false)
+    {
+        $this->requiresScopedActor = $requiresScopedActor;
+    }
 
     public function envelope(): Envelope
     {

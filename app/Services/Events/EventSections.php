@@ -101,6 +101,11 @@ final class EventSections
 
     public function allows(User $user, Tenant $tenant, Event $event, string $slug): bool
     {
+        if (EventStaffScope::isEventOrganiser($user, (string) $tenant->id)
+            && in_array($slug, ['finance', 'promo-codes', 'contributions'], true)) {
+            return false;
+        }
+
         foreach (self::GROUPS as $group) {
             if (isset($group['sections'][$slug])) {
                 return $this->passes($user, $tenant, $event, $group['sections'][$slug]);
@@ -118,11 +123,13 @@ final class EventSections
     public function menuFor(User $user, Tenant $tenant, Event $event): array
     {
         $menu = [];
+        $organiser = EventStaffScope::isEventOrganiser($user, (string) $tenant->id);
 
         foreach (self::GROUPS as $group) {
             $sections = [];
             foreach ($group['sections'] as $slug => $definition) {
-                if ($this->passes($user, $tenant, $event, $definition)) {
+                if ((! $organiser || ! in_array($slug, ['finance', 'promo-codes', 'contributions'], true))
+                    && $this->passes($user, $tenant, $event, $definition)) {
                     $sections[] = ['slug' => $slug, 'label' => $definition['label']];
                 }
             }

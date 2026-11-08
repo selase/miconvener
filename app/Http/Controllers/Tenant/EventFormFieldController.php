@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventFormField;
+use App\Services\Events\EventStaffScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ final class EventFormFieldController extends Controller
         return response()->json([
             'registration_settings' => $eventModel->effectiveRegistrationSettings(),
             'form_fields' => $eventModel->formFields()->ordered()->get(),
+            'can_edit_fields' => ! $this->isScopedOrganiser($eventModel) || ! $this->hasChoicePricing($eventModel),
         ]);
     }
 
@@ -32,6 +34,7 @@ final class EventFormFieldController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
+        $this->guardChoicePricing($request, $eventModel);
 
         $validated = $this->validateFormField($request, $eventModel);
 
@@ -51,6 +54,7 @@ final class EventFormFieldController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
+        $this->guardChoicePricing($request, $eventModel);
 
         $formFieldModel = $eventModel->formFields()->where('id', $field)->firstOrFail();
 
@@ -66,6 +70,7 @@ final class EventFormFieldController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
+        $this->guardChoicePricing(request(), $eventModel);
 
         $formFieldModel = $eventModel->formFields()->where('id', $field)->firstOrFail();
         $formFieldModel->delete();
@@ -78,6 +83,7 @@ final class EventFormFieldController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
+        $this->guardChoicePricing($request, $eventModel);
 
         $validated = $request->validate([
             'order' => ['required', 'array'],
@@ -139,6 +145,30 @@ final class EventFormFieldController extends Controller
             'message' => 'Registration settings updated.',
             'registration_settings' => $eventModel->effectiveRegistrationSettings(),
         ]);
+    }
+
+    private function isScopedOrganiser(Event $event): bool
+    {
+        return EventStaffScope::isEventOrganiser(request()->user(), (string) $event->tenant_id);
+    }
+
+    private function hasChoicePricing(Event $event): bool
+    {
+        return EventFormField::query()->where('event_id', $event->id)->where('tenant_id', $event->tenant_id)->get()->contains(fn (EventFormField $field): bool => collect($field->options ?? [])->contains(
+            fn (array $option): bool => (int) ($option['price'] ?? 0) !== 0 || ! empty($option['is_override']),
+        ));
+    }
+
+    private function guardChoicePricing(Request $request, Event $event): void
+    {
+        if (! $this->isScopedOrganiser($event)) {
+            return;
+        }
+
+        $incomingPrice = collect((array) $request->input('options', []))->contains(
+            fn (mixed $option): bool => is_array($option) && ((int) ($option['price'] ?? 0) !== 0 || ! empty($option['is_override'])),
+        );
+        abort_if($this->hasChoicePricing($event) || $incomingPrice, 403, 'An organisation administrator must change registration questions that affect ticket prices.');
     }
 
     /**

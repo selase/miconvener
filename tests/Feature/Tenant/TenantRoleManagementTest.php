@@ -89,7 +89,7 @@ test('tenant roles page excludes the platform superadmin but shows the organizat
         ->get(route('tenant.roles.index', ['subdomain' => $this->tenant->slug]))
         ->assertInertia(fn ($page) => $page
             ->component('Tenant/Roles/Index')
-            ->where('systemRoles', fn ($roles) => $roles->pluck('name')->sort()->values()->all() === ['Event Staff', 'Org Admin', 'Org Superadmin']));
+            ->where('systemRoles', fn ($roles) => $roles->pluck('name')->sort()->values()->all() === ['Event Organiser', 'Event Staff', 'Org Admin', 'Org Superadmin']));
 });
 
 test('tenant cannot duplicate the platform superadmin role', function () {

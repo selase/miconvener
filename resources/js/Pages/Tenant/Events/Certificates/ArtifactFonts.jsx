@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import Input from '@/Components/Console/Input';
 import Button from '@/Components/Console/Button';
 import Checkbox from '@/Components/Console/Checkbox';
@@ -87,6 +88,7 @@ export function useArtifactFonts(eventId, initialFonts, onFontsChange) {
 }
 
 export default function ArtifactFontLibrary({ eventId, fonts, setFonts, onSelect }) {
+    const canArchive = !usePage().props.auth?.eventOrganiser;
     const [source, setSource] = useState('');
     const [file, setFile] = useState(null);
     const [fileKey, setFileKey] = useState(0);
@@ -215,7 +217,7 @@ export default function ArtifactFontLibrary({ eventId, fonts, setFonts, onSelect
                             </span>
                             <Button
                                 type="button"
-                                disabled={pending}
+                                disabled={pending || !canArchive}
                                 aria-label={`Remove font ${font.name} from library`}
                                 onClick={() => archive(font)}
                             >

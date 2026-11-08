@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Libraries;
 
-use Spatie\Permission\Exceptions\RoleDoesNotExist;
 use Spatie\Permission\Models\Role;
 
 final class RolePermissions
@@ -23,6 +22,7 @@ final class RolePermissions
             'Org Superadmin' => self::organizationSuperadminPermissions(),
             'Org Admin' => self::organizationAdminPermissions(),
             'Event Staff' => self::eventStaffPermissions(),
+            'Event Organiser' => self::eventOrganiserPermissions(),
         ];
     }
 
@@ -52,14 +52,63 @@ final class RolePermissions
                 continue;
             }
 
-            try {
-                Role::findByName($roleName)->givePermissionTo($toGrant);
-            } catch (RoleDoesNotExist) {
+            $role = Role::query()->where('name', $roleName)->whereNull('tenant_id')->where('guard_name', 'web')->first();
+
+            if ($role === null) {
                 $missingRoles[] = $roleName;
+
+                continue;
             }
+
+            $role->givePermissionTo($toGrant);
         }
 
         return $missingRoles;
+    }
+
+    /**
+     * Nonfinancial management of explicitly assigned events.
+     *
+     * @return array<int, string>
+     */
+    private static function eventOrganiserPermissions(): array
+    {
+        return [
+            'access dashboard',
+            'read event',
+            'update event',
+            'manage participant-groups',
+            'check in attendees',
+            'handle service-requests',
+            'create abstract',
+            'read abstract',
+            'update abstract',
+            'delete abstract',
+            'review abstract',
+            'decide abstract',
+            'assign abstract-reviewer',
+            'manage scientific-programme',
+            'create event-operation',
+            'read event-operation',
+            'update event-operation',
+            'delete event-operation',
+            'manage operation-pillars',
+            'create certificate',
+            'read certificate',
+            'update certificate',
+            'delete certificate',
+            'issue certificates',
+            'read badge-template',
+            'update badge-template',
+            'create dynamic-form',
+            'read dynamic-form',
+            'update dynamic-form',
+            'delete dynamic-form',
+            'create notification-rule',
+            'read notification-rule',
+            'update notification-rule',
+            'delete notification-rule',
+        ];
     }
 
     /**

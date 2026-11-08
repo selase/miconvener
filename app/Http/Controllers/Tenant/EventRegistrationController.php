@@ -345,6 +345,7 @@ final class EventRegistrationController extends Controller
         $eventModel = $this->findEvent($tenant->id, $event);
 
         $memberRegistration = $eventModel->registrations()->whereKey($registration)->firstOrFail();
+        abort_unless(\App\Services\Events\EventStaffScope::canCancelRegistration(request()->user(), $memberRegistration), 403);
         if ($memberRegistration->member_benefit_required && ! $memberRegistration->isOfflinePayment()) {
             $source = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('registration_id', $memberRegistration->id)
                 ->where('is_extra_capture', false)->whereIn('state', ['fulfilled', 'paid_review', 'refund_pending', 'refund_unknown', 'refunded'])->first();
@@ -361,6 +362,7 @@ final class EventRegistrationController extends Controller
             // click, two admin sessions) blocks here instead of racing past
             // the status check and issuing a second Paystack refund.
             $registrationModel = $eventModel->registrations()->where('id', $registration)->lockForUpdate()->firstOrFail();
+            abort_unless(\App\Services\Events\EventStaffScope::canCancelRegistration(request()->user(), $registrationModel), 403);
 
             $cancellable = [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN, EventRegistration::STATUS_WAITLISTED];
             if (! in_array($registrationModel->status, $cancellable, true)) {

@@ -24,7 +24,7 @@ final class EventSessionController extends Controller
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
 
-        $validated = $this->validateSession($request, $tenant->id);
+        $validated = $this->validateSession($request, $tenant->id, $eventModel);
 
         $session = $eventModel->sessions()->create([
             ...Arr::except($validated, ['speaker_ids', 'speaker_roles']),
@@ -48,7 +48,7 @@ final class EventSessionController extends Controller
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
         $sessionModel = $eventModel->sessions()->where('id', $session)->firstOrFail();
 
-        $validated = $this->validateSession($request, $tenant->id);
+        $validated = $this->validateSession($request, $tenant->id, $eventModel);
 
         $sessionModel->update(collect($validated)->except(['speaker_ids', 'speaker_roles'])->all());
 
@@ -120,7 +120,7 @@ final class EventSessionController extends Controller
             'type' => ['sometimes', 'string', Rule::in(EventSession::TYPES)],
             'location' => ['nullable', 'string', 'max:255'],
             'speaker_ids' => ['nullable', 'array'],
-            'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenant->id)],
+            'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenant->id), ...(\App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), (string) $tenant->id) ? [Rule::in($eventModel->speakers()->pluck('speakers.id')->all())] : [])],
         ]);
 
         $sessionModel->update(Arr::except($validated, ['speaker_ids']));
@@ -366,8 +366,10 @@ final class EventSessionController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validateSession(Request $request, string $tenantId): array
+    private function validateSession(Request $request, string $tenantId, Event $event): array
     {
+        $scoped = \App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), $tenantId);
+
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -385,12 +387,12 @@ final class EventSessionController extends Controller
             'type' => ['required', Rule::in(EventSession::TYPES)],
             'abstract_id' => [
                 'nullable',
-                Rule::exists('event_abstracts', 'id')->where('tenant_id', $tenantId),
+                Rule::exists('event_abstracts', 'id')->where('tenant_id', $tenantId)->when($scoped, fn ($rule) => $rule->where('event_id', $event->id)),
             ],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'sort_order' => ['integer'],
             'speaker_ids' => ['nullable', 'array'],
-            'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenantId)],
+            'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenantId), ...($scoped ? [Rule::in($event->speakers()->pluck('speakers.id')->all())] : [])],
             'speaker_roles' => ['nullable', 'array'],
         ]);
     }
