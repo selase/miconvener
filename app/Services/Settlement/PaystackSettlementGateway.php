@@ -104,6 +104,10 @@ final class PaystackSettlementGateway implements SettlementGateway
             $amount = $response->json('data.amount');
             $currency = $response->json('data.currency');
             if (is_string($code) && is_string($reference) && is_int($amount) && is_string($currency)) {
+                $recipient = $response->json('data.recipient.recipient_code');
+                if (is_string($recipient)) {
+                    $result['recipient_code'] = $recipient;
+                }
                 $result += ['transfer_code' => $code, 'reference' => $reference, 'amount' => $amount, 'currency' => $currency];
             }
 

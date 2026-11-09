@@ -90,6 +90,7 @@ final class StorePayouts
     /** @return array<string, mixed> */
     public function send(EventPayout $payout): array
     {
+        app(\App\Services\Finance\PayoutSubmissionGuard::class)->assertEntry($payout);
         $this->assertPayout($payout);
         $claimed = $payout->getConnection()->transaction(function () use ($payout): ?EventPayout {
             $seller = $this->locks->tenant($payout->tenant_id);
@@ -134,6 +135,11 @@ final class StorePayouts
 
     public function reconcile(EventPayout $payout): EventPayout
     {
+        if (\App\Models\ScheduledPayoutProposal::query()->where('payout_id', $payout->id)->exists()) {
+            app(\App\Services\Finance\ScheduledPayoutSettlement::class)->reconcile($payout);
+
+            return $payout->fresh();
+        }
         $this->assertPayout($payout);
         $payout = $payout->fresh();
         if ($payout->status === EventPayout::STATUS_PAID || ! filled($payout->provider_reference)) {

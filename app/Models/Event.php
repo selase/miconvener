@@ -660,6 +660,7 @@ final class Event extends Model
         return $this->hasMany(EventAbstract::class)->orderByDesc('created_at');
     }
 
+    /** @return HasOne<EventPayoutSchedule, $this> */
     public function payoutSchedule(): HasOne
     {
         return $this->hasOne(EventPayoutSchedule::class);

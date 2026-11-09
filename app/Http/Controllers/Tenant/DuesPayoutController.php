@@ -76,6 +76,7 @@ final class DuesPayoutController extends Controller
             'payouts' => $payouts->map(fn (EventPayout $p): array => [
                 'id' => $p->id,
                 'amount' => $p->amount,
+                'reversed_amount' => $p->reversed_amount,
                 'currency' => $p->currency,
                 'status' => $p->status,
                 'scheduled_at' => $p->scheduled_at?->toIso8601String(),

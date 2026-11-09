@@ -425,7 +425,7 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
                             onChange={(e) =>
                                 setForm({ ...form, auto_payout_enabled: e.target.checked })
                             }
-                            label="Enable automated scheduled disbursements (Reconciliation Engine)"
+                            label="Save legacy schedule preference (preview only; no transfers)"
                             description="When active, the system automatically disburses payable balances to the selected account upon reaching maturity."
                         />
                     </div>
@@ -648,7 +648,7 @@ export default function FinancePanel({ event }) {
                     <div>
                         <div className="flex items-center gap-2">
                             <h4 className="text-sm font-semibold text-ink">
-                                Settlement Schedule &amp; Holdback
+                                Legacy Schedule &amp; Holdback
                             </h4>
                             <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
                                 {payout_schedule?.schedule_type === 'immediate'
@@ -659,7 +659,7 @@ export default function FinancePanel({ event }) {
                             </span>
                             {payout_schedule?.auto_payout_enabled && (
                                 <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
-                                    Auto-Disburse Active
+                                    Legacy preview only
                                 </span>
                             )}
                         </div>
@@ -683,7 +683,7 @@ export default function FinancePanel({ event }) {
                         </p>
                     </div>
                 </div>
-                <Button onClick={() => setScheduleModalOpen(true)}>Change Settings</Button>
+                <div className="flex flex-wrap gap-2"><Button href={route('tenant.finance.schedules.index')}>Payout schedules</Button><Button onClick={() => setScheduleModalOpen(true)}>Legacy settings</Button></div>
             </div>
 
             {/* Double-Entry General Ledger & Trial Balance */}

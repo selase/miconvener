@@ -254,6 +254,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('admin/attendee-profiles/{tenant}', [App\Http\Controllers\Admin\AttendeeProfileModerationController::class, 'index'])->name('admin.attendee-profiles.index');
     Route::post('admin/attendee-profiles/{tenant}/{profile}/release', [App\Http\Controllers\Admin\AttendeeProfileModerationController::class, 'release'])->whereUuid('profile')->name('admin.attendee-profiles.release');
 
+    Route::post('admin/payout-policies/reconciliation', [App\Http\Controllers\Admin\PayoutPolicyController::class, 'audit'])->middleware('password.confirm')->name('admin.payout-policies.audit');
+    Route::post('admin/payout-policies/{policy}/pause', [App\Http\Controllers\Admin\PayoutPolicyController::class, 'pause'])->name('admin.payout-policies.pause');
+    Route::get('admin/payout-policies', [App\Http\Controllers\Admin\PayoutPolicyController::class, 'index'])->name('admin.payout-policies.index');
+    Route::post('admin/payout-policies/{policy}/approve', [App\Http\Controllers\Admin\PayoutPolicyController::class, 'approve'])->middleware('password.confirm')->name('admin.payout-policies.approve');
+
     Route::get('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'index'])
         ->name('admin.store-agreements.index');
     Route::post('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'store'])

@@ -36,6 +36,7 @@ final class Permission extends SpatiePermission
         'manage public attendee profiles',
         'manage organization settings',
         'read finance',
+        'manage payout schedules',
         'manage giving',
         'manage store catalog',
         'manage store collection',

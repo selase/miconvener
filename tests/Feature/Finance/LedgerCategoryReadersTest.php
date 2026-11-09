@@ -55,9 +55,8 @@ test('marketplace money booked against an event never feeds that event payout', 
 
     Artisan::call('app:reconcile-payout-schedules');
 
-    // 10,000 gross, 500 commission, 10% of gross held back: the same 8,500 as
-    // without the marketplace booking.
-    expect($this->event->payouts()->firstOrFail()->amount)->toBe(8_500);
+    expect($this->event->payouts()->count())->toBe(0)
+        ->and(app(App\Services\Events\MemberBenefitBalance::class)->available($this->event))->toBe(9_500);
 });
 
 test('an event lists only its own ledger transactions', function (): void {

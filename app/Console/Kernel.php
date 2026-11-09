@@ -78,6 +78,8 @@ final class Kernel extends ConsoleKernel
 
         // Settlement — chase payouts whose transfer webhook never arrived, so a
         // lost webhook cannot strand money that has already left the platform.
+        $schedule->command('payouts:deliver-notices')->everyFifteenMinutes()->withoutOverlapping();
+        $schedule->command('payouts:prepare-schedules')->everyFifteenMinutes()->withoutOverlapping();
         $schedule->command('payouts:reconcile')->everyFifteenMinutes()->withoutOverlapping();
 
         // Conference reminders. Shares the fifteen-minute wake window with the

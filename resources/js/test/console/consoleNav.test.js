@@ -21,7 +21,7 @@ describe('visibleGroups', () => {
             features: { community: false, dues_payouts: true, finance: true },
             can: { read_finance: true },
         }).find((g) => g.key === 'finance');
-        expect(finance.items.map((i) => i.label)).toEqual(['Overview', 'Payouts']);
+        expect(finance.items.map((i) => i.label)).toEqual(['Payout schedules', 'Overview', 'Payouts']);
     });
 
     it('shows Staff bookings only with the plan feature and the permission', () => {

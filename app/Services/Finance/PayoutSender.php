@@ -15,8 +15,7 @@ use Illuminate\Support\Str;
  * needed, deduct the transfer fee, start the transfer and record the outcome
  * on the payout.
  *
- * Event callers keep their existing transaction and row lock. Community
- * callers commit a processing claim and original reference before the provider
+ * Event and Community callers commit a processing claim and original reference before the provider
  * call; response updates must still match that claim, without holding database
  * locks across the network or replacing a newer transfer.
  */
@@ -32,20 +31,36 @@ final class PayoutSender
      */
     public function send(EventPayout $payoutModel, string $currency, ?string $reservedReference = null): array
     {
+        app(PayoutSubmissionGuard::class)->assertEntry($payoutModel);
         if ($payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce && ($reservedReference === null || $payoutModel->provider_reference !== $reservedReference || $payoutModel->status !== EventPayout::STATUS_PROCESSING)) {
             return ['message' => 'Use the commerce payout flow and its reserved original reference.', 'http_status' => 422];
         }
-        $event = $payoutModel->event_id !== null ? \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->find($payoutModel->event_id) : null;
-        $balance = app(\App\Services\Events\MemberBenefitBalance::class);
-        if ($event !== null) {
-            return $payoutModel->getConnection()->transaction(function () use ($payoutModel, $currency, $reservedReference, $event, $balance): array {
-                $locked = \App\Models\Event::withoutGlobalScopes()->whereKey($event->id)->lockForUpdate()->firstOrFail();
-                if ($balance->applies($locked) && ($currency !== $payoutModel->currency || $currency !== $locked->currency || $payoutModel->amount > $balance->available($locked, $payoutModel->id))) {
-                    return ['message' => 'This payout exceeds the funds available after member-payment and refund holds.', 'http_status' => 422];
+        if ($reservedReference === null) {
+            $claim = $payoutModel->getConnection()->transaction(function () use ($payoutModel, $currency): array {
+                $event = $payoutModel->event_id !== null ? \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->lockForUpdate()->findOrFail($payoutModel->event_id) : null;
+                $current = EventPayout::withoutGlobalScopes()->lockForUpdate()->findOrFail($payoutModel->id);
+                if (! in_array($current->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
+                    return ['error' => ['message' => 'Only a scheduled or conclusively failed payout can be sent.', 'http_status' => 422]];
                 }
+                if ($event !== null) {
+                    $balance = app(\App\Services\Events\MemberBenefitBalance::class);
+                    if ($balance->applies($event) && ($currency !== $current->currency || $currency !== $event->currency || $current->amount > $balance->available($event, $current->id))) {
+                        return ['error' => ['message' => 'This payout exceeds the funds available after payment and refund holds.', 'http_status' => 422]];
+                    }
+                }
+                if ($current->amount <= $this->transferFeeSchedule->feeFor($current->payoutAccount->type)) {
+                    return ['error' => ['message' => 'This balance is smaller than the transfer fee, so it cannot be sent on its own. It will be paid out with the next batch.', 'http_status' => 422]];
+                }
+                $reference = 'payout_'.$current->id.'_'.Str::random(8);
+                $current->update(['status' => EventPayout::STATUS_PROCESSING, 'provider_reference' => $reference, 'failure_reason' => null]);
 
-                return $this->sendTransfer($payoutModel, $currency, $reservedReference);
+                return ['payout' => $current, 'reference' => $reference];
             });
+            if (isset($claim['error'])) {
+                return $claim['error'];
+            }
+            $payoutModel = $claim['payout'];
+            $reservedReference = $claim['reference'];
         }
 
         return $this->sendTransfer($payoutModel, $currency, $reservedReference);
@@ -91,15 +106,23 @@ final class PayoutSender
 
             $payoutModel->update(['requested_transfer_fee_amount' => $transferFee, 'requested_net_amount' => $netToSend]);
             $reference = $reservedReference ?? 'payout_'.$payoutModel->id.'_'.Str::random(8);
+            app(PayoutSubmissionGuard::class)->claim($payoutModel);
             $transferSubmitted = true;
             $transfer = $this->settlementGateway->initiateTransfer($account->recipient_code, $netToSend, $currency, $reference);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            if (! \App\Models\PayoutLiquidityAllocation::query()->where('payout_id', $payoutModel->id)->exists()) {
+                EventPayout::withoutGlobalScopes()->whereKey($payoutModel->id)->where('status', 'processing')->where('provider_reference', $reservedReference)
+                    ->update(['status' => 'scheduled', 'provider_reference' => null, 'failure_reason' => 'Submission blocked before any transfer request. Review payout controls and try again.']);
+            }
+
+            return ['message' => $exception->getMessage(), 'http_status' => 422];
         } catch (PaymentFailedException $e) {
             if ($payoutModel->fresh()->status === EventPayout::STATUS_PAID) {
                 return ['message' => 'Payout confirmed.', 'http_status' => 200];
             }
 
             if (! $transferSubmitted && $reservedReference !== null) {
-                EventPayout::withoutGlobalScopes()->whereKey($payoutModel->id)->where('status', EventPayout::STATUS_PROCESSING)->where('provider_reference', $reservedReference)->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => 'Recipient registration failed before any transfer was submitted.']);
+                EventPayout::withoutGlobalScopes()->whereKey($payoutModel->id)->where('status', EventPayout::STATUS_PROCESSING)->where('provider_reference', $reservedReference)->update(['status' => $payoutModel->event_id !== null ? EventPayout::STATUS_SCHEDULED : EventPayout::STATUS_FAILED, 'provider_reference' => $payoutModel->event_id !== null ? null : $reservedReference, 'failure_reason' => 'Recipient registration failed before any transfer was submitted.']);
             }
 
             return ['message' => $payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'Payout submission needs review. Reconcile the original reference before sending again.' : 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
@@ -146,6 +169,11 @@ final class PayoutSender
                 'provider_transfer_code' => $transferCode,
                 'failure_reason' => null,
             ], $reservedReference);
+
+            $proposal = \App\Models\ScheduledPayoutProposal::query()->where('payout_id', $payoutModel->id)->first();
+            if ($proposal !== null) {
+                app(ScheduledPayoutNotices::class)->enqueue(\App\Models\OrganisationPayoutPolicy::query()->findOrFail($proposal->policy_id), 'owner_code_needed', $proposal->id);
+            }
 
             return [
                 'message' => 'Paystack sent a one-time code to the account owner. Enter it to release this payout.',

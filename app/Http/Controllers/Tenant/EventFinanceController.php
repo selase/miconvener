@@ -30,7 +30,7 @@ final class EventFinanceController extends Controller
         $collected = (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount');
         $fees = (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('commission_amount');
         $netCollected = $this->netCollected($eventModel);
-        $paidOut = (int) $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount');
+        $paidOut = (int) $eventModel->payouts()->whereIn('status', [EventPayout::STATUS_PAID, 'reversed'])->reorder()->selectRaw('COALESCE(SUM(amount - reversed_amount), 0) as consumed')->value('consumed');
 
         $stats = [
             ...app(\App\Services\Giving\GivingContributionBridge::class)->eventSummary($eventModel),
@@ -136,22 +136,10 @@ final class EventFinanceController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        return DB::transaction(function () use ($eventModel, $payout, $payoutSender): JsonResponse {
-            // Lock the payout row for the whole check-send-write sequence so two
-            // concurrent "send" requests for the same payout can't both pass the
-            // status check and both fire a live Paystack transfer. Each retry
-            // deliberately generates a fresh reference, so Paystack's own
-            // duplicate-reference protection cannot catch a double send.
-            $payoutModel = $eventModel->payouts()->where('id', $payout)->lockForUpdate()->firstOrFail();
+        $payoutModel = $eventModel->payouts()->where('id', $payout)->firstOrFail();
+        $result = $payoutSender->send($payoutModel, $eventModel->currency ?: 'GHS');
 
-            if (! in_array($payoutModel->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
-                return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
-            }
-
-            $result = $payoutSender->send($payoutModel, $eventModel->currency ?: 'GHS');
-
-            return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
-        });
+        return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
     }
 
     /**
@@ -185,6 +173,7 @@ final class EventFinanceController extends Controller
         $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
+        abort_if(\App\Models\ScheduledPayoutProposal::query()->where('payout_id', $payout)->exists(), 422, 'Scheduled payouts require verified provider settlement.');
 
         $validated = $request->validate([
             'status' => ['required', Rule::in([EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PAID])],
@@ -355,8 +344,8 @@ final class EventFinanceController extends Controller
         }
 
         $committedToPayouts = (int) $eventModel->payouts()
-            ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])
-            ->sum('amount');
+            ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_AWAITING_OTP, EventPayout::STATUS_PAID, 'reversed'])
+            ->reorder()->selectRaw('COALESCE(SUM(amount - reversed_amount), 0) as consumed')->value('consumed');
 
         return $this->netCollected($eventModel) - $committedToPayouts;
     }

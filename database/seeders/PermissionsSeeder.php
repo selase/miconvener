@@ -81,6 +81,8 @@ final class PermissionsSeeder extends Seeder
     public function defaultPermissions(): array
     {
         return [
+            ['name' => 'manage payout schedules', 'category' => 'finance', 'guard_name' => 'web'],
+            ['name' => 'approve payout policies', 'category' => 'platform-finance', 'guard_name' => 'web'],
             [
                 'uuid' => Str::uuid(),
                 'name' => 'access dashboard',

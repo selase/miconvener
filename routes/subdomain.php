@@ -53,6 +53,14 @@ Route::get('/tenant-test', function () {
 });
 
 Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_staff_scope']], function () {
+    Route::get('/finance/schedules', [App\Http\Controllers\Tenant\PayoutScheduleController::class, 'index'])->name('tenant.finance.schedules.index');
+    Route::post('/finance/schedules', [App\Http\Controllers\Tenant\PayoutScheduleController::class, 'store'])->middleware('password.confirm')->name('tenant.finance.schedules.store');
+    Route::post('/finance/schedules/{policy}/pause', [App\Http\Controllers\Tenant\PayoutScheduleController::class, 'pause'])->name('tenant.finance.schedules.pause');
+    foreach (['approve', 'submit', 'cancel', 'finalize', 'refresh'] as $action) {
+        Route::post('/finance/schedules/proposals/{proposal}/'.$action, [App\Http\Controllers\Tenant\PayoutScheduleController::class, 'action'])
+            ->middleware('password.confirm')->name('tenant.finance.schedules.'.$action);
+    }
+
     Route::get('/account', [AccountController::class, 'index'])->name('tenant.account');
     Route::post('/account/two-factor/setup', [AccountController::class, 'setup'])->name('tenant.account.two-factor.setup');
     Route::post('/account/two-factor/confirm', [AccountController::class, 'confirm'])

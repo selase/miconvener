@@ -139,6 +139,7 @@ final class RolePermissions
     {
         return [
             'view platform finance',
+            'approve payout policies',
             'release payouts',
             'manage invoices',
             'manage commission credits',
@@ -217,6 +218,7 @@ final class RolePermissions
             'read finance',
             'process refunds',
             'manage payouts',
+            'manage payout schedules',
             'manage payment settings',
             'manage api keys',
             'create event',
@@ -289,6 +291,7 @@ final class RolePermissions
             'read finance',
             'process refunds',
             'manage payouts',
+            'manage payout schedules',
             'manage members',
             'manage giving',
             'send community messages',

@@ -55,18 +55,6 @@ parameters:
 			path: app/Console/Commands/Events/ReconcileStuckPayouts.php
 
 		-
-			rawMessage: Left side of && is always true.
-			identifier: booleanAnd.leftAlwaysTrue
-			count: 2
-			path: app/Console/Commands/ReconcilePayoutSchedulesCommand.php
-
-		-
-			rawMessage: Right side of && is always true.
-			identifier: booleanAnd.rightAlwaysTrue
-			count: 1
-			path: app/Console/Commands/ReconcilePayoutSchedulesCommand.php
-
-		-
 			rawMessage: Using nullsafe method call on non-nullable type Carbon\CarbonImmutable. Use -> instead.
 			identifier: nullsafe.neverNull
 			count: 1
@@ -1448,12 +1436,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventDynamicFormController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$auto_payout_enabled.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$commission_amount.
 			identifier: property.notFound
 			count: 1
@@ -1472,12 +1454,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$days_after_event.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$gateway_fee_amount.
 			identifier: property.notFound
 			count: 1
@@ -1490,55 +1466,13 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$holdback_percentage.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$holdback_release_days.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$last_reconciled_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$minimum_payout_amount.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$net_amount.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$preferred_account_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$provider_reference.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$schedule_type.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
@@ -2667,12 +2601,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\Event::operationTasks() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
-			rawMessage: 'Method App\Models\Event::payoutSchedule() return type with generic class Illuminate\Database\Eloquent\Relations\HasOne does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Event.php
