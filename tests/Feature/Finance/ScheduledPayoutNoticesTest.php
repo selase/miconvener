@@ -37,3 +37,37 @@ test('delivery is claimed once and does not change payout state', function () {
     Mail::assertSent(App\Mail\ScheduledPayoutNoticeMail::class, 1);
     expect($notice->fresh()->status)->toBe('sent')->and(App\Models\EventPayout::count())->toBe(0);
 });
+
+test('a queue outage preserves the committed policy and its durable notice', function () {
+    Illuminate\Support\Facades\Bus::shouldReceive('dispatch')->andThrow(new RuntimeException('Test queue unavailable'));
+    [$tenant, $owner, , $account] = scheduledPolicyActors();
+    $policy = app(PayoutPolicies::class)->request($tenant, $owner, scheduledPolicyInput($account));
+    expect($policy->fresh()->status)->toBe('pending')
+        ->and(ScheduledPayoutNotice::sole()->status)->toBe('queued')
+        ->and(App\Models\EventPayout::count())->toBe(0);
+});
+
+test('an email transport failure retains a retry without changing money', function () {
+    [$tenant, $owner, , $account] = scheduledPolicyActors();
+    app(PayoutPolicies::class)->request($tenant, $owner, scheduledPolicyInput($account));
+    $notice = ScheduledPayoutNotice::sole();
+    Mail::shouldReceive('to')->once()->andReturnSelf();
+    Mail::shouldReceive('send')->once()->andThrow(new RuntimeException('Test mail transport unavailable'));
+    app(ScheduledPayoutNotices::class)->deliver($notice->id);
+    expect($notice->fresh()->status)->toBe('retry')->and($notice->fresh()->attempts)->toBe(1)
+        ->and($notice->fresh()->next_attempt_at)->not->toBeNull()->and(App\Models\EventPayout::count())->toBe(0);
+});
+
+test('the notice sweep recovers an abandoned worker claim without sending a payout', function () {
+    [$tenant, $owner, , $account] = scheduledPolicyActors();
+    app(PayoutPolicies::class)->request($tenant, $owner, scheduledPolicyInput($account));
+    $notice = ScheduledPayoutNotice::sole();
+    $notice->update(['status' => 'sending', 'attempts' => 1, 'claimed_at' => now()->subMinutes(11)]);
+    Illuminate\Support\Facades\Queue::fake();
+    $this->artisan('payouts:deliver-notices')->assertSuccessful();
+    Illuminate\Support\Facades\Queue::assertPushed(App\Jobs\DeliverScheduledPayoutNotice::class, 1);
+    app(ScheduledPayoutNotices::class)->deliver($notice->id);
+    expect($notice->fresh()->status)->toBe('sent')->and($notice->fresh()->attempts)->toBe(2)
+        ->and(App\Models\EventPayout::count())->toBe(0);
+    Mail::assertSent(App\Mail\ScheduledPayoutNoticeMail::class, 1);
+});
