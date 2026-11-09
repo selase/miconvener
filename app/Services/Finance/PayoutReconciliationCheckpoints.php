@@ -14,10 +14,7 @@ final class PayoutReconciliationCheckpoints
         foreach (['*', $scopeKey] as $scope) {
             $last = PayoutReconciliationCheckpoint::query()->where('account_fingerprint', $accountFingerprint)->where('scope_key', $scope)
                 ->orderByDesc('observed_at')->orderByDesc('id')->first();
-            if ($scope === '*' && $last === null) {
-                continue;
-            }
-            $evidence = $last?->evidence ?? [];
+            $evidence = $last->evidence ?? [];
             if ($last === null || $last->status !== 'matched' || $last->observed_at->lte(now()->subDay()) || $last->observed_at->gt(now())
                 || ($evidence['ledger_checked'] ?? false) !== true || ($evidence['provider_checked'] ?? false) !== true
                 || ($evidence['unresolved_count'] ?? -1) !== 0) {

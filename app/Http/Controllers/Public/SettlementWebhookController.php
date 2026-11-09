@@ -134,7 +134,7 @@ final class SettlementWebhookController extends Controller
                     'member_dues' => $this->confirmDuesCharge($data, $data['reference'] ?? null),
                     default => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 },
-                'transfer.success', 'transfer.failed' => $this->confirmTransfer($event, (string) ($data['reference'] ?? ''), $data),
+                'transfer.success', 'transfer.failed', 'transfer.reversed' => $this->confirmTransfer($event, (string) ($data['reference'] ?? ''), $data),
                 default => null,
             };
         } catch (Throwable $e) {
@@ -340,6 +340,16 @@ final class SettlementWebhookController extends Controller
     private function confirmTransfer(string $event, string $reference, array $data): void
     {
         if ($reference === '') {
+            return;
+        }
+
+        $scheduled = EventPayout::withoutGlobalScopes()->where('provider_reference', $reference)->whereIn('id', \App\Models\ScheduledPayoutProposal::query()->select('payout_id')->whereNotNull('payout_id'))->first();
+        if ($scheduled !== null) {
+            app(\App\Services\Finance\ScheduledPayoutSettlement::class)->reconcile($scheduled);
+
+            return;
+        }
+        if ($event === 'transfer.reversed') {
             return;
         }
 

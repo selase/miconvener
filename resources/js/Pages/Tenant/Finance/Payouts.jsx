@@ -14,6 +14,7 @@ import { formatDuesMoney, sendJson, toMinorUnits } from '@/lib/dues';
 import csrfFetch from '@/lib/csrfFetch';
 
 const PAYOUT_LABEL = {
+    reversed: 'Reversed (principal returned)',
     scheduled: 'Scheduled',
     awaiting_otp: 'Awaiting code',
     processing: 'Sending',
@@ -22,6 +23,7 @@ const PAYOUT_LABEL = {
 };
 
 const PAYOUT_PILL = {
+    reversed: 'failed',
     scheduled: 'pending',
     awaiting_otp: 'pending',
     processing: 'pending',

@@ -57,10 +57,11 @@ final class ReconcileStuckPayouts extends Command
             ->whereNotNull('provider_reference')
             ->where(fn ($query) => $query
                 ->where(fn ($processing) => $processing->where('status', EventPayout::STATUS_PROCESSING)->where('updated_at', '<=', $threshold))
-                ->orWhere(fn ($awaiting) => $awaiting->where('status', EventPayout::STATUS_AWAITING_OTP)->where('updated_at', '<=', $otpThreshold)))
+                ->orWhere(fn ($awaiting) => $awaiting->where('status', EventPayout::STATUS_AWAITING_OTP)->where('updated_at', '<=', $otpThreshold))
+                ->orWhere(fn ($paid) => $paid->where('status', EventPayout::STATUS_PAID)->whereIn('id', \App\Models\ScheduledPayoutProposal::query()->where('status', 'paid')->where('updated_at', '<=', now()->subMinutes(15))->select('payout_id'))))
             ->orderBy('updated_at')
             ->orderBy('id')
-            ->get();
+            ->limit(100)->get();
 
         if ($stuck->isEmpty()) {
             $this->info('No payouts are stuck in processing or waiting on an expired code.');
@@ -71,6 +72,15 @@ final class ReconcileStuckPayouts extends Command
         $this->info("Reconciling {$stuck->count()} stuck payout(s).");
 
         foreach ($stuck as $payout) {
+            if (\App\Models\ScheduledPayoutProposal::query()->where('payout_id', $payout->id)->exists()) {
+                try {
+                    app(\App\Services\Finance\ScheduledPayoutSettlement::class)->reconcile($payout);
+                } catch (Throwable) {
+                    $this->warn($payout->id.': original transfer still needs reconciliation.');
+                }
+
+                continue;
+            }
             try {
                 $verified = $settlementGateway->verifyTransfer((string) $payout->provider_reference);
                 $status = $verified['status'];

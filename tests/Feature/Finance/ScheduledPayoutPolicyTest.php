@@ -61,3 +61,21 @@ test('a new policy version pauses its predecessor without moving funds', functio
     expect($second->fresh()->status)->toBe('paused');
     expect(OrganisationPayoutPolicy::count())->toBe(2);
 });
+
+test('commercial terms changes require a new approved policy', function () {
+    [$tenant, $owner, $platform, $account] = scheduledPolicyActors();
+    $tenant->update(['package_id' => null]);
+    config(['services.dues.free_plan_fee_percentage' => 2]);
+    $policy = app(PayoutPolicies::class)->approve(app(PayoutPolicies::class)->request($tenant, $owner, scheduledPolicyInput($account)), $platform);
+    $this->travel(2)->days();
+    config(['services.dues.free_plan_fee_percentage' => 3]);
+    expect(fn () => app(PayoutPolicies::class)->assertActive($policy))->toThrow(ValidationException::class);
+});
+
+test('credential recovery invalidates a previously approved schedule', function () {
+    [$tenant, $owner, $platform, $account] = scheduledPolicyActors();
+    $policy = app(PayoutPolicies::class)->approve(app(PayoutPolicies::class)->request($tenant, $owner, scheduledPolicyInput($account)), $platform);
+    $this->travel(2)->days();
+    $owner->update(['password' => bcrypt('a-new-recovered-password')]);
+    expect(fn () => app(PayoutPolicies::class)->assertActive($policy))->toThrow(ValidationException::class);
+});

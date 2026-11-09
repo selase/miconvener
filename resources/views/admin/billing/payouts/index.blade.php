@@ -7,6 +7,7 @@
 @section('content')
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
+        @can('approve payout policies')<a class="btn btn-light mb-5" href="{{ route('admin.payout-policies.index') }}">Payout policy approvals</a>@endcan
         @if (session('success'))
             <div class="alert alert-success p-5 mb-5">{{ session('success') }}</div>
         @endif

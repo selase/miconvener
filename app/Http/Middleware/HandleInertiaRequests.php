@@ -59,6 +59,7 @@ final class HandleInertiaRequests extends Middleware
                     'manage_billing' => fn (): bool => (bool) $request->user()?->can('manage billing'),
                     'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
                     'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
+                    'manage_payout_schedules' => fn (): bool => (bool) $request->user()?->can('manage payout schedules'),
                     'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
                     'send_community_messages' => fn (): bool => (bool) $request->user()?->can('send community messages'),
                     'manage_giving' => fn (): bool => (bool) $request->user()?->can('manage giving'),

@@ -599,6 +599,27 @@ final class LedgerService
             array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
     }
 
+    public function recordScheduledPayoutReversal(EventPayout $payout, int $returnedPrincipal): LedgerTransaction
+    {
+        if ($payout->status !== 'paid' || $returnedPrincipal !== $payout->requested_net_amount || $returnedPrincipal < 1 || $returnedPrincipal > $payout->amount) {
+            throw new InvalidArgumentException('A reversal must match the original recipient transfer.');
+        }
+        $event = $payout->event_id === null ? null : Event::withoutGlobalScopes()->where('tenant_id', $payout->tenant_id)->findOrFail($payout->event_id);
+        $reference = 'reversal:'.$payout->provider_reference;
+        $transaction = $this->postTransaction($payout->tenant, $event, 'payout_reversal', 'Verified payout principal returned; original fees retained', $reference, [
+            ['code' => LedgerAccount::CODE_BANK, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $returnedPrincipal],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $returnedPrincipal],
+        ], null, $payout->currency, $payout->category);
+        if ($event !== null) {
+            EventLedgerEntry::firstOrCreate(['tenant_id' => $payout->tenant_id, 'type' => 'payout_reversal', 'provider_reference' => $reference], [
+                'event_id' => $event->id, 'payout_id' => $payout->id, 'gross_amount' => $returnedPrincipal, 'gateway_fee_amount' => 0,
+                'commission_amount' => 0, 'net_amount' => -$returnedPrincipal, 'currency' => $payout->currency, 'provider' => 'paystack',
+            ]);
+        }
+
+        return $transaction;
+    }
+
     public function recordStorePayout(EventPayout $payout, string $reference): LedgerTransaction
     {
         if ($payout->category !== LedgerCategoryEnum::Commerce || $payout->event_id !== null || $payout->provider_reference !== $reference || $payout->currency !== 'GHS') {

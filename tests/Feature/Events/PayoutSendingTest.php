@@ -353,3 +353,17 @@ test('a gateway failure while sending answers 502 with the exact message and lea
 
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_SCHEDULED);
 });
+
+test('an uncertain event transfer remains processing and cannot be resent', function () {
+    Http::fake(['api.paystack.co/transfer' => Http::response(['status' => false, 'message' => 'Temporary problem'], 503)]);
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'recipient_code' => 'RCP_unknown']);
+    $payout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'payout_account_id' => $account->id, 'amount' => 5000]);
+    $host = eventSubdomainHost('acme');
+    $url = "http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send";
+    $this->actingAs($user)->postJson($url)->assertStatus(502);
+    expect($payout->fresh()->status)->toBe('processing')->and($payout->fresh()->provider_reference)->not->toBeNull();
+    $this->actingAs($user)->postJson($url)->assertUnprocessable();
+    Http::assertSentCount(1);
+});

@@ -177,6 +177,12 @@ export const NAV_GROUPS = [
         label: 'Finance',
         items: [
             {
+                label: 'Payout schedules',
+                href: 'tenant.finance.schedules.index',
+                icon: 'CalendarDays',
+                permission: 'read_finance',
+            },
+            {
                 label: 'Overview',
                 href: 'tenant.finance.index',
                 icon: 'Wallet',

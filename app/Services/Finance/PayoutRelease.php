@@ -8,7 +8,6 @@ use App\Contracts\SettlementGateway;
 use App\Exceptions\PaymentFailedException;
 use App\Models\EventPayout;
 use Closure;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Release a payout Paystack is holding for a one-time code.
@@ -43,83 +42,20 @@ final class PayoutRelease
      */
     public function release(EventPayout $payout, string $otp): array
     {
+        app(PayoutSubmissionGuard::class)->assertEntry($payout);
         if ($payout->category === \App\Enum\LedgerCategoryEnum::Commerce) {
             return ['released' => false, 'message' => 'Use the commerce payout flow to preserve its balance and original account checks.', 'http_status' => 422];
         }
 
-        return DB::connection('landlord')->transaction(function () use ($payout, $otp): array {
-            // Same lock as sending: two submissions of the same code must not
-            // both release the transfer.
-            $payoutModel = EventPayout::query()->whereKey($payout->getKey())->lockForUpdate()->firstOrFail();
-
-            if ($payoutModel->status !== EventPayout::STATUS_AWAITING_OTP) {
-                return ['released' => false, 'message' => 'This payout is not waiting for a one-time code.', 'http_status' => 422];
+        return $this->releaseWithoutLock($payout, $otp, function (EventPayout $claim): void {
+            if ($claim->event_id === null) {
+                return;
             }
-
-            if (! $payoutModel->provider_transfer_code) {
-                return ['released' => false, 'message' => 'This payout has no transfer to release. Send it again.', 'http_status' => 422];
+            $event = \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $claim->tenant_id)->lockForUpdate()->findOrFail($claim->event_id);
+            $balance = app(\App\Services\Events\MemberBenefitBalance::class);
+            if ($balance->applies($event) && ($event->currency !== $claim->currency || $claim->amount > $balance->available($event, $claim->id))) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['payout' => 'This parked transfer exceeds the funds available after payment and refund holds.']);
             }
-
-            if ($payoutModel->event_id !== null) {
-                $event = \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->lockForUpdate()->findOrFail($payoutModel->event_id);
-                $balance = app(\App\Services\Events\MemberBenefitBalance::class);
-                if ($balance->applies($event) && ($event->currency !== $payoutModel->currency || $payoutModel->amount > $balance->available($event, $payoutModel->id))) {
-                    return ['released' => false, 'message' => 'This parked transfer exceeds the funds available after payment and refund holds. Reconcile the holds before releasing it.', 'http_status' => 422];
-                }
-            }
-
-            try {
-                $transfer = $this->settlementGateway->finalizeTransfer($payoutModel->provider_transfer_code, $otp);
-            } catch (PaymentFailedException $e) {
-                /*
-                 * Paystack abandons a transfer whose code was not entered in
-                 * time and then refuses every code. Such a payout is failed so
-                 * it can be sent again and stops holding the balance.
-                 */
-                if ($this->transferIsDead($payoutModel)) {
-                    $payoutModel->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => self::OTP_EXPIRED_REASON]);
-
-                    return ['released' => false, 'message' => self::OTP_EXPIRED_REASON, 'http_status' => 422];
-                }
-
-                /*
-                 * A rejected code is not a failed payout — the transfer is
-                 * still parked and the code can be entered again.
-                 */
-                $payoutModel->update(['failure_reason' => 'The one-time code was not accepted: '.$e->providerMessage()]);
-
-                return ['released' => false, 'message' => (string) $payoutModel->failure_reason, 'http_status' => 422];
-            }
-
-            $transferStatus = $transfer['status'];
-
-            if (! in_array($transferStatus, ['success', 'pending', 'queued'], true)) {
-                $payoutModel->update([
-                    'status' => EventPayout::STATUS_FAILED,
-                    'failure_reason' => "The payment provider did not release the transfer (status: {$transferStatus}).",
-                ]);
-
-                return ['released' => false, 'message' => (string) $payoutModel->failure_reason, 'http_status' => 502];
-            }
-
-            $account = $payoutModel->payoutAccount;
-            $transferFee = $this->transferFeeSchedule->feeFor($account->type);
-
-            /*
-             * net_paid_amount follows the scheduled fee because that is what
-             * the transfer was actually requested for, while transfer_fee_amount
-             * records what the provider says it charged. They normally agree;
-             * when they do not, the provider has changed its pricing and the
-             * gap is worth seeing rather than papering over.
-             */
-            $payoutModel->update([
-                'status' => EventPayout::STATUS_PROCESSING,
-                'failure_reason' => null,
-                'transfer_fee_amount' => $this->transferFeeSchedule->feeFromProviderResponse($transfer) ?? $transferFee,
-                'net_paid_amount' => $payoutModel->amount - $transferFee,
-            ]);
-
-            return ['released' => true, 'message' => 'Payout released.', 'http_status' => 200];
         });
     }
 
@@ -128,6 +64,7 @@ final class PayoutRelease
      */
     public function releaseWithoutLock(EventPayout $payout, string $otp, ?Closure $beforeClaim = null): array
     {
+        app(PayoutSubmissionGuard::class)->assertEntry($payout);
         $claim = $payout->getConnection()->transaction(function () use ($payout, $beforeClaim): array {
             if ($payout->category === \App\Enum\LedgerCategoryEnum::Commerce && $beforeClaim === null) {
                 return ['error' => ['released' => false, 'message' => 'Commerce release requires its balance guard.', 'http_status' => 422]];
@@ -160,7 +97,7 @@ final class PayoutRelease
             }
             $previous = $exception->getPrevious();
             if ($previous instanceof \Illuminate\Http\Client\RequestException && $previous->response->status() >= 400 && $previous->response->status() < 500) {
-                $message = $locked->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'The one-time code was not accepted. Check the original transfer status before retrying.' : 'The one-time code was not accepted: '.$exception->providerMessage();
+                $message = ($locked->category === \App\Enum\LedgerCategoryEnum::Commerce || \App\Models\ScheduledPayoutProposal::query()->where('payout_id', $locked->id)->exists()) ? 'The one-time code was not accepted. Check the original transfer status before retrying.' : 'The one-time code was not accepted: '.$exception->providerMessage();
                 $this->changeProcessing($locked, ['status' => EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
 
                 return ['released' => false, 'message' => $message, 'http_status' => 422];

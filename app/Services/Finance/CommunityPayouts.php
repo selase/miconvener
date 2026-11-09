@@ -49,6 +49,7 @@ final class CommunityPayouts
     /** @return array<string, mixed> */
     public function send(Tenant $tenant, User $actor, EventPayout $payout): array
     {
+        app(PayoutSubmissionGuard::class)->assertEntry($payout);
         $this->authorize($tenant, $actor);
         $this->assertPayout($tenant, $payout);
         $balance = $this->balance($payout->category);

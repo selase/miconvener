@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 return [
+    'payout_schedules' => [
+        'liquidity_controls' => (bool) env('PAYOUT_LIQUIDITY_CONTROLS_ENABLED', false),
+        'paused' => (bool) env('PAYOUTS_PAUSED', false),
+        'cash_buffer' => ctype_digit((string) env('PAYOUT_CASH_BUFFER_PESEWAS', '')) ? (int) env('PAYOUT_CASH_BUFFER_PESEWAS') : null,
+        'daily_total_limit' => ctype_digit((string) env('PAYOUT_DAILY_LIMIT_PESEWAS', '')) ? (int) env('PAYOUT_DAILY_LIMIT_PESEWAS') : null,
+    ],
 
     /*
     |--------------------------------------------------------------------------

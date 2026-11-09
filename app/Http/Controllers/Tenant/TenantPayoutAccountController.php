@@ -77,7 +77,7 @@ final class TenantPayoutAccountController extends Controller
             ->where(fn ($query) => $query->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID, EventPayout::STATUS_AWAITING_OTP])->orWhere('category', \App\Enum\LedgerCategoryEnum::Commerce))
             ->exists();
 
-        if ($hasActivePayouts) {
+        if ($hasActivePayouts || \App\Models\OrganisationPayoutPolicy::query()->where('payout_account_id', $accountModel->id)->exists()) {
             return response()->json(['message' => 'Cannot remove this account: its payout history or an in-flight transfer must be preserved.'], 422);
         }
 

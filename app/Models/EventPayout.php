@@ -73,6 +73,8 @@ final class EventPayout extends Model
         'provider_reference',
         'provider_transfer_code',
         'failure_reason',
+        'reversed_amount',
+        'reversed_at',
     ];
 
     protected $hidden = ['commerce_account_fingerprint', 'commerce_recipient_fingerprint'];
@@ -80,6 +82,8 @@ final class EventPayout extends Model
     protected $casts = [
         'category' => LedgerCategoryEnum::class,
         'amount' => 'integer',
+        'reversed_amount' => 'integer',
+        'reversed_at' => 'immutable_datetime',
         'transfer_fee_amount' => 'integer',
         'requested_transfer_fee_amount' => 'integer',
         'requested_net_amount' => 'integer',

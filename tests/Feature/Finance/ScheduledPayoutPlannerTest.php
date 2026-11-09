@@ -51,3 +51,8 @@ test('exact reconciliation age is expired', function () {
     $this->travel(24)->hours();
     expect(app(ScheduledPayoutPlanner::class)->prepare($policy, CarbonImmutable::now()))->toBe([]);
 });
+
+test('a scope checkpoint without account-wide reconciliation cannot authorise proposals', function () {
+    [$policy] = fundedScheduledPolicy(false);
+    expect(app(ScheduledPayoutPlanner::class)->prepare($policy, CarbonImmutable::now()))->toBe([]);
+});
