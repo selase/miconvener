@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Events;
 
-use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayoutSchedule;
@@ -157,7 +156,7 @@ test('finance controller returns trial balance and allows updating payout schedu
     expect($schedule->days_after_event)->toBe(7);
 });
 
-test('reconcile payout schedules command processes matured payouts and holdback escrow', function () {
+test('legacy schedule reconciliation previews without creating payouts or changing holdbacks', function () {
     [$tenant] = ledgerScheduleHost();
     $event = Event::factory()->create([
         'tenant_id' => $tenant->id,
@@ -191,16 +190,13 @@ test('reconcile payout schedules command processes matured payouts and holdback 
     $tb = app(LedgerService::class)->getTrialBalance($event);
     expect($tb['is_balanced'])->toBeTrue();
 
-    // Verify payout was scheduled for remaining available balance
-    $payouts = $event->payouts()->get();
-    expect($payouts)->not->toBeEmpty();
-    $payout = $payouts->first();
-    expect($payout->payout_account_id)->toBe($account->id);
-    expect($payout->category)->toBe(LedgerCategoryEnum::Event);
-    expect($payout->amount)->toBe(8_500); // 9,500 net - 1,000 (10% of 10,000 gross) holdback
+    expect($event->payouts()->count())->toBe(0);
+    expect(EventLedgerEntry::where('event_id', $event->id)->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(0);
+    expect(Artisan::output())->toContain('preview only');
+
 });
 
-test('a payout the schedule command creates reaches the settlement statement', function () {
+test('repeated legacy schedule previews never invent completed payout postings', function () {
     [$tenant] = ledgerScheduleHost();
     $event = Event::factory()->create([
         'tenant_id' => $tenant->id,
@@ -227,16 +223,10 @@ test('a payout the schedule command creates reaches the settlement statement', f
 
     Artisan::call('app:reconcile-payout-schedules');
 
-    /*
-     * This command posted to the double-entry ledger and nowhere else, so a
-     * payout it created was missing from every settlement statement the
-     * organizer could export. One write path is what closes that.
-     */
-    $statementRow = EventLedgerEntry::where('event_id', $event->id)
-        ->where('type', EventLedgerEntry::TYPE_PAYOUT)
-        ->sole();
+    Artisan::call('app:reconcile-payout-schedules');
+    expect(EventLedgerEntry::where('event_id', $event->id)->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(0);
+    expect($event->payouts()->count())->toBe(0);
 
-    expect($statementRow->gross_amount)->toBe(8_500);
 });
 
 test('settlement statement export includes double-entry general ledger trial balance', function () {
