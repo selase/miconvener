@@ -115,6 +115,7 @@ test('the platform finance role holds the finance permissions and may read signu
     $role = Role::query()->where('name', 'Platform Finance')->whereNull('tenant_id')->firstOrFail();
 
     expect($role->permissions->pluck('name')->sort()->values()->all())->toBe([
+        'approve payout policies',
         'manage commission credits',
         'manage commission destinations',
         'manage invoices',

@@ -268,6 +268,7 @@ test('every mailable renders', function (): void {
     ]]);
 
     $mailables = [
+        'ScheduledPayoutNoticeMail' => fn () => new App\Mail\ScheduledPayoutNoticeMail('scheduled-notice-render', 'review_required', 'https://acme.test/finance/schedules'),
         'StoreOrderReady' => fn () => new App\Mail\StoreOrderReady(App\Models\StoreFulfilmentNotice::factory()->create()),
         'StoreOrderReceipt' => fn () => new StoreOrderReceipt($storeReceipt),
         'SetUpRecoveryCodesMail' => fn () => new SetUpRecoveryCodesMail('Ama', 'Acme Events', 'https://acme.test/account'),
