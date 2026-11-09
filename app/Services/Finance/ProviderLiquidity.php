@@ -21,6 +21,7 @@ final class ProviderLiquidity
         if ($currency !== 'GHS' || ! hash_equals($accountFingerprint, app(PayoutPolicies::class)->accountFingerprint())) {
             $this->refuse('The original settlement account must be reconciled before sending.');
         }
+        app(PayoutReconciliationCheckpoints::class)->assertFresh($accountFingerprint, '*');
         $amount = $this->observe($accountFingerprint, $currency)['balance'];
         (new ProviderPayoutLiquidity)->getConnection()->transaction(function () use ($accountFingerprint, $amount, $excludeUnsubmittedPayout): void {
             $allocatedIds = PayoutLiquidityAllocation::query()->select('payout_id');

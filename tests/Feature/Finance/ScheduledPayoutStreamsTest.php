@@ -35,7 +35,7 @@ function scheduledStreamPolicy(string $category): array
         App\Models\StoreCommercialAgreement::factory()->create(['tenant_id' => $tenant->id, 'shop_id' => $shop->id,
             'account_fingerprint' => app(PayoutPolicies::class)->accountFingerprint()]);
     }
-    app(App\Services\Finance\LedgerService::class)->postTransaction($tenant, $event, 'test_funding', 'Verified stream funds', 'stream-funding', [
+    app(App\Services\Finance\LedgerService::class)->postTransaction($tenant, $event, $category === 'event' ? 'ticket_sale' : 'test_funding', 'Verified stream funds', 'stream-funding', [
         ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => 'debit', 'amount' => 15000],
         ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => 'credit', 'amount' => 15000],
     ], currency: 'GHS', category: LedgerCategoryEnum::from($category));
@@ -73,4 +73,35 @@ test('existing event holdbacks are retained without double posting or changing h
     EventPayoutSchedule::query()->create(['tenant_id' => $event->tenant_id, 'event_id' => $event->id,
         'schedule_type' => 'post_event', 'status' => 'active', 'days_after_event' => 3, 'holdback_percentage' => 80, 'holdback_release_days' => 14]);
     expect(app(PayoutEligibility::class)->inspect($policy, $event->id)['available'])->toBe(2500);
+});
+
+test('an event refund hold added after submission prevents OTP release', function () {
+    [$policy, $tenant, $owner, $event] = scheduledStreamPolicy('event');
+    config(['services.payout_schedules.liquidity_controls' => true, 'services.payout_schedules.cash_buffer' => 100, 'services.payout_schedules.daily_total_limit' => 100000]);
+    Illuminate\Support\Facades\Http::fake(['*api.paystack.co/balance' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => [['currency' => 'GHS', 'balance' => 100000]]]),
+        '*api.paystack.co/transferrecipient' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => ['recipient_code' => 'RCP_event']]),
+        '*api.paystack.co/transfer' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => ['status' => 'otp', 'transfer_code' => 'TRF_event']])]);
+    $proposal = app(ScheduledPayoutPlanner::class)->prepare($policy, CarbonImmutable::now())[0];
+    $payout = app(ScheduledPayoutApproval::class)->reserve($proposal, $owner, (string) Str::uuid());
+    app(ScheduledPayoutApproval::class)->submit($proposal, $owner);
+    App\Models\EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'member_benefit_required' => false, 'status' => App\Models\EventRegistration::STATUS_PENDING_BENEFIT_REVIEW,
+        'currency' => 'GHS', 'amount' => 14000, 'charged_amount' => 14000, 'platform_fee_amount' => 0, 'payment_reference' => 'stream-funding']);
+    $gateway = Mockery::mock(App\Contracts\SettlementGateway::class);
+    $gateway->shouldNotReceive('finalizeTransfer');
+    app()->instance(App\Contracts\SettlementGateway::class, $gateway);
+    expect(app(ScheduledPayoutApproval::class)->finalize($proposal->fresh(), $owner, '123456')['http_status'])->toBe(422);
+    expect($payout->fresh()->status)->toBe('awaiting_otp');
+});
+
+test('event policy preparation continues in bounded queued batches', function () {
+    [$policy, $tenant] = scheduledStreamPolicy('event');
+    Event::factory()->count(26)->published()->create(['tenant_id' => $tenant->id, 'currency' => 'GHS']);
+    app(ScheduledPayoutPlanner::class)->prepare($policy, CarbonImmutable::now());
+    Queue::assertPushed(App\Jobs\PrepareScheduledPayoutPolicy::class, 1);
+    $job = Queue::pushed(App\Jobs\PrepareScheduledPayoutPolicy::class)->first();
+    expect($job->afterEventId)->not->toBeNull();
+    $job->handle(app(ScheduledPayoutPlanner::class));
+    Queue::assertPushed(App\Jobs\PrepareScheduledPayoutPolicy::class, 1);
+    expect(App\Models\ScheduledPayoutProposal::query()->count())->toBe(1);
 });

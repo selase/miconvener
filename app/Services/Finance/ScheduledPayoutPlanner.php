@@ -14,9 +14,9 @@ use Illuminate\Validation\ValidationException;
 final class ScheduledPayoutPlanner
 {
     /** @return list<ScheduledPayoutProposal> */
-    public function prepare(OrganisationPayoutPolicy $policy, CarbonImmutable $now): array
+    public function prepare(OrganisationPayoutPolicy $policy, CarbonImmutable $now, ?string $afterEventId = null): array
     {
-        return $policy->getConnection()->transaction(function () use ($policy, $now): array {
+        return $policy->getConnection()->transaction(function () use ($policy, $now, $afterEventId): array {
             app(CommerceInventoryLocks::class)->tenant($policy->tenant_id);
             $current = OrganisationPayoutPolicy::query()->lockForUpdate()->findOrFail($policy->id);
             try {
@@ -26,8 +26,10 @@ final class ScheduledPayoutPlanner
                     return [];
                 }
                 $events = $current->category === 'event'
-                    ? Event::withoutGlobalScopes()->where('tenant_id', $current->tenant_id)->where('currency', 'GHS')->orderBy('id')->pluck('id')->all()
+                    ? Event::withoutGlobalScopes()->where('tenant_id', $current->tenant_id)->where('currency', 'GHS')->when($afterEventId !== null, fn ($query) => $query->where('id', '>', $afterEventId))->orderBy('id')->limit(26)->pluck('id')->all()
                     : [null];
+                $hasMore = count($events) > 25;
+                $events = array_slice($events, 0, 25);
                 $results = [];
                 foreach ($events as $eventId) {
                     $snapshot = app(PayoutEligibility::class)->inspect($current, $eventId);
@@ -41,6 +43,11 @@ final class ScheduledPayoutPlanner
 
                 foreach ($results as $proposal) {
                     app(ScheduledPayoutNotices::class)->enqueue($current, 'proposal_ready', $proposal->id);
+                }
+
+                if ($hasMore) {
+                    $cursor = $events[array_key_last($events)];
+                    \App\Jobs\PrepareScheduledPayoutPolicy::dispatch($current->id, $cursor)->afterCommit();
                 }
 
                 return $results;

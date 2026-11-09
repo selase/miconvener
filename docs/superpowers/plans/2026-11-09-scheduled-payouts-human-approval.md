@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Proposed for owner review. NOT approved for implementation, production migration, financial changes or activation.
+**Status:** Implementation approved by owner on 9 November 2026. Implemented in `codex/scheduled-payouts-human-approval`; final verification in progress. Merge, deployment, production remediation and activation are separate gates.
 
 **Goal:** Prepare organisation-specific payout proposals on a schedule, with explicit human authorisation and existing Paystack OTP protection before money moves.
 
@@ -64,11 +64,11 @@ Inspected checkout head: 94554f0c (same source tree as merged main after PR #96)
 
 **Interfaces:** Preserve existing manual endpoints. Legacy schedule reconciliation becomes preview-only for payout creation/posting; reserve retention/release changes require their own idempotent lock-protected checks. Produce a read-only inventory of scheduled/processing/OTP/paid payouts and linked ledger postings for review.
 
-- [ ] Write failing tests: legacy scheduling makes zero provider calls and creates zero payout ledger postings; no fallback recipient; scheduled proposals cannot be manually marked paid; unknown event transfer outcomes cannot be blindly resent.
-- [ ] Run affected files individually and confirm each new regression fails for its intended reason.
-- [ ] Implement the fence; preserve existing payout history and expose historical mismatches as review exceptions. Do not auto-correct postings or auto-import legacy policies.
-- [ ] Ensure every scheduled submission path persists original account/reference/net/fee before HTTP, calls provider outside business locks, and settles verified success once. Record compensating entries for verified reversals through LedgerService. Where manual paths share those functions, include their regression suites.
-- [ ] Run the three affected files plus `tests/Feature/Finance/PayoutOtpFlowTest.php`; commit source and tick these steps together.
+- [x] Write failing tests: legacy scheduling makes zero provider calls and creates zero payout ledger postings; no fallback recipient; scheduled proposals cannot be manually marked paid; unknown event transfer outcomes cannot be blindly resent.
+- [x] Run affected files individually and confirm each new regression fails for its intended reason.
+- [x] Implement the fence; preserve existing payout history and expose historical mismatches as review exceptions. Do not auto-correct postings or auto-import legacy policies.
+- [x] Ensure every scheduled submission path persists original account/reference/net/fee before HTTP, calls provider outside business locks, and settles verified success once. Record compensating entries for verified reversals through LedgerService. Where manual paths share those functions, include their regression suites.
+- [x] Run the three affected files plus `tests/Feature/Finance/PayoutOtpFlowTest.php`; commit source and tick these steps together.
 
 ## Task 2 — Versioned policy, permissions and destination approvals
 
@@ -78,11 +78,11 @@ Inspected checkout head: 94554f0c (same source tree as merged main after PR #96)
 
 Policy stores immutable version/stream/currency/settlement-account identity/destination fingerprint/timezone/cadence/local time/weekday/explicit limits/reserve terms, requester/approver, activation time and supersession. Actions append; direct edits to approved terms are forbidden. Proposal stores policy version, scope, window key, entitlement/reserve/available snapshot, proposed gross/fee/net, reason, expiry and optional reserved payout ID. Financial snapshots contain no full bank credentials.
 
-- [ ] Write failing tests for tenant isolation, same-person policy approval, inactive users, organisation owners raising ceilings, destination edits after verification, cooling period, missing MFA, GHS-only and own-gateway refusal.
-- [ ] Confirm failures, then implement typed validation through Form Requests and policies. New permissions: tenant-safe `manage payout schedules`; platform-only `approve payout policies`. Existing payout permissions remain necessary to reserve/send. Event Organiser receives none.
-- [ ] Invalidate unsubmitted proposals/approvals when destination, commercial terms, settlement account, policy or security authority changes; submitted payouts keep original snapshots and reconcile normally.
-- [ ] Add immutable action evidence, source uniqueness and database checks. No existing schedule is enabled by migration/seeding.
-- [ ] Run `ScheduledPayoutPolicyTest.php` and `tests/Feature/Billing/TenantPayoutAccountVerificationTest.php`; commit.
+- [x] Write failing tests for tenant isolation, same-person policy approval, inactive users, organisation owners raising ceilings, destination edits after verification, cooling period, missing MFA, GHS-only and own-gateway refusal.
+- [x] Confirm failures, then implement typed validation through Form Requests and policies. New permissions: tenant-safe `manage payout schedules`; platform-only `approve payout policies`. Existing payout permissions remain necessary to reserve/send. Event Organiser receives none.
+- [x] Invalidate unsubmitted proposals/approvals when destination, commercial terms, settlement account, policy or security authority changes; submitted payouts keep original snapshots and reconcile normally.
+- [x] Add immutable action evidence, source uniqueness and database checks. No existing schedule is enabled by migration/seeding.
+- [x] Run `ScheduledPayoutPolicyTest.php` and `tests/Feature/Billing/TenantPayoutAccountVerificationTest.php`; commit.
 
 ## Task 3 — Scheduled previews, without reserving or moving money
 
@@ -90,11 +90,11 @@ Policy stores immutable version/stream/currency/settlement-account identity/dest
 
 **Interfaces:** `PayoutEligibility::inspect(OrganisationPayoutPolicy $policy, ?string $eventId = null): array` (typed shape: eligible/reason/gross entitlement/reserves/available/currency); `ScheduledPayoutPlanner::prepare(OrganisationPayoutPolicy $policy, CarbonImmutable $now): array` returns zero or more persisted proposals, one per eligible scope/current schedule window.
 
-- [ ] Test duplicate workers and missed days produce one current proposal per policy/scope/window; an expired or superseded policy cannot generate one. Scheduler makes zero transfer, reservation or ledger calls.
-- [ ] Test Monday local boundary, daily mode, DST skipped/repeated time (run at first valid instant; once per local date), timezone policy version change and 24-hour expiry.
-- [ ] Confirm failures; implement bounded cursor jobs with continuation, due-policy selection and database uniqueness. Run every fifteen minutes without overlap; database uniqueness remains authority.
-- [ ] Use category services; exclude cash, unverified captures, pending refunds, disputes, security liabilities and unreleased venue earnings. No cross-event ticket pooling or cross-category/currency offset. Unknown eligibility fails closed with a visible reason.
-- [ ] Test minimum/fee equality, explicit reserves, withheld venue earnings, missing agreement and stale reconciliation. Run `ScheduledPayoutPlannerTest.php`; commit.
+- [x] Test duplicate workers and missed days produce one current proposal per policy/scope/window; an expired or superseded policy cannot generate one. Scheduler makes zero transfer, reservation or ledger calls.
+- [x] Test Monday local boundary, daily mode, DST skipped/repeated time (run at first valid instant; once per local date), timezone policy version change and 24-hour expiry.
+- [x] Confirm failures; implement bounded cursor jobs with continuation, due-policy selection and database uniqueness. Run every fifteen minutes without overlap; database uniqueness remains authority.
+- [x] Use category services; exclude cash, unverified captures, pending refunds, disputes, security liabilities and unreleased venue earnings. No cross-event ticket pooling or cross-category/currency offset. Unknown eligibility fails closed with a visible reason.
+- [x] Test minimum/fee equality, explicit reserves, withheld venue earnings, missing agreement and stale reconciliation. Run `ScheduledPayoutPlannerTest.php`; commit.
 
 ## Task 4 — Human approval, atomic reservation and guarded submission
 
@@ -102,13 +102,13 @@ Policy stores immutable version/stream/currency/settlement-account identity/dest
 
 **Interfaces:** `ScheduledPayoutApproval::reserve(ScheduledPayoutProposal $proposal, User $actor, string $operationKey): EventPayout`; `submit(ScheduledPayoutProposal $proposal, User $actor): array`; `ProviderLiquidity::refresh(string $accountFingerprint, string $currency): array` (verified provider available balance, observation time, account identity); `PayoutSubmissionGuard::claim(EventPayout $payout, User $actor): void` verifies/records a guarded submission claim, not a ledger posting.
 
-- [ ] Write failing tests for expired/changed proposals, revoked permission, changed account, paused policy, altered hidden amount, repeated operation key and refund racing approval. Reject changed values; require a fresh proposal, never silently approve a different amount.
-- [ ] Implement reserve through existing category services under canonical locks, with current actor permission and live availability. Capture policy/proposal/actor in immutable approval evidence; no synthetic staff user in scheduler.
-- [ ] Implement a provider-account liquidity allocation record using a local transactional lock shared by all platform manual and scheduled senders. Refresh provider balance outside locks; allocation uses a maximum 60-second-old observation, subtracts buffer and commitments, and conservatively avoids treating recently completed debits as immediately reusable cash. Reconcile observations/commitments without double counting or inventing new capacity.
-- [ ] Before submission recheck limits, authority, reconciliation, policy and availability excluding this reservation. Count gross commitments against local-day AND rolling-24-hour limits; apply platform aggregate cap. Insufficient cash leaves a visible awaiting-liquidity state with no transfer submitted.
-- [ ] Persist reference/account/recipient/gross/net/fee identity before HTTP; retry uncertainty only through reconciliation. Approval expires after 30 minutes if unsent. Cancellation and submission must race safely.
-- [ ] Prove with real PostgreSQL workers: two approvals, manual versus scheduled payout, payout versus refund, two tenants sharing one provider cash pool, pause versus send, expiry cancellation versus send. Assert financial outcomes and ledger counts, not only lock ordering.
-- [ ] Run approval/concurrency tests plus DuesPayoutTest, GivingPayoutTest, StorePayoutsTest, PayoutSendingTest and PayoutOtpFlowTest; commit. No provider-account-wide change is released without all manual-stream regressions passing.
+- [x] Write failing tests for expired/changed proposals, revoked permission, changed account, paused policy, altered hidden amount, repeated operation key and refund racing approval. Reject changed values; require a fresh proposal, never silently approve a different amount.
+- [x] Implement reserve through existing category services under canonical locks, with current actor permission and live availability. Capture policy/proposal/actor in immutable approval evidence; no synthetic staff user in scheduler.
+- [x] Implement a provider-account liquidity allocation record using a local transactional lock shared by all platform manual and scheduled senders. Refresh provider balance outside locks; allocation uses a maximum 60-second-old observation, subtracts buffer and commitments, and conservatively avoids treating recently completed debits as immediately reusable cash. Reconcile observations/commitments without double counting or inventing new capacity.
+- [x] Before submission recheck limits, authority, reconciliation, policy and availability excluding this reservation. Count gross commitments against local-day AND rolling-24-hour limits; apply platform aggregate cap. Insufficient cash leaves a visible awaiting-liquidity state with no transfer submitted.
+- [x] Persist reference/account/recipient/gross/net/fee identity before HTTP; retry uncertainty only through reconciliation. Approval expires after 30 minutes if unsent. Cancellation and submission must race safely.
+- [x] Prove with real PostgreSQL workers: two approvals, manual versus scheduled payout, payout versus refund, two tenants sharing one provider cash pool, pause versus send, expiry cancellation versus send. Assert financial outcomes and ledger counts, not only lock ordering.
+- [x] Run approval/concurrency tests plus DuesPayoutTest, GivingPayoutTest, StorePayoutsTest, PayoutSendingTest and PayoutOtpFlowTest; commit. No provider-account-wide change is released without all manual-stream regressions passing.
 
 ## Task 5 — Finance controls, approval queue and transactional notices
 
@@ -116,11 +116,11 @@ Policy stores immutable version/stream/currency/settlement-account identity/dest
 
 **Interfaces:** Tenant-scoped list/request/pause/approve-proposal/submit/cancel endpoints; platform-only policy approval and global pause. All server routes re-authorise; UI permission flags are presentation only.
 
-- [ ] Test access through forged tenant/proposal/payout IDs and finance read-only roles; Event Organiser denied; signed-out and stale-role sessions denied. No full bank data or OTPs in DTOs/logs/cache.
-- [ ] Build schedule form, masked destination, policy approval status, next local run, preview breakdown, review queue, explicit approve and submit actions, existing OTP entry, and needs-review reasons. Exact explanation: “The schedule prepares a payout for review. No transfer is sent until an authorised person submits it.”
-- [ ] Provide empty/manual/paused/expired/stale/insufficient-liquidity states, approval expiry and cancellation. Show balances as entitled / reserved / available, fees and net separately; no “paid” until verified completion.
-- [ ] Add durable, deduplicated transactional notices for proposal ready, destination/policy change, OTP needed, payout confirmed and review required. Send only to authorised finance contacts; failure to send never changes money state. Reuse existing outbox conventions, not marketing credits.
-- [ ] Test keyboard, 390px, dark/light, double click, stale tabs and mail/queue failures; run focused PHP/Vitest, build public/build, Pint; commit.
+- [x] Test access through forged tenant/proposal/payout IDs and finance read-only roles; Event Organiser denied; signed-out and stale-role sessions denied. No full bank data or OTPs in DTOs/logs/cache.
+- [x] Build schedule form, masked destination, policy approval status, next local run, preview breakdown, review queue, explicit approve and submit actions, existing OTP entry, and needs-review reasons. Exact explanation: “The schedule prepares a payout for review. No transfer is sent until an authorised person submits it.”
+- [x] Provide empty/manual/paused/expired/stale/insufficient-liquidity states, approval expiry and cancellation. Show balances as entitled / reserved / available, fees and net separately; no “paid” until verified completion.
+- [x] Add durable, deduplicated transactional notices for proposal ready, destination/policy change, OTP needed, payout confirmed and review required. Send only to authorised finance contacts; failure to send never changes money state. Reuse existing outbox conventions, not marketing credits.
+- [ ] Finish complete authenticated payment/OTP browser acceptance; local request, password-confirmation, pause, keyboard, 390px and dark/light checks passed, with double-click/stale-state/mail recovery covered programmatically. Run focused PHP/Vitest, build public/build, Pint; commit.
 
 ## Task 6 — Recovery, reconciliation freshness and operational gates
 
@@ -128,16 +128,16 @@ Policy stores immutable version/stream/currency/settlement-account identity/dest
 
 **Interfaces:** `PayoutReconciliationCheckpoint::assertFresh(string $accountFingerprint, string $scopeKey): void`; audit command dry/read-only by default, bounded by tenant/account. A checkpoint requires completed comparison of provider transfer/fee/reversal evidence with local intents, postings and clearing, not merely a recent job timestamp.
 
-- [ ] Test lost response followed by success, duplicate/out-of-order webhooks, OTP expiry, known failure, unknown outcome, provider outage, delayed reversal, revoked actor at OTP and ledger-post failure. Preserve liabilities until conclusive evidence; post reversal once.
-- [ ] Test failed audit cannot refresh checkpoint; an unresolved transfer remains reserved and blocks the affected scope; unallocatable provider discrepancy blocks the account. Cross-organisation mismatches cannot be silently netted away.
-- [ ] Implement checkpoints, exception ownership/escalation and platform kill switch. Pauses stop new reservations/submissions, not settlement/reconciliation of submitted transfers. No automatic replacement transfer or auto-release of uncertain reservations.
-- [ ] Run recovery and affected existing reconciliation suites; commit.
+- [x] Test lost response followed by success, duplicate/out-of-order webhooks, OTP expiry, known failure, unknown outcome, provider outage, delayed reversal, revoked actor at OTP and ledger-post failure. Preserve liabilities until conclusive evidence; post reversal once.
+- [x] Test failed audit cannot refresh checkpoint; an unresolved transfer remains reserved and blocks the affected scope; unallocatable provider discrepancy blocks the account. Cross-organisation mismatches cannot be silently netted away.
+- [x] Implement checkpoints, exception ownership/escalation and platform kill switch. Pauses stop new reservations/submissions, not settlement/reconciliation of submitted transfers. No automatic replacement transfer or auto-release of uncertain reservations.
+- [x] Run recovery and affected existing reconciliation suites; commit.
 
 ## Task 7 — Whole-change review, staged release and Purpledot pilot
 
-- [ ] Self-review “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Cover money lifecycle, all sender paths, permission/seed/navigation/config, original account, sensitive data, old records and rollback.
+- [x] Self-review “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Cover money lifecycle, all sender paths, permission/seed/navigation/config, original account, sensitive data, old records and rollback.
 - [ ] Run configured PHPStan, Pint, affected suites and real-worker races; build assets. CI runs full existing suites once on final reviewed head; fix/retest only affected areas locally unless new evidence requires broader work.
-- [ ] Independent whole-change financial/security review before merge; resolve confirmed findings with failing regressions. Keep one final review cycle unless changes warrant another.
+- [x] Independent whole-change financial/security review before merge; resolve confirmed findings with failing regressions. Keep one final review cycle unless changes warrant another.
 - [ ] Browser walkthrough: draft policy → distinct approval → scheduled proposal → human approval → submission → owner OTP → verified paid. Repeat cancelled/expired proposal, insufficient liquidity and refund race using approved test-mode setup.
 - [ ] Deploy disabled, no migrated organisation enabled. Read-only production inventory validates old schedules, permissions, ledger/transfer exceptions and provider account prerequisites. Obtain separate approval for historical remediation.
 - [ ] Owner approves Purpledot stream, destination, monetary limits, buffer/reserves, finance contacts and staffing. No pilot values inferred from previous test-commerce agreements.
@@ -156,3 +156,48 @@ Fully automatic execution needs a separate plan for authenticated server approva
 - Kept legacy schedule/early posting investigation as the first gate, with no automatic historical adjustment.
 - Explicitly retained OTP and separated unattended execution. No production writes, transfers, tests, migrations, invitations or feature activation performed while preparing this plan.
 - Monetary caps/reserves and pilot contacts remain activation inputs requiring owner approval, not unspecified coding decisions. The liquidity observation algorithm is a dedicated Task 4 review gate; shared-account correctness takes priority over transfer throughput.
+
+
+## Implementation self-review — 9 November 2026
+
+### Touchpoints updated
+
+- [x] AGENTS.md: scheduled proposal, original transfer, reversal and disabled-rollout invariants.
+- [x] Execution memory: local SDD progress ledger records decisions, reproductions and evidence; no separate memory system was introduced.
+- [x] Seeders/roles/permissions: tenant request authority and independent platform approval; no Event Organiser money access.
+- [x] Navigation: tenant Finance → Payout schedules; existing platform payouts desk links the approval/reconciliation desk.
+- [x] Environment/config: liquidity controls default off, explicit buffer/cap and pause configuration; no OTP setting change.
+- [x] Tests: existing stream regressions, policy/access/scheduler/notices/recovery tests, real PostgreSQL worker races and UI tests. No new dependencies.
+
+### UI gap analysis
+
+- Discoverability, empty states, masked destinations, current permissions, loading/errors and expiry states are implemented.
+- Local browser: normal login and MFA using a newly created test-only reviewer, policy request with explicit QA limits, native password confirmation, pending policy, pause, desktop and 390px layouts, light/dark and visible keyboard focus. Mobile document width remained exactly 390px; all fields were named and readable.
+- The full platform-approval → transfer → owner OTP → paid browser journey remains an activation acceptance gate. No provider transfer or production activation occurred during implementation.
+
+### Solved during review
+
+- Independent reviewer found four blockers: event OTP bypassed a refund hold; a lost response stranded OTP recovery; reversal-first released a retained fee; known discrepancies did not invalidate a green checkpoint. Each was reproduced before correction; narrow recheck cleared the corrections.
+- A further OTP-release failure regression now reconciles the original scheduled transfer instead of prematurely releasing its liability.
+- Shared liquidity now requires current global reconciliation for manual sends too. Preparation is queued in cursor batches of at most 25 events.
+- Existing event finance aggregates drop inherited ordering; preview-only legacy command tests retain category isolation; direct release retains its existing 422 response contract.
+- Browser found the password-confirmation Inertia overlay; a failing UI regression now enforces native full-page navigation. Assets rebuilt.
+
+### Recommended for owner decision
+
+- Before activation, approve the first stream, destination, monetary caps/reserve, platform buffer and staffing; complete capped provider test-mode acceptance and then a separately approved small live transfer. Recommend one weekly stream first; allow a staffed acceptance session plus the two scheduled observation cycles already specified above.
+- Historical legacy payouts/reserves require read-only inventory and explicit remediation approval. No automatic repair is included.
+
+### Not gaps / implementation choices
+
+- Access checks live in PayoutPolicies and existing route/FormRequest guards instead of an unused second policy class.
+- Provider liquidity is a dedicated read-only adapter alongside SettlementGateway; existing transfer contracts and dependencies remain intact.
+- The account audit is conservative: pending commitments or more than 100 records requiring baseline inspection block certification. External account cash requires separately evidenced reconciliation and cannot fund tenant payouts.
+- The first release is scheduled preparation plus human submission and owner OTP. Unattended transfers are deliberately unavailable.
+
+### Verification evidence
+
+- Finance regression: 210 tests passed, 726 assertions.
+- Correction/stream/liquidity/race run: 21 passed; two test-harness failures (QueueFake return shape and a missing test-account checkpoint) corrected and rerun successfully, 2/2 with 15 assertions. Six real worker scenarios covered duplicate/manual approvals, refund/send, pause/send, cancel/send and shared provider cash.
+- JavaScript: 645/649 passed in the full run; four unrelated 5-second timeouts all passed in a two-worker rerun (57/57). Final payout/navigation checks: 20/20, including the new password-navigation regression.
+- Configured PHPStan: zero errors; no added suppressions. Pint, ESLint and production build completed. CI on the final PR head remains the merge gate.

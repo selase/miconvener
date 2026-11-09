@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Services\Finance\PayoutFinancialAudit;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/../../Support/ScheduledPayoutScenario.php';
 
@@ -37,4 +38,14 @@ test('only a platform reviewer can certify matched source evidence', function ()
     $before = App\Models\PayoutReconciliationCheckpoint::where('scope_key', '*')->count();
     $audit->record($report, $platform, 'statement-001', 'Reviewed provider balance and all transfer evidence.');
     expect(App\Models\PayoutReconciliationCheckpoint::where('scope_key', '*')->count())->toBe($before + 1);
+});
+
+test('an authorised discrepancy record blocks an older matched certificate', function () {
+    [$policy, $tenant, , $platform] = fundedScheduledPolicy();
+    Http::fake(['api.paystack.co/balance' => Http::response(['status' => true, 'data' => [['currency' => 'GHS', 'balance' => 15001]]])]);
+    $audit = app(PayoutFinancialAudit::class);
+    $report = $audit->inspect();
+    $audit->recordException($report, $platform);
+    expect(fn () => app(App\Services\Finance\PayoutReconciliationCheckpoints::class)->assertFresh($policy->account_fingerprint, $tenant->id.':dues'))
+        ->toThrow(ValidationException::class);
 });

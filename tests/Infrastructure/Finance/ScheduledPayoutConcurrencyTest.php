@@ -24,8 +24,14 @@ beforeEach(function () {
     config(['services.settlement.paystack.secret_key' => 'sk_test_schedule']);
     $this->travelTo(CarbonImmutable::parse('2026-11-09 10:00:00', 'UTC'));
     Queue::fake();
+    App\Models\PayoutReconciliationCheckpoint::query()->create(['account_fingerprint' => app(App\Services\Finance\PayoutPolicies::class)->accountFingerprint(), 'scope_key' => '*',
+        'observed_at' => now(), 'status' => 'matched', 'created_at' => now(),
+        'evidence' => ['ledger_checked' => true, 'provider_checked' => true, 'unresolved_count' => 0]]);
+
 });
-afterEach(function () { $this->truncateDatabaseTables(); });
+afterEach(function () {
+    $this->truncateDatabaseTables();
+});
 
 function scheduledPayoutRace(array $jobs): array
 {
@@ -37,11 +43,16 @@ function scheduledPayoutRace(array $jobs): array
             'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1',
         ]);
         $worker->setTimeout(45)->setInput(json_encode($job + ['start_at' => $start, 'now' => now()->toIso8601String()], JSON_THROW_ON_ERROR));
-        $worker->start(); $workers[] = $worker;
+        $worker->start();
+        $workers[] = $worker;
     }
+
     return array_map(function (Process $worker): array {
         $worker->wait();
         expect($worker->isSuccessful())->toBeTrue($worker->getErrorOutput());
+
+        expect(mb_trim($worker->getOutput()))->toStartWith('{', 'Test worker must return JSON: '.mb_substr($worker->getOutput(), 0, 600));
+
         return json_decode($worker->getOutput(), true, 512, JSON_THROW_ON_ERROR);
     }, $workers);
 }
@@ -96,6 +107,9 @@ test('different organisations cannot allocate the same provider cash', function 
 test('a real commerce refund and payout submission preserve refund funding and one transfer claim', function () {
     [$tenant, , $actor, , $order] = Tests\Support\StoreCheckoutScenario::paid();
     $actor->givePermissionTo('manage store finance');
+    App\Models\PayoutReconciliationCheckpoint::query()->create(['account_fingerprint' => app(App\Services\Finance\PayoutPolicies::class)->accountFingerprint(), 'scope_key' => '*',
+        'observed_at' => now(), 'status' => 'matched', 'created_at' => now(),
+        'evidence' => ['ledger_checked' => true, 'provider_checked' => true, 'unresolved_count' => 0]]);
     $account = App\Models\TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
     $payout = app(App\Services\Marketplace\StorePayouts::class)->reserve($tenant, $actor,
         ['amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Str::uuid()]);

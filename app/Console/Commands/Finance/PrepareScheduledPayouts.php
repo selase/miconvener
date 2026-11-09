@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Finance;
 
+use App\Jobs\PrepareScheduledPayoutPolicy;
 use App\Models\OrganisationPayoutPolicy;
-use App\Services\Finance\ScheduledPayoutPlanner;
-use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
 final class PrepareScheduledPayouts extends Command
@@ -15,14 +14,14 @@ final class PrepareScheduledPayouts extends Command
 
     protected $description = 'Prepare approved payout proposals for human review; never submit transfers';
 
-    public function handle(ScheduledPayoutPlanner $planner): int
+    public function handle(): int
     {
         OrganisationPayoutPolicy::query()->where('status', 'approved')
             ->when($this->option('tenant'), fn ($query, $tenant) => $query->where('tenant_id', $tenant))
-            ->orderBy('id')->chunkById(50, function ($policies) use ($planner): void {
+            ->orderBy('id')->chunkById(50, function ($policies): void {
                 foreach ($policies as $policy) {
-                    $count = count($planner->prepare($policy, CarbonImmutable::now()));
-                    $this->line($policy->id.': '.$count.' proposal(s); no transfer sent.');
+                    PrepareScheduledPayoutPolicy::dispatch($policy->id);
+                    $this->line($policy->id.': preparation queued; no transfer sent.');
                 }
             });
 

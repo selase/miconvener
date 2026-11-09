@@ -29,7 +29,9 @@ final class ScheduledPayoutSettlement
         $verified = app(SettlementGateway::class)->verifyTransfer((string) $payout->provider_reference);
         if (($verified['reference'] ?? null) !== $intent['provider_reference'] || ($verified['amount'] ?? null) !== $intent['net']
             || ($verified['currency'] ?? null) !== 'GHS' || ($verified['recipient_code'] ?? null) !== $intent['recipient_code']
-            || ! is_int($verified['fee']) || $verified['fee'] !== $intent['fee']) {
+            || (in_array($verified['status'], ['success', 'reversed'], true)
+                && (! is_int($verified['fee']) || $verified['fee'] !== $intent['fee']))
+            || (in_array($verified['status'], ['failed', 'abandoned'], true) && ($verified['fee']) !== 0)) {
             $this->review($payout, 'Provider evidence differs from the original amount, fee, currency, reference or destination.');
 
             return;
@@ -43,7 +45,10 @@ final class ScheduledPayoutSettlement
             }
             $ledger = app(LedgerService::class);
             $status = $verified['status'];
-            if ($status === 'success' && in_array($locked->status, ['processing', 'awaiting_otp'], true)) {
+            if ($status === 'otp' && in_array($locked->status, ['processing', 'awaiting_otp'], true) && filled($verified['transfer_code'] ?? null)) {
+                $locked->update(['status' => 'awaiting_otp', 'provider_transfer_code' => $verified['transfer_code'], 'failure_reason' => null]);
+            }
+            if (in_array($status, ['success', 'reversed'], true) && in_array($locked->status, ['processing', 'awaiting_otp'], true)) {
                 $locked->update(['status' => 'paid', 'paid_at' => now(), 'transfer_fee_amount' => $verified['fee'], 'net_paid_amount' => $verified['amount'], 'failure_reason' => null]);
                 match ($policy->category) {
                     'commerce' => $ledger->recordStorePayout($locked, $locked->provider_reference),
@@ -53,8 +58,11 @@ final class ScheduledPayoutSettlement
                     default => throw new LogicException('Unsupported payout accounting category.'),
                 };
                 $currentProposal->update(['status' => 'paid', 'reason' => null]);
-                app(ScheduledPayoutNotices::class)->enqueue($policy, 'payout_confirmed', $currentProposal->id);
-            } elseif ($status === 'reversed' && $locked->status === 'paid') {
+                if ($status === 'success') {
+                    app(ScheduledPayoutNotices::class)->enqueue($policy, 'payout_confirmed', $currentProposal->id);
+                }
+            }
+            if ($status === 'reversed' && $locked->status === 'paid') {
                 $ledger->recordScheduledPayoutReversal($locked, $verified['amount']);
                 $locked->update(['status' => 'reversed', 'reversed_amount' => $verified['amount'], 'reversed_at' => now(),
                     'failure_reason' => 'Provider reversed the recipient transfer. Transfer fees remain charged unless separately confirmed returned.']);
@@ -69,6 +77,10 @@ final class ScheduledPayoutSettlement
 
     private function review(EventPayout $payout, string $reason): void
     {
+        $proposal = ScheduledPayoutProposal::query()->where('payout_id', $payout->id)->firstOrFail();
+        $policy = OrganisationPayoutPolicy::query()->findOrFail($proposal->policy_id);
+        app(PayoutReconciliationCheckpoints::class)->block($policy->account_fingerprint, 'Transfer evidence needs finance review.');
+        app(ScheduledPayoutNotices::class)->enqueue($policy, 'review_required', $payout->id);
         EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('provider_reference', $payout->provider_reference)
             ->update(['failure_reason' => $reason]);
     }

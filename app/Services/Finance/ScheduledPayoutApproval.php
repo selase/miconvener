@@ -109,7 +109,7 @@ final class ScheduledPayoutApproval
         return app(PayoutSubmissionGuard::class)->withHuman($payout, $actor, fn (): array => match ($policy->category) {
             'commerce' => app(StorePayouts::class)->finalize($payout, $otp),
             'dues', 'giving' => app(CommunityPayouts::class)->finalize($tenant, $actor, $payout, $otp),
-            default => app(PayoutRelease::class)->releaseWithoutLock($payout, $otp),
+            default => app(PayoutRelease::class)->release($payout, $otp),
         });
     }
 

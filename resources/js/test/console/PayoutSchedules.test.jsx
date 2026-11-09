@@ -6,7 +6,7 @@ import Schedules from '@/Pages/Tenant/Finance/Schedules';
 vi.mock('@/Layouts/ConsoleLayout', () => ({ default: ({ children }) => <div>{children}</div> }));
 vi.mock('@inertiajs/react', () => ({
     router: { reload: vi.fn() },
-    Link: ({ children, href }) => <a href={href}>{children}</a>,
+    Link: ({ children, href }) => <a data-inertia-link="true" href={href}>{children}</a>,
 }));
 
 vi.mock('@/lib/dues', async (original) => ({ ...(await original()), sendJson: vi.fn() }));
@@ -82,4 +82,16 @@ test('successful approval shows the actual server response', async () => {
             'Payout reserved. Review before submission.'
         )
     );
+});
+
+
+test('password confirmation uses full-page navigation for the standalone authentication page', async () => {
+    sendJson.mockResolvedValue({ ok: false, status: 423, body: { message: 'Password confirmation required.' } });
+    render(<Schedules {...props} policies={[{ id: 'policy', category: 'dues', status: 'approved' }]}
+        proposals={[{ id: 'proposal', policy_id: 'policy', status: 'proposed', amount: 10000,
+            expires_at: new Date(Date.now() + 100000).toISOString(), snapshot: { fee: 100, net: 9900 } }]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Approve payout' }));
+    const link = await screen.findByRole('link', { name: 'Confirm your password, then return to review this payout.' });
+    expect(link.getAttribute('href')).toBe('/password.confirm');
+    expect(link.getAttribute('data-inertia-link')).toBeNull();
 });

@@ -13,7 +13,7 @@
             <label for="external-cash" class="form-label">Separately reconciled external cash (pesewas; enter 0 if none)</label><input id="external-cash" name="external_cash" type="number" min="0" required class="form-control mb-3">
             <label for="statement" class="form-label">Provider statement reference (needed to certify)</label><input id="statement" name="statement" maxlength="200" class="form-control mb-3">
             <label for="review-note" class="form-label">Reconciliation explanation (needed to certify)</label><textarea id="review-note" name="note" maxlength="1000" class="form-control mb-3"></textarea>
-            <div class="d-flex flex-wrap gap-3"><button name="action" value="preview" class="btn btn-light" type="submit">Read-only check</button><button name="action" value="record" class="btn btn-primary" type="submit">Recheck and certify matched evidence</button></div>
+            <div class="d-flex flex-wrap gap-3"><button name="action" value="preview" class="btn btn-light" type="submit">Check and block unresolved discrepancies</button><button name="action" value="record" class="btn btn-primary" type="submit">Recheck and certify matched evidence</button></div>
         </form>
     </div></div>
     <div class="row g-5">

@@ -33,9 +33,13 @@ final class PayoutPolicyController extends Controller
             return back()->with('success', 'Matched provider and ledger evidence certified. No transfer sent.');
         }
 
+        if (! $report['matched']) {
+            $audit->recordException($report, $request->user());
+        }
+
         return back()->with($report['matched'] ? 'success' : 'error', $report['matched']
             ? 'Read-only check matched. Review the statement before certifying; no checkpoint was recorded.'
-            : 'Reconciliation needs review: '.count($report['unresolved']).' unresolved transfer(s), provider '.$report['provider_balance'].' pesewas, ledger '.$report['book_cash'].' pesewas. No checkpoint was recorded.');
+            : 'Reconciliation needs review: '.count($report['unresolved']).' unresolved transfer(s), provider '.$report['provider_balance'].' pesewas, ledger '.$report['book_cash'].' pesewas. New submissions are blocked until a fresh matched reconciliation is certified.');
     }
 
     public function pause(Request $request, string $policy, PayoutPolicies $policies): RedirectResponse

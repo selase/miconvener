@@ -30,7 +30,7 @@ final class EventFinanceController extends Controller
         $collected = (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount');
         $fees = (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('commission_amount');
         $netCollected = $this->netCollected($eventModel);
-        $paidOut = (int) $eventModel->payouts()->whereIn('status', [EventPayout::STATUS_PAID, 'reversed'])->selectRaw('COALESCE(SUM(amount - reversed_amount), 0) as consumed')->value('consumed');
+        $paidOut = (int) $eventModel->payouts()->whereIn('status', [EventPayout::STATUS_PAID, 'reversed'])->reorder()->selectRaw('COALESCE(SUM(amount - reversed_amount), 0) as consumed')->value('consumed');
 
         $stats = [
             ...app(\App\Services\Giving\GivingContributionBridge::class)->eventSummary($eventModel),
@@ -345,7 +345,7 @@ final class EventFinanceController extends Controller
 
         $committedToPayouts = (int) $eventModel->payouts()
             ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_AWAITING_OTP, EventPayout::STATUS_PAID, 'reversed'])
-            ->selectRaw('COALESCE(SUM(amount - reversed_amount), 0) as consumed')->value('consumed');
+            ->reorder()->selectRaw('COALESCE(SUM(amount - reversed_amount), 0) as consumed')->value('consumed');
 
         return $this->netCollected($eventModel) - $committedToPayouts;
     }

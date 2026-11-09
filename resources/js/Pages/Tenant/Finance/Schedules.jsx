@@ -140,9 +140,9 @@ export default function Schedules({
                 </div>
                 {reauthRequired && (
                     <p className="text-sm text-accent underline">
-                        <Link href={route('password.confirm')}>
+                        <a href={route('password.confirm')}>
                             Confirm your password, then return to review this payout.
-                        </Link>
+                        </a>
                     </p>
                 )}
                 {message && (

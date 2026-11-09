@@ -27,8 +27,17 @@ final class AuditScheduledPayouts extends Command
             $this->warn($exception);
         }
         $this->line($report['matched'] ? 'Matched. No money moved.' : 'Needs review or exceeds the bounded scan. No checkpoint certified.');
+        if (! $this->option('record')) {
+            $this->line('Read-only: controls unchanged. Use --record with an authorised reviewer to certify a match or block discovered exceptions.');
+        }
         if ($this->option('record')) {
             $actor = User::query()->findOrFail($this->option('actor'));
+            if (! $report['matched']) {
+                $audit->recordException($report, $actor);
+                $this->error('Exceptions recorded; new submissions blocked pending matched finance reconciliation.');
+
+                return self::FAILURE;
+            }
             $audit->record($report, $actor, (string) $this->option('statement'), (string) $this->option('note'));
             $this->info('Matched evidence certified by the platform reviewer. No transfer submitted.');
         }

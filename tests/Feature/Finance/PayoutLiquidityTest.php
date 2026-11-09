@@ -16,6 +16,10 @@ beforeEach(function () {
 });
 
 test('shared account liquidity cannot be allocated twice across organisations', function () {
+    App\Models\PayoutReconciliationCheckpoint::query()->create(['account_fingerprint' => app(PayoutPolicies::class)->accountFingerprint(), 'scope_key' => '*',
+        'observed_at' => now(), 'status' => 'matched', 'created_at' => now(),
+        'evidence' => ['ledger_checked' => true, 'provider_checked' => true, 'unresolved_count' => 0]]);
+
     Http::fake(['api.paystack.co/balance' => Http::response(['status' => true, 'data' => [['currency' => 'GHS', 'balance' => 10000]]])]);
     $service = app(ProviderLiquidity::class);
     $fingerprint = app(PayoutPolicies::class)->accountFingerprint();
@@ -31,6 +35,16 @@ test('shared account liquidity cannot be allocated twice across organisations', 
 });
 
 test('unknown provider balance and missing platform limits fail closed', function () {
+    App\Models\PayoutReconciliationCheckpoint::query()->create(['account_fingerprint' => app(PayoutPolicies::class)->accountFingerprint(), 'scope_key' => '*',
+        'observed_at' => now(), 'status' => 'matched', 'created_at' => now(),
+        'evidence' => ['ledger_checked' => true, 'provider_checked' => true, 'unresolved_count' => 0]]);
+
     Http::fake(['api.paystack.co/balance' => Http::response(['status' => false], 503)]);
     expect(fn () => app(ProviderLiquidity::class)->refresh(app(PayoutPolicies::class)->accountFingerprint(), 'GHS'))->toThrow(ValidationException::class);
+});
+
+test('manual liquidity cannot use an account without current reconciliation', function () {
+    Http::fake(['api.paystack.co/balance' => Http::response(['status' => true, 'data' => [['currency' => 'GHS', 'balance' => 10000]]])]);
+    expect(fn () => app(ProviderLiquidity::class)->refresh(app(PayoutPolicies::class)->accountFingerprint(), 'GHS'))
+        ->toThrow(ValidationException::class);
 });

@@ -81,6 +81,9 @@ final class PayoutFinancialAudit
             throw ValidationException::withMessages(['audit' => 'Provide a statement reference and an explanation of the reconciliation.']);
         }
         $fresh = $this->inspect((int) ($report['external_cash'] ?? 0));
+        if (! $fresh['matched']) {
+            app(PayoutReconciliationCheckpoints::class)->block($fresh['account_fingerprint'], 'Financial reconciliation has unresolved exceptions.', $actor->id);
+        }
         if (! $fresh['matched'] || ($report['source_digest'] ?? null) !== $fresh['source_digest']) {
             throw ValidationException::withMessages(['audit' => 'Source evidence changed or reconciliation does not match. Resolve exceptions before certifying.']);
         }
@@ -106,6 +109,16 @@ final class PayoutFinancialAudit
         });
     }
 
+    /** @param array<string,mixed> $report */
+    public function recordException(array $report, User $actor): void
+    {
+        app(PayoutPolicies::class)->authorisePlatform($actor);
+        $fresh = $this->inspect((int) ($report['external_cash'] ?? 0));
+        if (! $fresh['matched']) {
+            app(PayoutReconciliationCheckpoints::class)->block($fresh['account_fingerprint'], 'Financial reconciliation has unresolved exceptions.', $actor->id);
+        }
+    }
+
     public function sourceDigest(): string
     {
         $context = hash_init('sha256');
@@ -116,7 +129,7 @@ final class PayoutFinancialAudit
                 }
             });
         hash_update($context, json_encode([LedgerEntry::withoutGlobalScopes()->count(), LedgerEntry::withoutGlobalScopes()->sum('amount'),
-            PayoutLiquidityAllocation::query()->count()], JSON_THROW_ON_ERROR));
+            PayoutLiquidityAllocation::query()->count(), PayoutReconciliationCheckpoint::query()->count()], JSON_THROW_ON_ERROR));
 
         return hash_final($context);
     }

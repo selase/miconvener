@@ -47,16 +47,20 @@ final class PayoutRelease
             return ['released' => false, 'message' => 'Use the commerce payout flow to preserve its balance and original account checks.', 'http_status' => 422];
         }
 
-        return $this->releaseWithoutLock($payout, $otp, function (EventPayout $claim): void {
-            if ($claim->event_id === null) {
-                return;
-            }
-            $event = \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $claim->tenant_id)->lockForUpdate()->findOrFail($claim->event_id);
-            $balance = app(\App\Services\Events\MemberBenefitBalance::class);
-            if ($balance->applies($event) && ($event->currency !== $claim->currency || $claim->amount > $balance->available($event, $claim->id))) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['payout' => 'This parked transfer exceeds the funds available after payment and refund holds.']);
-            }
-        });
+        try {
+            return $this->releaseWithoutLock($payout, $otp, function (EventPayout $claim): void {
+                if ($claim->event_id === null) {
+                    return;
+                }
+                $event = \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $claim->tenant_id)->lockForUpdate()->findOrFail($claim->event_id);
+                $balance = app(\App\Services\Events\MemberBenefitBalance::class);
+                if ($balance->applies($event) && ($event->currency !== $claim->currency || $claim->amount > $balance->available($event, $claim->id))) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['payout' => 'This parked transfer exceeds the funds available after payment and refund holds.']);
+                }
+            });
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return ['released' => false, 'message' => $exception->getMessage(), 'http_status' => 422];
+        }
     }
 
     /** Claim once, then call the provider outside the lock; an uncertain release stays reserved.
@@ -87,6 +91,9 @@ final class PayoutRelease
         try {
             $transfer = $this->settlementGateway->finalizeTransfer($locked->provider_transfer_code, $otp);
         } catch (PaymentFailedException $exception) {
+            if (\App\Models\ScheduledPayoutProposal::query()->where('payout_id', $locked->id)->exists()) {
+                return $this->reconcileScheduledRelease($locked);
+            }
             if ($locked->fresh()->status === EventPayout::STATUS_PAID) {
                 return ['released' => true, 'message' => 'Payout confirmed.', 'http_status' => 200];
             }
@@ -97,7 +104,7 @@ final class PayoutRelease
             }
             $previous = $exception->getPrevious();
             if ($previous instanceof \Illuminate\Http\Client\RequestException && $previous->response->status() >= 400 && $previous->response->status() < 500) {
-                $message = ($locked->category === \App\Enum\LedgerCategoryEnum::Commerce || \App\Models\ScheduledPayoutProposal::query()->where('payout_id', $locked->id)->exists()) ? 'The one-time code was not accepted. Check the original transfer status before retrying.' : 'The one-time code was not accepted: '.$exception->providerMessage();
+                $message = $locked->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'The one-time code was not accepted. Check the original transfer status before retrying.' : 'The one-time code was not accepted: '.$exception->providerMessage();
                 $this->changeProcessing($locked, ['status' => EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
 
                 return ['released' => false, 'message' => $message, 'http_status' => 422];
@@ -112,6 +119,9 @@ final class PayoutRelease
         }
         $status = $transfer['status'];
         if (! in_array($status, ['success', 'pending', 'queued'], true)) {
+            if (\App\Models\ScheduledPayoutProposal::query()->where('payout_id', $locked->id)->exists()) {
+                return $this->reconcileScheduledRelease($locked);
+            }
             $message = $locked->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'The original transfer still needs reconciliation before release.' : 'The payment provider did not release the transfer (status: '.$status.').';
             $this->changeProcessing($locked, ['status' => in_array($status, self::DEAD_TRANSFER_STATUSES, true) ? EventPayout::STATUS_FAILED : EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
 
@@ -122,6 +132,21 @@ final class PayoutRelease
             'net_paid_amount' => $locked->requested_net_amount ?? $locked->amount - $scheduledFee]);
 
         return ['released' => true, 'message' => 'Payout released.', 'http_status' => 200];
+    }
+
+    /** @return array{released:bool, message:string, http_status:int} */
+    private function reconcileScheduledRelease(EventPayout $payout): array
+    {
+        try {
+            app(ScheduledPayoutSettlement::class)->reconcile($payout);
+        } catch (PaymentFailedException) {
+            $this->changeProcessing($payout, ['failure_reason' => 'The original transfer could not be verified. No replacement was sent.']);
+        }
+        if ($payout->fresh()->status === EventPayout::STATUS_PAID) {
+            return ['released' => true, 'message' => 'Payout confirmed.', 'http_status' => 200];
+        }
+
+        return ['released' => false, 'message' => 'Check the reconciled original transfer status before any further action. No replacement was sent.', 'http_status' => 422];
     }
 
     /** @param array<string, mixed> $attributes */

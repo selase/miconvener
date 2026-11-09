@@ -77,3 +77,50 @@ test('a verified reversal restores only returned principal once and retains the 
     expect(LedgerTransaction::where('transaction_type', 'payout_reversal')->count())->toBe(1);
     expect(app(App\Services\Dues\DuesBalance::class)->payable($tenant, 'GHS'))->toBe(15000 - $payout->requested_transfer_fee_amount);
 });
+
+test('a lost initiation response recovers the original OTP transfer without sending again', function () {
+    [$payout] = submittedScheduledPayout();
+    $payout->update(['status' => 'processing', 'provider_transfer_code' => null]);
+    $gateway = Mockery::mock(App\Contracts\SettlementGateway::class);
+    $gateway->shouldReceive('verifyTransfer')->once()->andReturn(scheduledTransferEvidence($payout, ['status' => 'otp', 'fee' => null]));
+    $gateway->shouldNotReceive('initiateTransfer');
+    app()->instance(App\Contracts\SettlementGateway::class, $gateway);
+    app(ScheduledPayoutSettlement::class)->reconcile($payout);
+    expect($payout->fresh()->status)->toBe('awaiting_otp')->and($payout->fresh()->provider_transfer_code)->toBe('TRF_scheduled');
+});
+
+test('a reversal observed before success still consumes the verified original transfer fee once', function () {
+    [$payout, , $tenant] = submittedScheduledPayout();
+    $gateway = Mockery::mock(App\Contracts\SettlementGateway::class);
+    $gateway->shouldReceive('verifyTransfer')->twice()->andReturn(scheduledTransferEvidence($payout, ['status' => 'reversed']));
+    app()->instance(App\Contracts\SettlementGateway::class, $gateway);
+    $service = app(ScheduledPayoutSettlement::class);
+    $service->reconcile($payout);
+    $service->reconcile($payout);
+    expect($payout->fresh()->status)->toBe('reversed')
+        ->and(app(App\Services\Dues\DuesBalance::class)->payable($tenant, 'GHS'))->toBe(15000 - $payout->requested_transfer_fee_amount)
+        ->and(LedgerTransaction::where('transaction_type', 'payout_reversal')->count())->toBe(1);
+});
+
+test('mismatched provider evidence invalidates the previous reconciliation certificate', function () {
+    [$payout, $proposal, $tenant] = submittedScheduledPayout();
+    $policy = App\Models\OrganisationPayoutPolicy::findOrFail($proposal->policy_id);
+    $gateway = Mockery::mock(App\Contracts\SettlementGateway::class);
+    $gateway->shouldReceive('verifyTransfer')->once()->andReturn(scheduledTransferEvidence($payout, ['amount' => 1]));
+    app()->instance(App\Contracts\SettlementGateway::class, $gateway);
+    app(ScheduledPayoutSettlement::class)->reconcile($payout);
+    expect(App\Models\ScheduledPayoutNotice::query()->where('kind', 'review_required')->exists())->toBeTrue();
+    expect(fn () => app(App\Services\Finance\PayoutReconciliationCheckpoints::class)->assertFresh($policy->account_fingerprint, $tenant->id.':dues'))
+        ->toThrow(Illuminate\Validation\ValidationException::class);
+});
+
+test('an OTP release rejection cannot discard a scheduled reversal fee', function () {
+    [$payout, $proposal, $tenant, $owner] = submittedScheduledPayout();
+    $gateway = Mockery::mock(App\Contracts\SettlementGateway::class);
+    $gateway->shouldReceive('finalizeTransfer')->once()->andThrow(new App\Exceptions\PaymentFailedException('Release outcome uncertain'));
+    $gateway->shouldReceive('verifyTransfer')->once()->andReturn(scheduledTransferEvidence($payout, ['status' => 'reversed']));
+    app()->instance(App\Contracts\SettlementGateway::class, $gateway);
+    app(ScheduledPayoutApproval::class)->finalize($proposal->fresh(), $owner, '123456');
+    expect($payout->fresh()->status)->toBe('reversed')
+        ->and(app(App\Services\Dues\DuesBalance::class)->payable($tenant, 'GHS'))->toBe(15000 - $payout->requested_transfer_fee_amount);
+});
