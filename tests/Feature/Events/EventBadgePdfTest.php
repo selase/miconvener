@@ -298,3 +298,12 @@ test('background fitting uses exact printable image dimensions', function (?stri
     ['cover', 'center', 350.0, 70.0, -125.0, 0.0],
     ['cover', 'right', 350.0, 70.0, -250.0, 0.0],
 ]);
+
+test('badge name fitting reserves the actual PDF font line height', function (): void {
+    [$tenant] = eventHost('acme');
+    $settings = ['visible' => true, 'font_family' => 'DejaVu Sans', 'font_weight' => 700, 'font_size' => 32];
+    $fitted = app(\App\Services\Design\ArtifactLayoutValidator::class)->fitText('Short Sample', $settings, 100, 10, 'layout.attendee_name', tenantId: (string) $tenant->id, minimumFontSize: 6);
+    $metrics = app(\App\Services\Design\ArtifactFontRegistry::class)->metrics('DejaVu Sans', (string) $tenant->id);
+    $font = $metrics->getFont('DejaVu Sans', 'bold');
+    expect($metrics->getFontHeight($font, $fitted['font_size']) * 1.15)->toBeLessThanOrEqual(10 * 72 / 25.4);
+});

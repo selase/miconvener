@@ -60,7 +60,8 @@ final class ArtifactLayoutValidator
                     }
                 }
             }
-            if ($fits && $lines * $size * $lineHeight <= $height) {
+            $fontHeight = $minimumFontSize !== null ? max($size, $metrics->getFontHeight($font, $size)) : $size;
+            if ($fits && $lines * $fontHeight * $lineHeight <= $height) {
                 $settings['font_size'] = $size;
 
                 return $settings;
