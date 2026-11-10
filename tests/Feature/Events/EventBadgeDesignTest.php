@@ -47,6 +47,23 @@ function validBadgeDesign(array $overrides = []): array
     ];
 }
 
+test('printed category labels are scoped to this event and leave ticket names unchanged', function (): void {
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $ticket = \App\Models\EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'In-person - Nurse or Midwife']);
+    $host = eventSubdomainHost('acme');
+    $design = validBadgeDesign();
+    $design['sheet_settings']['category_labels'] = [$ticket->id => 'Nurse'];
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", $design, ['HTTP_HOST' => $host])
+        ->assertOk()->assertJsonPath('template.sheet_settings.category_labels.'.$ticket->id, 'Nurse');
+    expect($ticket->fresh()->name)->toBe('In-person - Nurse or Midwife');
+    $other = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $foreign = \App\Models\EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $other->id]);
+    $design['sheet_settings']['category_labels'] = [$foreign->id => 'Host'];
+    $this->postJson("http://{$host}/events/{$event->id}/badges/template", $design, ['HTTP_HOST' => $host])
+        ->assertUnprocessable()->assertJsonValidationErrors('sheet_settings.category_labels');
+});
+
 test('badge index creates and returns the compatible default template', function (): void {
     [$tenant, $user] = badgeDesignerHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);

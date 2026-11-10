@@ -31,6 +31,8 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
             'sheet_settings.margin_mm' => ['required', 'numeric', 'min:3', 'max:30'],
             'sheet_settings.gap_mm' => ['required', 'numeric', $this->boolean('sheet_settings.crop_marks') ? 'min:3' : 'min:0', 'max:20'],
             'sheet_settings.crop_marks' => ['required', 'boolean'],
+            'sheet_settings.category_labels' => ['sometimes', 'array', 'max:100'],
+            'sheet_settings.category_labels.*' => ['nullable', 'string', 'max:80'],
             'background_settings' => ['sometimes', 'array:fit,position,visible,removed'],
             'background_settings.fit' => ['required_with:background_settings', Rule::in(['stretch', 'contain', 'cover'])],
             'background_settings.position' => ['required_with:background_settings', Rule::in(['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'])],
@@ -52,6 +54,14 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
                 return;
             }
             $settings = $this->input('sheet_settings');
+            $labels = $settings['category_labels'] ?? [];
+            if ($labels !== []) {
+                $event = \App\Models\Event::query()->whereKey($this->route('event'))->first();
+                $ticketIds = $event?->ticketTypes()->pluck('id')->all() ?? [];
+                if (array_diff(array_keys($labels), $ticketIds) !== []) {
+                    $validator->errors()->add('sheet_settings.category_labels', 'Printed labels must belong to ticket types for this event.');
+                }
+            }
             $paper = $settings['paper'] === 'letter' ? [215.9, 279.4] : [210.0, 297.0];
             $margin = (float) $settings['margin_mm'];
             if ((float) $this->input('width_mm') > $paper[0] - 2 * $margin || (float) $this->input('height_mm') > $paper[1] - 2 * $margin) {

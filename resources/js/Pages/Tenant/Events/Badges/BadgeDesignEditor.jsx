@@ -33,7 +33,12 @@ export default function BadgeDesignEditor({
     existingLogo,
     initialFonts,
     onFontsChange,
+    ticketTypes = [],
+    badges = [],
+    event,
 }) {
+    const [previewId, setPreviewId] = useState('');
+    const previewBadge = badges.find((badge) => badge.id === previewId) || badges[0];
     const [backgroundUrl, setBackgroundUrl] = useState(null);
     const {
         fonts,
@@ -250,6 +255,12 @@ export default function BadgeDesignEditor({
                     </Select>
                 </div>
                 <p className="text-xs text-ink-secondary">
+                    Upload artwork without attendee names or categories. Keep logos, coloured edges
+                    and fixed event information in the image; position the changing fields over it.
+                    Hide any fields already included in the artwork. Match its dimensions to the
+                    badge.
+                </p>
+                <p className="text-xs text-ink-secondary">
                     Contain shows the whole image. Cover fills the badge and crops its edges.
                     Stretch fills it without preserving proportions.
                 </p>
@@ -448,6 +459,48 @@ export default function BadgeDesignEditor({
                         </button>
                     )}
                 </section>
+                {ticketTypes.length > 0 && (
+                    <section
+                        className="space-y-3 rounded-xl border border-border p-3"
+                        aria-label="Printed categories"
+                    >
+                        <h3 className="text-sm font-semibold">Printed categories</h3>
+                        <p className="text-xs text-ink-secondary">
+                            Set the text shown in the Ticket type field, such as Doctor or Faculty.
+                            Blank keeps the ticket name. This does not change tickets, prices or
+                            admission.
+                        </p>
+                        {ticketTypes.map((ticket) => (
+                            <Input
+                                key={ticket.id}
+                                label={ticket.name}
+                                aria-label={`Printed label for ${ticket.name}`}
+                                maxLength={80}
+                                placeholder={ticket.name}
+                                value={form.sheet_settings?.category_labels?.[ticket.id] || ''}
+                                error={fieldErrors[
+                                    `sheet_settings.category_labels.${ticket.id}`
+                                ]?.join(' ')}
+                                onChange={(event) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        sheet_settings: {
+                                            ...current.sheet_settings,
+                                            category_labels: {
+                                                ...current.sheet_settings?.category_labels,
+                                                [ticket.id]: event.target.value,
+                                            },
+                                        },
+                                    }))
+                                }
+                            />
+                        ))}
+                    </section>
+                )}
+                <p className="text-xs text-ink-secondary">
+                    Names wrap and shrink automatically, down to 6 pt. Enlarge the name box if the
+                    full name still does not fit.
+                </p>
                 <ArtifactLayoutControls
                     selectedField={selectedField}
                     onSelectField={selectField}
@@ -517,7 +570,25 @@ export default function BadgeDesignEditor({
                 data-mobile-hidden={mobileView !== 'canvas'}
                 className={`${mobileView === 'canvas' ? 'block' : 'hidden'} space-y-3 lg:block lg:self-start`}
             >
+                {badges.length > 0 && (
+                    <label className="block text-sm">
+                        Preview attendee
+                        <Select
+                            aria-label="Preview attendee"
+                            value={previewBadge?.id || ''}
+                            onChange={(event) => setPreviewId(event.target.value)}
+                        >
+                            {badges.map((badge) => (
+                                <option key={badge.id} value={badge.id}>
+                                    {badge.full_name}
+                                </option>
+                            ))}
+                        </Select>
+                    </label>
+                )}
                 <BadgeLayoutPreview
+                    badge={previewBadge}
+                    event={event}
                     selectedField={selectedField}
                     onSelectField={selectField}
                     onActivateField={setSelectedField}

@@ -24,6 +24,7 @@ function Editor() {
     return (
         <>
             <BadgeDesignEditor
+                ticketTypes={[{ id: 'nurse-type', name: 'In-person - Nurse or Midwife' }]}
                 form={form}
                 setForm={setForm}
                 layoutDefaults={{ attendee_name: field }}
@@ -33,6 +34,17 @@ function Editor() {
         </>
     );
 }
+it('lets organisers set a printed category without renaming the ticket', () => {
+    render(<Editor />);
+    fireEvent.change(screen.getByLabelText('Printed label for In-person - Nurse or Midwife'), {
+        target: { value: 'Nurse' },
+    });
+    expect(
+        JSON.parse(screen.getByLabelText('Design values').textContent).sheet_settings
+            .category_labels
+    ).toEqual({ 'nurse-type': 'Nurse' });
+    expect(screen.getByText(/Upload artwork without attendee names/)).toBeTruthy();
+});
 it('provides complete field controls, real boolean visibility, canonical reset and orientation updates', () => {
     render(<Editor />);
     fireEvent.change(screen.getByLabelText('Attendee name Width'), { target: { value: '0.5' } });
@@ -226,4 +238,31 @@ it('uploads a badge logo without organization branding and selects its propertie
     expect(
         JSON.parse(screen.getByLabelText('Design values').textContent).layout.tenant_logo
     ).toMatchObject({ visible: true, removed: false });
+});
+
+it('lets organisers preview different real attendees before printing', () => {
+    render(
+        <BadgeDesignEditor
+            form={{
+                width_mm: 54,
+                height_mm: 85,
+                layout: { attendee_name: field },
+                sheet_settings: { paper: 'a4', margin_mm: 8, gap_mm: 3, crop_marks: true },
+            }}
+            setForm={vi.fn()}
+            layoutDefaults={{ attendee_name: field }}
+            badges={[
+                { id: 'one', full_name: 'First attendee' },
+                { id: 'two', full_name: 'Long second attendee name' },
+            ]}
+            onSave={vi.fn()}
+        />
+    );
+    expect(screen.getByRole('button', { name: 'Select Attendee name' }).textContent).toBe(
+        'First attendee'
+    );
+    fireEvent.change(screen.getByLabelText('Preview attendee'), { target: { value: 'two' } });
+    expect(screen.getByRole('button', { name: 'Select Attendee name' }).textContent).toBe(
+        'Long second attendee name'
+    );
 });

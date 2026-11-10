@@ -107,7 +107,7 @@ it('uses saved design and actual attendee fields, resets changed filters, and pr
     await act(async () => {
         render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
     });
-    expect(screen.getByText('Person 0').style.color).toBe('rgb(171, 205, 239)');
+    expect(screen.getByText('Person 0').parentElement.style.color).toBe('rgb(171, 205, 239)');
     expect(screen.getByText('CODE-0')).toBeTruthy();
     expect(screen.getByText('Seat 0')).toBeTruthy();
     expect(screen.getAllByAltText('Attendee QR')[0].getAttribute('src')).toBe('qr-0');
