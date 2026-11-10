@@ -72,7 +72,7 @@ final class BadgePdfService
             $values = [
                 'event_name' => $event->name,
                 'attendee_name' => $registration->full_name,
-                'ticket_type' => $registration->ticketType->name ?? '',
+                'ticket_type' => $template->sheetSettings()['category_labels'][$registration->ticket_type_id] ?? $registration->ticketType->name ?? '',
                 'tier_label' => mb_strtoupper($tier),
                 'ticket_code' => $registration->ticket_code ?? '',
                 'seat_label' => $registration->seatAssignment->seat_label ?? '',
@@ -80,7 +80,7 @@ final class BadgePdfService
             $layout = $template->layoutSettings();
             foreach ($values as $key => $value) {
                 if (isset($layout[$key])) {
-                    $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key, tenantId: (string) $event->tenant_id);
+                    $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key, tenantId: (string) $event->tenant_id, minimumFontSize: $key === 'attendee_name' ? 6.0 : null);
                 }
             }
 

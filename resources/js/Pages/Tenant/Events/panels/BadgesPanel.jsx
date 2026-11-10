@@ -41,6 +41,7 @@ export default function BadgesPanel({ event }) {
     const [query, setQuery] = useState('');
     const [printing, setPrinting] = useState(false);
     const [template, setTemplate] = useState(null);
+    const [ticketTypes, setTicketTypes] = useState([]);
     const [designerOpen, setDesignerOpen] = useState(false);
     const [savingDesign, setSavingDesign] = useState(false);
     const [error, setError] = useState(null);
@@ -59,11 +60,14 @@ export default function BadgesPanel({ event }) {
             setBadges(data.badges || []);
             setLayoutDefaults(data.layout_defaults || data.template?.layout || {});
             setTenantLogo(data.tenant_logo || null);
-            setBadgeLogo(Object.hasOwn(data, 'badge_logo') ? data.badge_logo : data.tenant_logo || null);
+            setBadgeLogo(
+                Object.hasOwn(data, 'badge_logo') ? data.badge_logo : data.tenant_logo || null
+            );
             setCustomLogo(data.custom_logo || null);
             setFonts(data.fonts || DEFAULT_ARTIFACT_FONTS);
             setRecentPrints(data.recent_prints || []);
             setTemplate(data.template || null);
+            setTicketTypes(data.ticket_types || []);
         } catch (reason) {
             if (sequence === loadSequence.current) setLoadError(reason);
         } finally {
@@ -363,6 +367,9 @@ export default function BadgesPanel({ event }) {
                 <ArtifactErrors error={designError} />
                 {designForm && (
                     <BadgeDesignEditor
+                        ticketTypes={ticketTypes}
+                        badges={badges}
+                        event={event}
                         fieldErrors={designError?.fields}
                         form={designForm}
                         eventId={event.id}

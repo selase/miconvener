@@ -93,7 +93,7 @@ it('badges use actual attendee data and saved tier styles while honoring hidden 
             }}
         />
     );
-    expect(screen.getByText('Real attendee').style.color).toBe('rgb(171, 205, 239)');
+    expect(screen.getByText('Real attendee').parentElement.style.color).toBe('rgb(171, 205, 239)');
     expect(screen.queryByText('HIDDEN')).toBeNull();
     expect(screen.getByAltText('Attendee QR').getAttribute('src')).toBe('real-qr');
     expect(
@@ -169,4 +169,24 @@ it('badge preview shows the tenant logo and studio tier colors and hides optiona
         />
     );
     expect(screen.queryByAltText('Badge logo')).toBeNull();
+});
+
+it('uses print-only category labels in the badge preview', () => {
+    render(
+        <BadgeLayoutPreview
+            template={{
+                width_mm: 54,
+                height_mm: 85,
+                sheet_settings: { category_labels: { nurse: 'Nurse' } },
+                layout: { ticket_type: { x: 0, y: 0, width: 1, height: 0.2, font_size: 12 } },
+            }}
+            badge={{
+                full_name: 'Attendee',
+                ticket_type_id: 'nurse',
+                ticket_type_name: 'Full ticket sales name',
+            }}
+        />
+    );
+    expect(screen.getByText('Nurse')).toBeTruthy();
+    expect(screen.queryByText('Full ticket sales name')).toBeNull();
 });

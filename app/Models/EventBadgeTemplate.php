@@ -45,7 +45,7 @@ final class EventBadgeTemplate extends Model
         return is_array($styles) ? $styles : [];
     }
 
-    /** @return array{paper: string, margin_mm: float, gap_mm: float, crop_marks: bool} */
+    /** @return array{paper: string, margin_mm: float, gap_mm: float, crop_marks: bool, category_labels: array<string, string>} */
     public function sheetSettings(): array
     {
         $settings = $this->getAttribute('sheet_settings');
@@ -55,6 +55,7 @@ final class EventBadgeTemplate extends Model
             'margin_mm' => is_array($settings) && is_numeric($settings['margin_mm'] ?? null) ? (float) $settings['margin_mm'] : 8.0,
             'gap_mm' => is_array($settings) && is_numeric($settings['gap_mm'] ?? null) ? (float) $settings['gap_mm'] : 3.0,
             'crop_marks' => is_array($settings) && is_bool($settings['crop_marks'] ?? null) ? $settings['crop_marks'] : true,
+            'category_labels' => is_array($settings) && is_array($settings['category_labels'] ?? null) ? $settings['category_labels'] : [],
         ];
     }
 

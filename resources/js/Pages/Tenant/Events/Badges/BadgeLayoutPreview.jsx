@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import BadgeFittedText from './BadgeFittedText';
 import BadgeCanvasElement from './BadgeCanvasElement';
 import { artifactFontFamily } from '../Certificates/ArtifactFonts';
 const SAMPLE = {
@@ -20,12 +22,16 @@ export default function BadgeLayoutPreview({
     onActivateField,
     onChangeElement,
 }) {
+    const [nameOverflow, setNameOverflow] = useState(false);
     const ratio = `${template.width_mm || 100}/${template.height_mm || 70}`;
     const values = badge
         ? {
               event_name: event?.name || '',
               attendee_name: badge.full_name || '',
-              ticket_type: badge.ticket_type_name || '',
+              ticket_type:
+                  template.sheet_settings?.category_labels?.[badge.ticket_type_id] ||
+                  badge.ticket_type_name ||
+                  '',
               tier_label: (badge.badge_tier || 'general').toUpperCase(),
               ticket_code: badge.ticket_code || '',
               seat_label: badge.seat_label || '',
@@ -50,7 +56,9 @@ export default function BadgeLayoutPreview({
                 style={{
                     aspectRatio: ratio,
                     backgroundImage:
-                        backgroundUrl && template.background_settings?.visible !== false && !template.background_settings?.removed
+                        backgroundUrl &&
+                        template.background_settings?.visible !== false &&
+                        !template.background_settings?.removed
                             ? `url(${backgroundUrl})`
                             : undefined,
                     backgroundSize:
@@ -127,7 +135,16 @@ export default function BadgeLayoutPreview({
                                 fontSize: `${((item.font_size || 12) / (((template.width_mm || 100) * 72) / 25.4)) * 100}cqw`,
                             }}
                         >
-                            {values[key] || ''}
+                            {key === 'attendee_name' ? (
+                                <BadgeFittedText
+                                    text={values[key] || ''}
+                                    item={item}
+                                    pageWidthMm={template.width_mm || 100}
+                                    onOverflow={setNameOverflow}
+                                />
+                            ) : (
+                                values[key] || ''
+                            )}
                         </BadgeCanvasElement>
                     );
                 })}
@@ -149,6 +166,13 @@ export default function BadgeLayoutPreview({
                     <p className="mt-2 text-xs text-amber-700">
                         The QR is smaller than 20 mm. Increase its size and test a printed badge
                         before use.
+                    </p>
+                )}
+            {nameOverflow &&
+                template.layout?.attendee_name?.visible !== false &&
+                !template.layout?.attendee_name?.removed && (
+                    <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                        The name does not fit even at 6 pt. Enlarge its box before printing.
                     </p>
                 )}
             {longName && (

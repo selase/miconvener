@@ -62,6 +62,7 @@ final class EventBadgeController extends Controller
 
         return response()->json([
             'template' => $template,
+            'ticket_types' => $eventModel->ticketTypes()->get(['id', 'name']),
             'fonts' => app(ArtifactFontRegistry::class)->catalog((string) $tenant->id, (string) $eventModel->id),
             'badge_logo' => $this->templates->badgeLogo($eventModel, $template),
             'custom_logo' => $this->templates->storedLogo($template),
@@ -71,6 +72,7 @@ final class EventBadgeController extends Controller
                 'id' => $r->id,
                 'full_name' => $r->full_name,
                 'ticket_type_name' => $r->ticketType?->name,
+                'ticket_type_id' => $r->ticket_type_id,
                 'badge_tier' => $r->ticketType?->badge_tier ?? 'general',
                 'ticket_code' => $r->ticket_code,
                 'seat_label' => $seatLabels->get($r->id)?->seat_label,
@@ -92,6 +94,12 @@ final class EventBadgeController extends Controller
         $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
         $template = $this->templates->forEvent($eventModel);
         $validated = $request->validated();
+        if (isset($validated['sheet_settings']['category_labels'])) {
+            $validated['sheet_settings']['category_labels'] = array_filter(
+                array_map(fn ($label): string => mb_trim((string) $label), $validated['sheet_settings']['category_labels']),
+                fn (string $label): bool => $label !== '',
+            );
+        }
         $validated['layout'] = $this->layouts->validate($validated['layout'], 'badge');
         $validated['orientation'] = $validated['width_mm'] > $validated['height_mm'] ? 'landscape' : 'portrait';
         $oldDisk = null;

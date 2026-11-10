@@ -27,7 +27,7 @@ final class ArtifactLayoutValidator
      * @param  array<string, bool|float|int|string>  $settings
      * @return array<string, bool|float|int|string>
      */
-    public function fitText(string $text, array $settings, float $widthMm, float $heightMm, string $field, float $lineHeight = 1.15, ?string $tenantId = null): array
+    public function fitText(string $text, array $settings, float $widthMm, float $heightMm, string $field, float $lineHeight = 1.15, ?string $tenantId = null, ?float $minimumFontSize = null): array
     {
         if ($text === '' || ($settings['visible'] ?? true) === false || ($settings['removed'] ?? false) === true) {
             return $settings;
@@ -38,7 +38,7 @@ final class ArtifactLayoutValidator
         $width = $widthMm * 72 / 25.4;
         $height = $heightMm * 72 / 25.4;
         $original = (float) $settings['font_size'];
-        $minimum = max(6.0, $original * 0.7);
+        $minimum = max(6.0, min($original, $minimumFontSize ?? $original * 0.7));
         $size = $original;
         while (true) {
             $lines = 0;
@@ -66,7 +66,9 @@ final class ArtifactLayoutValidator
                 return $settings;
             }
             if ($size <= $minimum) {
-                throw ValidationException::withMessages([$field => 'Text does not fit this field. Enlarge its box, reduce its font size, or shorten the text. Automatic reduction is limited to 30%.']);
+                throw ValidationException::withMessages([$field => $minimumFontSize !== null
+                    ? 'Text does not fit even at 6 points. Enlarge its box before printing.'
+                    : 'Text does not fit this field. Enlarge its box, reduce its font size, or shorten the text. Automatic reduction is limited to 30%.']);
             }
             $size = max($minimum, $size - 0.5);
         }

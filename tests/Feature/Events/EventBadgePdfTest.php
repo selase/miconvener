@@ -30,6 +30,34 @@ function badgePdfRegistration(Event $event, array $overrides = []): EventRegistr
     ]);
 }
 
+test('badge prints a category override instead of the ticket sales name', function (): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $ticket = EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'In-person - Nurse or Midwife']);
+    $registration = badgePdfRegistration($event, ['ticket_type_id' => $ticket->id]);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    $template->update(['sheet_settings' => array_replace($template->sheetSettings(), ['category_labels' => [$ticket->id => 'Nurse']])]);
+    $html = app(BadgePdfService::class)->renderHtml($event, $template, collect([$registration]));
+    expect($html)->toContain('>Nurse</div>')->not->toContain('In-person - Nurse or Midwife');
+});
+
+test('badge names shrink beyond thirty percent rather than disappearing in a compact name box', function (): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = badgePdfRegistration($event, ['full_name' => 'Selwyn Nana Akwasi Agyeman-Ababio']);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    $layout = $template->layoutSettings();
+    foreach ($layout as &$item) {
+        $item['visible'] = false;
+    }
+    unset($item);
+    $layout['attendee_name'] = array_replace($layout['attendee_name'], ['visible' => true, 'x' => .08, 'y' => .25, 'width' => .84, 'height' => .3, 'font_size' => 32]);
+    $template->update(['width_mm' => 54, 'height_mm' => 85, 'layout' => $layout]);
+    $pdf = app(BadgePdfService::class)->generate($event, $template, collect([$registration]));
+    expect($pdf->output())->toStartWith('%PDF-');
+    expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe(1);
+});
+
 test('badge renderer uses exact millimetre dimensions and deterministic sheet pagination', function (): void {
     [$tenant] = eventHost('acme');
     $event = Event::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Medical Congress']);
