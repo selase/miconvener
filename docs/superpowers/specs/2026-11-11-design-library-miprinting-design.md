@@ -1,6 +1,6 @@
 # Cross-event design library and MiPrinting
 
-**Prepared 11 November 2026.** Product and phased delivery proposal for owner review. Implementation has not started. The GH₵50 paid-template price is requested. The unit of purchase is awaiting the owner's answer. All other proposed defaults below are recommendations, not recorded approvals.
+**Prepared 11 November 2026.** Product and phased delivery proposal for owner review. Implementation has not started. The GH₵50 paid-template price is requested. The owner approved GH₵50 per event with unlimited reprints on 11 November 2026. Other proposed defaults below remain recommendations for review.
 
 ## 1. Intended experience
 
@@ -44,7 +44,7 @@ Safe areas and crop/bleed belong to the template and print specification. Fixed 
 
 Free designs apply immediately. Paid designs can be previewed and adapted before purchase, including long-name and target-size previews. Purchasing must happen once at an obvious point. Applying an already licensed version and reprinting must not create another charge.
 
-**Proposed licence, pending owner choice** — GH₵50 per event, including edits, all attendee quantities and unlimited downloads/reprints for that event. A licence covers the same design family’s orientation variants, dimension changes and later catalogue revisions for its licensed scope. Each event copy pins an immutable version and upgrades only after an explicit preview/apply action. A genuinely different design family requires its own purchase. Saving an adapted paid template privately retains its paid source provenance and licence requirement when applied elsewhere. If the owner chooses an organisation-wide licence instead, the uniqueness and permission checks bind to the organisation rather than an event. Do not implement both commercial models unless requested.
+**Approved licence** — GH₵50 per event, with unlimited reprints. Proposed included usage covers edits, all attendee quantities and unlimited downloads for that event. A licence covers the same design family’s orientation variants, dimension changes and later catalogue revisions for its licensed scope. Each event copy pins an immutable version and upgrades only after an explicit preview/apply action. A genuinely different design family requires its own purchase. Saving an adapted paid template privately retains its paid source provenance and licence requirement when applied elsewhere. Bind licence uniqueness to the purchasing organisation, event and design family.
 
 User-uploaded artwork and private organisation templates remain free to apply. Saving, changing a background or using an unlocked design does not itself trigger a payment. A paid source's licence remains required after copying or adapting that source. Preview outputs for unlicensed paid designs carry a visible sample watermark and cannot be used as clean print production files. The watermark disappears after verified payment. Before purchase, serve watermarked preview derivatives and provisional field changes through authorised server rendering. Original paid artwork/font downloads and clean PDF endpoints require the same entitlement. Client-side hiding alone cannot enforce paid access. The organiser sees **Free**, **GH₵50** or **Purchased** consistently.
 
@@ -130,7 +130,7 @@ Ship each milestone as a reviewable PR or a small dependency-ordered set. Use na
 
 ## 9. Owner decisions and defaults to confirm
 
-1. GH₵50 licence unit, per event or per organisation. Proposed per event with unlimited edits/downloads/reprints.
+1. Agreed on 11 November 2026 — GH₵50 per event with unlimited reprints. Edits, downloads, orientation changes and version upgrades are proposed included usage as specified above.
 2. Whether GH₵50 is the final customer total. Proposed yes, platform absorbs gateway costs.
 3. Seller/service identity and authorised MiPrinting contact. Proposed a platform-operated service with an explicit supplying organisation, not an assumed existing merchant.
 4. Refund/retention/production policy. Proposed unused licence refunds through existing verified refund controls, full quoted payment plus approved proof before production, and 90-day print-pack working-file retention after completion. Used-licence and started-production cancellation terms require owner wording.
