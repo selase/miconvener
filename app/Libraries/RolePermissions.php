@@ -168,6 +168,7 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            'manage badge-library',
             'moderate public attendee profiles',
             'manage public attendee profiles',
             'manage store catalog',
@@ -270,6 +271,7 @@ final class RolePermissions
     private static function organizationSuperadminPermissions(): array
     {
         return [
+            'manage badge-library',
             'manage public attendee profiles',
             'manage store catalog',
             'manage store collection',
@@ -353,6 +355,7 @@ final class RolePermissions
     private static function organizationAdminPermissions(): array
     {
         return [
+            'manage badge-library',
             'manage store catalog',
             'manage store collection',
             'manage store orders',

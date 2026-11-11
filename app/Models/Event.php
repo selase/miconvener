@@ -938,10 +938,14 @@ final class Event extends Model
             }
 
             $cleanup = app(\App\Services\Design\ArtifactArtworkCleanup::class);
-            foreach ([EventCertificateTemplate::class, EventCertificateDesignVersion::class, EventBadgeTemplate::class] as $model) {
+            foreach ([EventCertificateTemplate::class, EventCertificateDesignVersion::class, EventBadgeTemplate::class, BadgeDesignRevision::class] as $model) {
                 foreach ($model::withoutGlobalScopes()->where('event_id', $event->id)->get() as $design) {
                     array_push($event->artifactAssetsForDeletion, ...$cleanup->assets($design));
                 }
+            }
+
+            foreach (BadgeLibraryVersion::query()->whereHas('design', fn (Builder $query) => $query->where('event_id', $event->id)->where('scope', 'event'))->get() as $version) {
+                array_push($event->artifactAssetsForDeletion, ...$cleanup->assets($version));
             }
 
             $disk = self::uploadDisk();

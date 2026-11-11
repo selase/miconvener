@@ -14,8 +14,11 @@ body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
 </style></head><body>
 @foreach ($pages as $page)
 <section class="sheet">
-@foreach ($page as $badge)
-<div class="badge-slot" style="left:{{ $margin + ($loop->index % $columns) * ($template->width_mm + $gap) }}mm;top:{{ $margin + intdiv($loop->index, $columns) * ($template->height_mm + $gap) }}mm">
+@php($backgroundDataUri = $page['backgroundDataUri'])
+@php($backgroundBox = $page['backgroundBox'])
+@php($tenantLogoDataUri = $page['tenantLogoDataUri'])
+@foreach ($page['badges'] as $badge)
+<div class="badge-slot" style="left:{{ $badge['x'] }}mm;top:{{ $badge['y'] }}mm">
 <div class="badge" style="background-color: {{ $badge['tier_style']['background_color'] ?? '#FFFFFF' }}; color: {{ $badge['tier_style']['text_color'] ?? '#111827' }}">
     @if ($backgroundDataUri)<img class="background" style="left:{{ $backgroundBox['x'] }}mm;top:{{ $backgroundBox['y'] }}mm;width:{{ $backgroundBox['width'] }}mm;height:{{ $backgroundBox['height'] }}mm" src="{{ $backgroundDataUri }}" alt="">@endif
     @foreach ($badge['layout'] as $key => $item)

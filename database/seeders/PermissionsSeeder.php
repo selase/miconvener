@@ -52,6 +52,10 @@ final class PermissionsSeeder extends Seeder
          */
         app(RoleSeeder::class)->ensureRoles(['Event Organiser']);
 
+        if (\Illuminate\Support\Facades\Schema::connection('landlord')->hasTable('badge_library_designs')) {
+            $this->callSilent(BadgeLibrarySeeder::class);
+        }
+
         foreach (RolePermissions::assign($created) as $missingRole) {
             $this->command?->warn("Built-in role [{$missingRole}] was not found; its new permissions were not granted.");
         }
@@ -278,6 +282,12 @@ final class PermissionsSeeder extends Seeder
                 'name' => 'issue certificates',
                 'guard_name' => 'web',
                 'category' => 'certificates',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage badge-library',
+                'guard_name' => 'web',
+                'category' => 'event',
             ],
             [
                 'uuid' => Str::uuid(),

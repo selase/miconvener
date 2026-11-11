@@ -31,6 +31,11 @@ return [
     */
 
     'disks' => [
+        'badge-catalog' => [
+            'driver' => 'local',
+            'root' => resource_path('badge-designs'),
+            'throw' => true,
+        ],
 
         'attendee-profiles-local' => [
             'driver' => 'local',

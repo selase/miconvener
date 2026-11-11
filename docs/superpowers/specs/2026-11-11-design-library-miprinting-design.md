@@ -1,6 +1,6 @@
 # Cross-event design library and MiPrinting
 
-**Prepared 11 November 2026.** Product and phased delivery proposal for owner review. Implementation has not started. The GH₵50 paid-template price is requested. The owner approved GH₵50 per event with unlimited reprints on 11 November 2026. Other proposed defaults below remain recommendations for review.
+**Prepared 11 November 2026.** Product and phased delivery proposal for owner review. M1 implementation is in local review on `codex/reusable-badge-library`. Later milestones remain planned. The GH₵50 paid-template price is requested. The owner approved GH₵50 per event with unlimited reprints on 11 November 2026. Other proposed defaults below remain recommendations for review.
 
 ## 1. Intended experience
 

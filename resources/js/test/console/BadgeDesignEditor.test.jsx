@@ -266,3 +266,16 @@ it('lets organisers preview different real attendees before printing', () => {
         'Long second attendee name'
     );
 });
+it('edits a back face independently and retains the front when it is removed', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add back face' }));
+    fireEvent.change(screen.getByLabelText('Attendee name Font size'), { target: { value: '16' } });
+    let form = JSON.parse(screen.getByLabelText('Design values').textContent);
+    expect(form.back.layout.attendee_name.font_size).toBe(16);
+    expect(form.layout.attendee_name.font_size).toBe(20);
+    fireEvent.click(screen.getByRole('button', { name: 'Front' }));
+    expect(screen.getByLabelText('Attendee name Font size').value).toBe('20');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove back face' }));
+    form = JSON.parse(screen.getByLabelText('Design values').textContent);
+    expect(form.remove_back).toBe(true);
+});

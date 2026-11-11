@@ -18,7 +18,7 @@ final class EventBadgeTemplate extends Model
     protected $connection = 'landlord';
 
     protected $fillable = [
-        'tenant_id', 'event_id', 'width_mm', 'height_mm', 'orientation',
+        'back', 'source_version_id', 'tenant_id', 'event_id', 'width_mm', 'height_mm', 'orientation',
         'background_disk', 'background_path', 'layout', 'tier_styles',
         'sheet_settings', 'background_settings', 'design_version', 'logo_disk', 'logo_path', 'logo_source',
     ];
@@ -45,7 +45,7 @@ final class EventBadgeTemplate extends Model
         return is_array($styles) ? $styles : [];
     }
 
-    /** @return array{paper: string, margin_mm: float, gap_mm: float, crop_marks: bool, category_labels: array<string, string>} */
+    /** @return array{paper: string, margin_mm: float, gap_mm: float, crop_marks: bool, duplex: string, category_labels: array<string, string>} */
     public function sheetSettings(): array
     {
         $settings = $this->getAttribute('sheet_settings');
@@ -54,6 +54,7 @@ final class EventBadgeTemplate extends Model
             'paper' => is_array($settings) && is_string($settings['paper'] ?? null) ? $settings['paper'] : 'a4',
             'margin_mm' => is_array($settings) && is_numeric($settings['margin_mm'] ?? null) ? (float) $settings['margin_mm'] : 8.0,
             'gap_mm' => is_array($settings) && is_numeric($settings['gap_mm'] ?? null) ? (float) $settings['gap_mm'] : 3.0,
+            'duplex' => is_array($settings) && in_array($settings['duplex'] ?? null, ['long-edge', 'short-edge'], true) ? $settings['duplex'] : 'long-edge',
             'crop_marks' => is_array($settings) && is_bool($settings['crop_marks'] ?? null) ? $settings['crop_marks'] : true,
             'category_labels' => is_array($settings) && is_array($settings['category_labels'] ?? null) ? $settings['category_labels'] : [],
         ];
@@ -71,6 +72,14 @@ final class EventBadgeTemplate extends Model
         ];
     }
 
+    /** @return array<string, mixed>|null */
+    public function backSettings(): ?array
+    {
+        $back = $this->getAttribute('back');
+
+        return is_array($back) ? $back : null;
+    }
+
     protected static function booted(): void
     {
         self::deleted(function (self $design): void {
@@ -84,6 +93,7 @@ final class EventBadgeTemplate extends Model
         return [
             'width_mm' => 'float',
             'height_mm' => 'float',
+            'back' => 'array',
             'layout' => 'array',
             'tier_styles' => 'array',
             'sheet_settings' => 'array',

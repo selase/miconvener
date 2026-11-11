@@ -30,7 +30,12 @@ final class BadgePdfService
     {
         $paper = $template->sheetSettings()['paper'] === 'letter' ? 'letter' : 'a4';
 
-        return app(ArtifactFontRegistry::class)->preparePdf(Pdf::loadHTML($this->renderHtml($event, $template, $registrations)), $template->layoutSettings(), (string) $event->tenant_id)
+        $fontLayout = $template->layoutSettings();
+        foreach ($template->backSettings()['layout'] ?? [] as $key => $item) {
+            $fontLayout['back_'.$key] = $item;
+        }
+
+        return app(ArtifactFontRegistry::class)->preparePdf(Pdf::loadHTML($this->renderHtml($event, $template, $registrations)), $fontLayout, (string) $event->tenant_id)
             ->setPaper($paper, 'portrait')
             ->setOption('isHtml5ParserEnabled', true)
             ->setOption('isRemoteEnabled', false);
@@ -53,49 +58,90 @@ final class BadgePdfService
             throw ValidationException::withMessages(['sheet_settings' => 'The badge dimensions do not fit on the selected paper.']);
         }
 
-        $background = null;
-        if ($template->backgroundSettings()['visible'] && is_string($template->background_disk) && is_string($template->background_path)) {
-            try {
-                $background = $this->artwork->dataUri($template->background_disk, $template->background_path);
-            } catch (RuntimeException) {
-                report('Badge artwork is unavailable; the MiConvener fallback was used.');
-            }
+        $faces = [$template];
+        if ($template->backSettings() !== null) {
+            $faces[] = new EventBadgeTemplate(array_replace($template->only(BadgeLibraryService::FIELDS), [
+                'layout' => $template->backSettings()['layout'],
+                'background_disk' => $template->backSettings()['background_disk'] ?? null,
+                'background_path' => $template->backSettings()['background_path'] ?? null,
+                'background_settings' => $template->backSettings()['background_settings'] ?? ['fit' => 'contain', 'position' => 'center'],
+                'back' => null,
+            ]));
         }
-
-        $badges = $registrations->map(function (EventRegistration $registration) use ($event, $template): array {
-            if (mb_strlen($registration->full_name) > 80) {
-                throw ValidationException::withMessages(['registration_ids' => "{$registration->full_name} is too long for the badge layout."]);
-            }
-
-            $tier = $registration->ticketType->badge_tier ?? 'general';
-
-            $values = [
-                'event_name' => $event->name,
-                'attendee_name' => $registration->full_name,
-                'ticket_type' => $template->sheetSettings()['category_labels'][$registration->ticket_type_id] ?? $registration->ticketType->name ?? '',
-                'tier_label' => mb_strtoupper($tier),
-                'ticket_code' => $registration->ticket_code ?? '',
-                'seat_label' => $registration->seatAssignment->seat_label ?? '',
-            ];
-            $layout = $template->layoutSettings();
-            foreach ($values as $key => $value) {
-                if (isset($layout[$key])) {
-                    $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key, tenantId: (string) $event->tenant_id, minimumFontSize: $key === 'attendee_name' ? 6.0 : null);
+        $faceData = [];
+        foreach ($faces as $faceIndex => $face) {
+            $template = $face;
+            $background = null;
+            if ($template->backgroundSettings()['visible'] && is_string($template->background_disk) && is_string($template->background_path)) {
+                try {
+                    $background = $this->artwork->dataUri($template->background_disk, $template->background_path);
+                } catch (RuntimeException) {
+                    report('Badge artwork is unavailable; the MiConvener fallback was used.');
                 }
             }
 
-            return [
-                'values' => $values,
-                'layout' => $layout,
-                'qr' => $registration->qr_token ? QrCodeGenerator::svgDataUri($registration->qr_token, 240) : null,
-                'tier_style' => $template->tierStyleSettings()[$tier] ?? [],
+            $badges = $registrations->map(function (EventRegistration $registration) use ($event, $template): array {
+                if (mb_strlen($registration->full_name) > 80) {
+                    throw ValidationException::withMessages(['registration_ids' => "{$registration->full_name} is too long for the badge layout."]);
+                }
+
+                $tier = $registration->ticketType->badge_tier ?? 'general';
+
+                $values = [
+                    'event_name' => $event->name,
+                    'attendee_name' => $registration->full_name,
+                    'ticket_type' => $template->sheetSettings()['category_labels'][$registration->ticket_type_id] ?? $registration->ticketType->name ?? '',
+                    'tier_label' => mb_strtoupper($tier),
+                    'ticket_code' => $registration->ticket_code ?? '',
+                    'seat_label' => $registration->seatAssignment->seat_label ?? '',
+                ];
+                $layout = $template->layoutSettings();
+                foreach ($values as $key => $value) {
+                    if (isset($layout[$key])) {
+                        $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key, tenantId: (string) $event->tenant_id, minimumFontSize: $key === 'attendee_name' ? 6.0 : null);
+                    }
+                }
+
+                return [
+                    'values' => $values,
+                    'layout' => $layout,
+                    'qr' => $registration->qr_token ? QrCodeGenerator::svgDataUri($registration->qr_token, 240) : null,
+                    'tier_style' => $template->tierStyleSettings()[$tier] ?? [],
+                ];
+            });
+
+            $faceData[] = [
+                'badges' => $badges,
+                'backgroundDataUri' => $background,
+                'backgroundBox' => $this->backgroundBox($template, $background),
+                'tenantLogoDataUri' => $this->templates->badgeLogo($event, $template),
             ];
-        });
+        }
+        $template = $faces[0];
+        $pages = collect();
+        foreach ($faceData[0]['badges']->chunk($columns * $rows) as $pageIndex => $unused) {
+            foreach ($faceData as $faceIndex => $data) {
+                $pageBadges = $data['badges']->slice($pageIndex * $columns * $rows, $columns * $rows)->values()->map(function (array $badge, int $index) use ($faceIndex, $settings, $paper, $columns, $margin, $gap, $template): array {
+                    $x = $margin + ($index % $columns) * ($template->width_mm + $gap);
+                    $y = $margin + intdiv($index, $columns) * ($template->height_mm + $gap);
+                    if ($faceIndex === 1) {
+                        if ($settings['duplex'] === 'short-edge') {
+                            $y = $paper[1] - $y - $template->height_mm;
+                        } else {
+                            $x = $paper[0] - $x - $template->width_mm;
+                        }
+                    }
+
+                    return $badge + ['x' => $x, 'y' => $y];
+                });
+                $pages->push(array_replace($data, ['badges' => $pageBadges]));
+            }
+        }
 
         return view('pdf.badge-sheet', [
             'template' => $template,
             'layout' => $template->layoutSettings(),
-            'pages' => $badges->chunk($columns * $rows),
+            'pages' => $pages,
             'backgroundDataUri' => $background,
             'backgroundBox' => $this->backgroundBox($template, $background),
             'tenantLogoDataUri' => $this->templates->badgeLogo($event, $template),

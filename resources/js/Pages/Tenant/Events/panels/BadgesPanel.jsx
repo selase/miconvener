@@ -7,6 +7,7 @@ import SearchInput from '@/Components/Console/SearchInput';
 import Select from '@/Components/Console/Select';
 import Modal from '@/Components/Console/Modal';
 import BadgeLayoutPreview from '@/Pages/Tenant/Events/Badges/BadgeLayoutPreview';
+import BadgeDesignLibrary from '@/Pages/Tenant/Events/Badges/BadgeDesignLibrary';
 import BadgeDesignEditor from '@/Pages/Tenant/Events/Badges/BadgeDesignEditor';
 import { ArtifactFontStyles, DEFAULT_ARTIFACT_FONTS } from '../Certificates/ArtifactFonts';
 import { Download, History, Palette, Printer } from 'lucide-react';
@@ -43,6 +44,8 @@ export default function BadgesPanel({ event }) {
     const [template, setTemplate] = useState(null);
     const [ticketTypes, setTicketTypes] = useState([]);
     const [designerOpen, setDesignerOpen] = useState(false);
+    const [libraryOpen, setLibraryOpen] = useState(false);
+    const [backBackground, setBackBackground] = useState(null);
     const [savingDesign, setSavingDesign] = useState(false);
     const [error, setError] = useState(null);
     const [designForm, setDesignForm] = useState(null);
@@ -64,6 +67,7 @@ export default function BadgesPanel({ event }) {
                 Object.hasOwn(data, 'badge_logo') ? data.badge_logo : data.tenant_logo || null
             );
             setCustomLogo(data.custom_logo || null);
+            setBackBackground(data.back_background || null);
             setFonts(data.fonts || DEFAULT_ARTIFACT_FONTS);
             setRecentPrints(data.recent_prints || []);
             setTemplate(data.template || null);
@@ -185,11 +189,26 @@ export default function BadgesPanel({ event }) {
                     'logo_disk',
                     'logo_path',
                     'design_version',
+                    'source_version_id',
                 ].includes(key)
             )
                 return;
-            if (['layout', 'tier_styles', 'sheet_settings', 'background_settings'].includes(key))
-                payload.append(key, JSON.stringify(value));
+            if (
+                ['layout', 'tier_styles', 'sheet_settings', 'background_settings', 'back'].includes(
+                    key
+                )
+            )
+                payload.append(
+                    key,
+                    JSON.stringify(
+                        key === 'back'
+                            ? {
+                                  layout: value.layout,
+                                  background_settings: value.background_settings,
+                              }
+                            : value
+                    )
+                );
             else if (typeof value === 'boolean') payload.append(key, value ? '1' : '0');
             else payload.append(key, value);
         });
@@ -212,6 +231,24 @@ export default function BadgesPanel({ event }) {
         }
     };
 
+    const sheetSettings = template?.sheet_settings || {};
+    const paperWidth = sheetSettings.paper === 'letter' ? 215.9 : 210;
+    const paperHeight = sheetSettings.paper === 'letter' ? 279.4 : 297;
+    const margin = sheetSettings.margin_mm ?? 8;
+    const gap = sheetSettings.gap_mm ?? 3;
+    const columns = template
+        ? Math.max(
+              0,
+              Math.floor((paperWidth - 2 * margin + gap) / (Number(template.width_mm) + gap))
+          )
+        : 0;
+    const rows = template
+        ? Math.max(
+              0,
+              Math.floor((paperHeight - 2 * margin + gap) / (Number(template.height_mm) + gap))
+          )
+        : 0;
+
     return (
         <div>
             <ArtifactFontStyles fonts={fonts} />
@@ -225,7 +262,12 @@ export default function BadgesPanel({ event }) {
                         selected batch (up to 100 badges).
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                    {can.update_badge_template && (
+                        <Button onClick={() => setLibraryOpen(true)} disabled={!template}>
+                            Design library
+                        </Button>
+                    )}
                     {can.update_badge_template && (
                         <Button icon={Palette} onClick={openDesigner} disabled={!template}>
                             Design badges
@@ -246,6 +288,17 @@ export default function BadgesPanel({ event }) {
                 </div>
             </div>
 
+            {template && (
+                <p className="mb-4 text-xs text-ink-secondary">
+                    {template.width_mm} × {template.height_mm} mm ·{' '}
+                    {(template.sheet_settings?.paper || 'a4').toUpperCase()} · {columns * rows}{' '}
+                    badges per sheet
+                    {template.back
+                        ? ` · Two-sided, flip ${template.sheet_settings?.duplex || 'long-edge'}`
+                        : ''}{' '}
+                    · Print at 100% / actual size
+                </p>
+            )}
             <ArtifactErrors error={error} />
             {loadError && (
                 <div className="mb-4">
@@ -358,6 +411,31 @@ export default function BadgesPanel({ event }) {
             )}
 
             <Modal
+                open={libraryOpen}
+                onClose={() => setLibraryOpen(false)}
+                title="Badge design library"
+                className="max-w-[1400px]"
+                fullScreenOnMobile
+            >
+                {libraryOpen && template && (
+                    <BadgeDesignLibrary
+                        event={event}
+                        template={template}
+                        ticketTypes={ticketTypes}
+                        badges={badges || []}
+                        currentLogo={badgeLogo}
+                        currentBackground={
+                            template.background_path
+                                ? route('tenant.events.badges.template.artwork', {
+                                      event: event.id,
+                                  })
+                                : null
+                        }
+                        onApplied={load}
+                    />
+                )}
+            </Modal>
+            <Modal
                 open={designerOpen}
                 onClose={() => setDesignerOpen(false)}
                 title="Badge print studio"
@@ -376,6 +454,7 @@ export default function BadgesPanel({ event }) {
                         initialFonts={fonts}
                         onFontsChange={setFonts}
                         existingLogo={customLogo}
+                        existingBackBackground={backBackground}
                         layoutDefaults={layoutDefaults}
                         tenantLogo={tenantLogo}
                         setForm={setDesignForm}

@@ -46,6 +46,7 @@ final class Permission extends SpatiePermission
         'manage community library',
         'manage community polls',
         'read community poll results',
+        'manage badge-library',
         'read badge-template',
         'update badge-template',
     ];
