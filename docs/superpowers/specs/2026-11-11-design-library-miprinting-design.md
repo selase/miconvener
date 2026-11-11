@@ -28,7 +28,7 @@ An organiser can save their event design as a private event template. Promoting 
 
 Versions are immutable once published or purchased. Editing a published template creates a new version. Applying a design creates an event-owned copy and records its source/version. Existing events keep their current copy when a catalogue version changes or is withdrawn. Withdrawal stops new selection and purchase while retaining licensed versions for existing events and financial records.
 
-Applying to an event with a saved design shows a before/after preview and asks the organiser to replace it. Preserve the previous event design as a recoverable revision. Store the layout, sheet settings, font references and artwork together. Never mutate registrations or ticket prices. Printed category mappings bind to the destination event's own ticket types. Match labels only through an explicit mapping or exact unambiguous labels, and show unresolved rows for review. Never copy source ticket UUIDs into another event.
+Applying to an event with a saved design shows a before/after preview and asks the organiser to replace it. Preserve the previous event design as a recoverable revision. Store the layout, sheet settings, font references and artwork together. A template may have a front and an optional back, each with its own background and dynamic fields. Legacy templates become front-only. The event licence covers both faces of the chosen design family. Switching face, orientation or size does not create another template purchase. Never mutate registrations or ticket prices. Printed category mappings bind to the destination event's own ticket types. Match labels only through an explicit mapping or exact unambiguous labels, and show unresolved rows for review. Never copy source ticket UUIDs into another event.
 
 ### Background and size adaptation
 
@@ -72,13 +72,26 @@ MiPrinting has a service page with samples, materials, finishing options and a c
 
 A print request starts with event, requested-by contact, badge dimensions, selected design version, selected attendees and quantity. Show selected people, category counts, blanks/spares, required date, collection/delivery preference and destination/contact. The organiser can exclude people, supply an updated roster or order a later batch. Price is quoted until a real print price list has been approved.
 
-Allow relevant options such as paper/card stock, single/double-sided work, holder/lanyard inclusion and finishing. Show only options MiPrinting actually offers. An uploaded reverse-side design can be quoted without inventing a second face in the current badge editor. Explain all quoted items and delivery in the full price before payment.
+Present a photo-backed product configurator populated from the supplying shop’s actual options. Organisers can open full-size photos and compare supported combinations. Separate the following specifications so an acrylic holder is not treated as a strap material.
+
+- Badge dimensions, portrait/landscape, material, thickness, finish and front-only or front-and-back printing. Each face can use the event template or the organiser’s own uploaded design.
+- Holder type, such as a rigid acrylic holder, rigid plastic holder or flexible pouch, with its own photo, insert dimensions, orientation, attachment points and compatible badge size. These are examples to configure, not promised stock.
+- Lanyard construction and material/finish, such as flat/tubular construction and supported polyester, woven or satin-finish choices. Record width, length, colour and the supplier’s minimum quantity where applicable.
+- Attachment and safety options, such as a supported clip/hook, breakaway connector or detachable buckle. Filter compatibility with the selected holder rather than allowing an impossible combination.
+- Strap branding, with plain or printed straps, print on one or both sides, artwork, print colours/technique and repeat placement. An organiser can upload a logo or a complete strap design and review a strap proof independently of the badge faces.
+- Separate quantities for printed badges, holders, lanyards and blank spares. A two-sided badge is still one physical badge. Printing-side charges, setup/design, finishing and delivery remain clear quote components.
+
+Each option has a stable seller-owned ID and photo/media references. Snapshot the actual material/finish, measurements, compatible options and agreed costs when quoting, so later catalogue edits cannot rewrite the order. Only publish choices that the supplier offers, with indicative prices or price-on-request until a verified tariff exists. Real supplier/product photos may be reused through existing catalogue media. The proposal’s supplied holder photo is a visual reference and does not certify its material or availability.
+
+Own-artwork uploads are first-class for the badge front, back and lanyard strap. PNG/JPEG can feed the existing background workflow. Accept PDF as print-ready/reference artwork with page/dimension checks and an approved proof process. Editable PDF-to-canvas conversion and preview rendering require an explicitly implemented, tested conversion path. Keep originals, validate file types and sizes, and store them privately. A user uploading their own design can go directly to the print request. The GH₵50 charge applies when they choose a paid catalogue design.
+
+Explain all selected items, sides, quantities and delivery in the full quoted price before payment.
 
 Custom design requests collect a short brief, brand assets, dimensions, required formats and deadline. Staff return a quote with a stated number of revisions, scope, final deliverables and timing. A paid catalogue licence and custom design work are distinct quote lines. Do not charge GH₵50 automatically for bespoke work or count it twice when a package already includes the licence.
 
 ### Proof and production
 
-Freeze an immutable print pack when the organiser approves a proof. Include template revision, resolved name/category data, selection/quantity, exact PDF, dimensions, material, finishing, artwork checksums, quote, delivery agreement and explicit approver/time. Generate the production PDF on the server. The organiser must review and approve that exact proof, including spelling and category information.
+Freeze an immutable print pack when the organiser approves a proof. Include template revision, resolved name/category data, selection/quantity, exact front/back PDFs, strap proof where selected, dimensions, badge/holder/lanyard specifications, option photo/version references, finishing, artwork checksums, quote, delivery agreement and explicit approver/time. Generate the production PDF on the server. The organiser must review and approve that exact proof, including spelling and category information, both badge faces and any printed strap. Self-print A4/Letter exports of two-sided badges must use an explicitly selected long-edge/short-edge duplex mode with correct mirrored back-side slot ordering. Offer a paired one-badge-per-page production export for the print supplier. Test physical front/back registration and the same attendee on both sides, including partially filled final sheets. A front/back preview alone is not evidence of correct duplex imposition.
 
 Later attendee or design edits do not mutate a paid or approved print pack. Show that changes exist and offer a revised proof or a separately quoted additional batch. Proof approval and payment are independent recorded states. Recommend starting production only when the agreed payment requirement and current proof approval are both satisfied. The first release can take full payment after quote acceptance. Deposits and milestones need their own explicit design if required operationally.
 
@@ -92,6 +105,20 @@ Capture suitable details per item. Tote bags use size/material/colour/printing a
 
 Reuse made-to-order enquiries, seller-issued quotes, versioned accepted prices, payment links, receipts, refunds and physical fulfilment. Add an event-linked request/production brief around these facilities. Goods remain purchase offerings. Pure design services receive an explicit typed handler so stock, collection passes and physical-ready messages are never applied to digital files.
 
+## 6a. Relationship with the existing shop and marketplace
+
+MiPrinting should be a branded supplying shop and event-linked entry point within the unified marketplace. The marketplace already owns catalogue identity, public/private visibility, seller media, product variants, made-to-order enquiries, quotes, secure payment verification, receipts, refunds, order history and collection/delivery. Those responsibilities continue through their existing services and finance invariants.
+
+Use `Shop`, `StoreListing`, `StoreListingMedia`, `StoreMerchandise` and `StoreVariant` for the supplier catalogue and real stocked options. Link option photographs to existing seller media, adding option-level associations where absent. A printed-badge package, holders, straps, bags, pens and garments are physical goods. Made-to-order manufacturing uses the existing enquiry/quote approach with production timing. Finite ready-stock components still use genuine variant stock and reservation rules. Do not invent stock for made-to-order designs or consume a catalogue design like a physical item.
+
+Add an event print brief that references the seller/listings/options, destination event and selected template, followed by immutable proof/production records. These records extend the existing order and quote journey. MiPrinting’s staff work queue should link to existing seller quotes/orders and expose the production-specific actions appropriate to the staff member.
+
+The catalogue already recognises `listing_kind=service`, but recognition is not a complete service payment/fulfilment implementation. The current commerce registry handles purchase and reservation. Extend that typed boundary for digital-template licensing and pure design services, with explicit secure file delivery. The marketplace’s supplier, agreement, ledger and original-account rules continue to govern the transaction. Keep the buying organisation/event identity separate from the supplying shop’s tenant ownership.
+
+The design studio owns layout, front/back composition, font/name fitting and template licences. The print layer owns material compatibility, selected roster, proofs, duplex imposition and production release. The existing marketplace owns the commercial order. This keeps the organiser’s event-linked journey coherent and avoids a second payment or order-history implementation.
+
+A supplier’s approved options and photos can be browsed publicly from its storefront. Private event artwork and print rosters are accessible only through authorised briefs/orders. Later approved suppliers can use the same capabilities with their own catalogue and terms. Multi-seller checkout is not included in the initial scope.
+
 ## 7. Staff operations, data and communications
 
 The organisation's event staff see their permitted requests and proofs. MiPrinting staff have a supplier work queue, production statuses, private artwork access and appropriate order permissions. Grant the minimum access to the frozen print pack. The organiser’s event finance and payment history are not necessary to print names. Entry QR codes are optional print content. If the selected design shows a QR, the organiser explicitly chooses whether to include the real entry code in the supplier pack and reviews that choice on the proof. The pack must reflect the choice without silently changing a saved design. The supplier receives an entry QR only through that authorised, frozen print job. Never include portal login, payment, collection or delivery credentials. Public samples always use illustrative QR codes.
@@ -104,9 +131,9 @@ Transactional order and proof messages go to the organiser's requested contact, 
 
 ### M1 — Cross-event library and adaptable designs
 
-Build private organisation templates, platform catalogue, immutable published versions, safe artwork/font storage, responsive library and preview/apply/restore. Include save-from-event and field/category mapping. Deliver curated portrait and landscape compositions plus custom-size fitting. M1 releases free/private use and paid previews. Paid clean exports become available with M2’s verified entitlement flow. Preserve legacy event templates as private event-owned designs without automatic publication.
+Build private organisation templates, platform catalogue, immutable published versions, safe artwork/font storage, responsive library and preview/apply/restore. Include save-from-event and field/category mapping. Deliver curated portrait and landscape compositions plus custom-size fitting and optional front/back faces. M1 releases free/private use and paid previews. Paid clean exports become available with M2’s verified entitlement flow. Preserve legacy event templates as private event-owned designs without automatic publication.
 
-Acceptance covers cross-tenant access, restricted event staff, previous designs, publication/withdrawal, copied artwork survival after source deletion, font ownership, unsafe uploads, replaced event designs, destination ticket IDs, A4/Letter dimensions and the neonatal design in both orientations with long names.
+Acceptance covers cross-tenant access, restricted event staff, previous designs, publication/withdrawal, copied artwork survival after source deletion, font ownership, unsafe uploads, replaced event designs, destination ticket IDs, A4/Letter dimensions, front/back attendee matching and duplex slot order, and the neonatal design in both orientations with long names.
 
 ### M2 — GH₵50 access and purchase recovery
 
@@ -116,9 +143,9 @@ Acceptance covers free use, preview watermark, clean-export protection, 5,000-pe
 
 ### M3 — MiPrinting and bespoke badge design
 
-Deliver approved sample gallery, print/design briefs, event-linked staff queue, quote acceptance, server-generated proof, immutable approved print packs, payment requirement, production states and collection/delivery. Use existing quote/payment services with explicit service extensions where required. Prepare the supplier's real contact, fulfilment options, cancellation/refund terms and operating agreement before taking payable orders.
+Deliver approved sample and option-photo galleries, compatible holder/lanyard/material/strap-print choices, front/back and own-artwork uploads, print/design briefs, event-linked staff queue, quote acceptance, server-generated proof, immutable approved print packs, payment requirement, production states and collection/delivery. Use existing quote/payment services with explicit service extensions where required. Prepare the supplier's real contact, fulfilment options, cancellation/refund terms and operating agreement before taking payable orders.
 
-Acceptance covers selected attendees and blank spares, no attendee notifications, privacy/permissions, changed roster after approval, proof/version mismatch, duplicate approvals, missed deadlines, rejected proof, expired/revised quotes, payment recovery, refund cases, inaccessible private artwork, and the complete neonatal print order through collection or delivery.
+Acceptance covers selected attendees and blank spares, front/back badge versus physical-unit quantities, compatible option combinations, readable option photos, own front/back/strap artwork, frozen material/photo references, no attendee notifications, privacy/permissions, changed roster after approval, proof/version mismatch, duplicate approvals, missed deadlines, rejected proof, expired/revised quotes, payment recovery, refund cases, inaccessible private artwork, and the complete neonatal print order through collection or delivery.
 
 ### M4 — Paraphernalia and combined requests
 
