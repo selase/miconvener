@@ -62,6 +62,7 @@ final class EventBadgeController extends Controller
 
         return response()->json([
             'template' => $template,
+            'back_background' => $template->backSettings() !== null && is_string($template->backSettings()['background_path'] ?? null) ? $this->artwork->dataUri($template->backSettings()['background_disk'], $template->backSettings()['background_path']) : null,
             'ticket_types' => $eventModel->ticketTypes()->get(['id', 'name']),
             'fonts' => app(ArtifactFontRegistry::class)->catalog((string) $tenant->id, (string) $eventModel->id),
             'badge_logo' => $this->templates->badgeLogo($eventModel, $template),
@@ -102,12 +103,17 @@ final class EventBadgeController extends Controller
         }
         $validated['layout'] = $this->layouts->validate($validated['layout'], 'badge');
         $validated['orientation'] = $validated['width_mm'] > $validated['height_mm'] ? 'landscape' : 'portrait';
+        if (is_array($validated['back'] ?? null)) {
+            $validated['back']['layout'] = $this->layouts->validate($validated['back']['layout'], 'badge');
+        }
         $oldDisk = null;
         $oldPath = null;
         $newArtwork = null;
         $newLogo = null;
+        $newBack = null;
         $oldLogoDisk = null;
         $oldLogoPath = null;
+        $oldBack = null;
 
         if ($request->file('background') !== null) {
             $newArtwork = $this->artwork->store($request->file('background'), (string) $tenant->id, (string) $eventModel->id, 'badge-background');
@@ -119,6 +125,9 @@ final class EventBadgeController extends Controller
         }
 
         try {
+            if ($request->file('back_background') !== null) {
+                $newBack = $this->artwork->store($request->file('back_background'), (string) $tenant->id, (string) $eventModel->id, 'badge-background');
+            }
             if ($request->file('logo') !== null) {
                 $newLogo = $this->artwork->store($request->file('logo'), (string) $tenant->id, (string) $eventModel->id, 'badge-logo');
                 $validated['logo_disk'] = $newLogo->disk;
@@ -129,19 +138,36 @@ final class EventBadgeController extends Controller
                 $validated['logo_path'] = null;
             }
         } catch (Throwable $exception) {
+            if ($newBack !== null) {
+                $this->artwork->delete($newBack->disk, $newBack->path);
+            }
             if ($newArtwork !== null) {
                 $this->artwork->delete($newArtwork->disk, $newArtwork->path);
             }
             throw $exception;
         }
-        unset($validated['background'], $validated['remove_background'], $validated['logo'], $validated['remove_logo']);
+        unset($validated['back_background'], $validated['remove_back_background'], $validated['remove_back'], $validated['background'], $validated['remove_background'], $validated['logo'], $validated['remove_logo']);
         try {
-            $template = $template->getConnection()->transaction(function () use ($template, $validated, &$oldDisk, &$oldPath, &$oldLogoDisk, &$oldLogoPath) {
+            $template = $template->getConnection()->transaction(function () use ($request, $newBack, $template, $validated, &$oldDisk, &$oldPath, &$oldLogoDisk, &$oldLogoPath, &$oldBack) {
                 $current = $template->newQuery()->whereKey($template->id)->lockForUpdate()->firstOrFail();
                 $oldDisk = $current->background_disk;
                 $oldPath = $current->background_path;
                 $oldLogoDisk = $current->logo_disk;
                 $oldLogoPath = $current->logo_path;
+                $oldBack = $current->backSettings();
+                if ($request->boolean('remove_back')) {
+                    $validated['back'] = null;
+                } elseif (isset($validated['back'])) {
+                    $back = array_replace($current->back ?? [], $validated['back']);
+                    if ($newBack !== null) {
+                        $back['background_disk'] = $newBack->disk;
+                        $back['background_path'] = $newBack->path;
+                    } elseif ($request->boolean('remove_back_background')) {
+                        $back['background_disk'] = null;
+                        $back['background_path'] = null;
+                    }
+                    $validated['back'] = $back;
+                }
                 $current->fill($validated);
                 $current->design_version = max(1, (int) $current->design_version) + 1;
                 $current->save();
@@ -149,6 +175,9 @@ final class EventBadgeController extends Controller
                 return $current;
             }, 3);
         } catch (Throwable $exception) {
+            if ($newBack !== null) {
+                $this->artwork->delete($newBack->disk, $newBack->path);
+            }
             if ($newArtwork !== null) {
                 $this->artwork->delete($newArtwork->disk, $newArtwork->path);
             }
@@ -158,6 +187,9 @@ final class EventBadgeController extends Controller
             throw $exception;
         }
 
+        if (is_array($oldBack) && is_string($oldBack['background_disk'] ?? null) && is_string($oldBack['background_path'] ?? null) && $oldBack['background_path'] !== ($template->backSettings()['background_path'] ?? null)) {
+            $this->artwork->delete($oldBack['background_disk'], $oldBack['background_path']);
+        }
         if (is_string($oldLogoDisk) && is_string($oldLogoPath) && $oldLogoPath !== $template->logo_path) {
             $this->artwork->delete($oldLogoDisk, $oldLogoPath);
         }

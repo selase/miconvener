@@ -307,3 +307,44 @@ test('badge name fitting reserves the actual PDF font line height', function ():
     $font = $metrics->getFont('DejaVu Sans', 'bold');
     expect($metrics->getFontHeight($font, $fitted['font_size']) * 1.15)->toBeLessThanOrEqual(10 * 72 / 25.4);
 });
+
+test('duplex mirrors partial sheets across the physical paper and preserves attendee pairs', function (string $edge, float $left, float $top): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    $template->update(['width_mm' => 54, 'height_mm' => 85, 'back' => ['layout' => $template->layoutSettings()], 'sheet_settings' => ['paper' => 'a4', 'margin_mm' => 8, 'gap_mm' => 3, 'crop_marks' => true, 'duplex' => $edge]]);
+    $registration = badgePdfRegistration($event, ['full_name' => 'Sample Attendee']);
+    $html = app(BadgePdfService::class)->renderHtml($event, $template, collect([$registration]));
+    expect(mb_substr_count($html, 'class="sheet"'))->toBe(2)
+        ->and(mb_substr_count($html, 'Sample Attendee'))->toBe(2)
+        ->and($html)->toContain('left:'.$left.'mm;top:'.$top.'mm');
+    $pdf = app(BadgePdfService::class)->generate($event, $template, collect([$registration]));
+    $pdf->output();
+    expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe(2);
+})->with(['long-edge' => ['long-edge', 148.0, 8.0], 'short-edge' => ['short-edge', 8.0, 204.0]]);
+
+test('curated compositions print all five categories and long names at their actual size', function (string $composition, int $pages): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Quality Care and Nourishment for Preterm Newborns in Low-Resource Settings']);
+    $version = \App\Models\BadgeLibraryDesign::where('name', 'Spectrum lines')->firstOrFail()->versions()->firstOrFail();
+    $template = app(\App\Services\Badges\BadgeLibraryService::class)->apply($event, ['version_id' => $version->id, 'expected_version' => 1, 'composition' => $composition]);
+    $names = [
+        'Doctor' => 'Selwyn Nana Akwasi Agyeman-Ababio',
+        'Nurse' => 'Wisdom Zanetor Ahiagbede',
+        'Physician Assistant' => 'Diana Ama Yabameh',
+        'Faculty' => 'Christabel Enweronu-Laryea',
+        'Host' => 'Maame Amankwaa Ofori-Asumadu',
+    ];
+    $registrations = collect($names)->map(function (string $name, string $category) use ($event, $tenant): EventRegistration {
+        $ticket = EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => $category]);
+
+        return badgePdfRegistration($event, ['full_name' => $name, 'ticket_type_id' => $ticket->id]);
+    })->values();
+    $html = app(BadgePdfService::class)->renderHtml($event, $template, $registrations);
+    foreach ($names as $category => $name) {
+        expect($html)->toContain($name, $category);
+    }
+    $pdf = app(BadgePdfService::class)->generate($event, $template, $registrations);
+    $pdf->output();
+    expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe($pages);
+})->with(['portrait' => ['portrait', 1], 'landscape' => ['landscape', 2]]);

@@ -38,6 +38,16 @@ export default function BadgeSheetSettings({ value, onChange }) {
                     onChange={(event) => update('gap_mm', Number(event.target.value))}
                 />
             </label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Duplex flip (two-sided only)
+                <Select
+                    value={value.duplex || 'long-edge'}
+                    onChange={(event) => update('duplex', event.target.value)}
+                >
+                    <option value="long-edge">Long edge</option>
+                    <option value="short-edge">Short edge</option>
+                </Select>
+            </label>
             <label className="flex items-center gap-2 self-end pb-2 text-xs">
                 <Checkbox
                     checked={value.crop_marks}

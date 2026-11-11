@@ -23,10 +23,21 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
             'height_mm' => ['required', 'numeric', 'min:40', 'max:210'],
             'orientation' => ['required', Rule::in(['landscape', 'portrait'])],
             'layout' => ['required', 'array'],
+            'back' => ['nullable', 'required_with:back_background', 'array:layout,background_settings'],
+            'back.layout' => ['required_with:back', 'array'],
+            'back.background_settings' => ['sometimes', 'array:fit,position,visible,removed'],
+            'back.background_settings.fit' => ['sometimes', Rule::in(['stretch', 'contain', 'cover'])],
+            'back.background_settings.position' => ['sometimes', Rule::in(['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'])],
+            'back.background_settings.visible' => ['sometimes', 'boolean'],
+            'back.background_settings.removed' => ['sometimes', 'boolean'],
+            'back_background' => [Rule::prohibitedIf($this->boolean('remove_back')), 'nullable', 'file', 'max:10240', 'mimetypes:image/png,image/jpeg', 'dimensions:max_width=8000,max_height=8000'],
+            'remove_back_background' => ['sometimes', 'boolean'],
+            'remove_back' => ['sometimes', 'boolean'],
             'tier_styles' => ['nullable', 'array'],
             'tier_styles.*.background_color' => ['sometimes', 'regex:/\A#[0-9A-Fa-f]{6}\z/'],
             'tier_styles.*.text_color' => ['sometimes', 'regex:/\A#[0-9A-Fa-f]{6}\z/'],
             'sheet_settings' => ['required', 'array'],
+            'sheet_settings.duplex' => ['sometimes', Rule::in(['long-edge', 'short-edge'])],
             'sheet_settings.paper' => ['required', Rule::in(['a4', 'letter'])],
             'sheet_settings.margin_mm' => ['required', 'numeric', 'min:3', 'max:30'],
             'sheet_settings.gap_mm' => ['required', 'numeric', $this->boolean('sheet_settings.crop_marks') ? 'min:3' : 'min:0', 'max:20'],
@@ -72,7 +83,7 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        foreach (['layout', 'tier_styles', 'sheet_settings', 'background_settings'] as $key) {
+        foreach (['layout', 'tier_styles', 'sheet_settings', 'background_settings', 'back'] as $key) {
             if (is_string($this->input($key))) {
                 $this->merge([$key => json_decode((string) $this->input($key), true)]);
             }

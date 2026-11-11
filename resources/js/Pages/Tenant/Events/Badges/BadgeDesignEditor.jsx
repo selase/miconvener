@@ -18,7 +18,107 @@ const PRESETS = [
     { label: 'Portrait', width: 70, height: 100 },
 ];
 
-export default function BadgeDesignEditor({
+export default function BadgeDesignEditor(props) {
+    const [face, setFace] = useState('front');
+    const { form, setForm } = props;
+    const hasBack = Boolean(form.back) && !form.remove_back;
+    const backForm = (current) => ({
+        ...current,
+        layout: current.back?.layout || {},
+        background: current.back_background || null,
+        remove_background: current.remove_back_background || false,
+        background_settings: current.back?.background_settings || {
+            fit: 'contain',
+            position: 'center',
+        },
+    });
+    const changeBack = (updater) =>
+        setForm((current) => {
+            const before = backForm(current);
+            const next = typeof updater === 'function' ? updater(before) : updater;
+            return {
+                ...current,
+                width_mm: next.width_mm,
+                height_mm: next.height_mm,
+                orientation: next.orientation,
+                sheet_settings: next.sheet_settings,
+                tier_styles: next.tier_styles,
+                logo: next.logo,
+                logo_source: next.logo_source,
+                remove_logo: next.remove_logo,
+                back_background: next.background,
+                remove_back_background: next.remove_background,
+                back: {
+                    ...current.back,
+                    layout: next.layout,
+                    background_settings: next.background_settings,
+                },
+            };
+        });
+    const back = face === 'back' && hasBack;
+    return (
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2" aria-label="Badge faces">
+                <Button type="button" aria-pressed={!back} onClick={() => setFace('front')}>
+                    Front
+                </Button>
+                {hasBack ? (
+                    <>
+                        <Button type="button" aria-pressed={back} onClick={() => setFace('back')}>
+                            Back
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                setForm((current) => ({
+                                    ...current,
+                                    back: null,
+                                    back_background: null,
+                                    remove_back: true,
+                                }));
+                                setFace('front');
+                            }}
+                        >
+                            Remove back face
+                        </Button>
+                    </>
+                ) : (
+                    <Button
+                        type="button"
+                        onClick={() => {
+                            setForm((current) => ({
+                                ...current,
+                                remove_back: false,
+                                back: {
+                                    layout: structuredClone(current.layout),
+                                    background_settings: { fit: 'contain', position: 'center' },
+                                },
+                            }));
+                            setFace('back');
+                        }}
+                    >
+                        Add back face
+                    </Button>
+                )}
+                <span className="text-xs text-ink-secondary">
+                    {hasBack ? 'Two-sided · choose the duplex setting below' : 'Front-only'}
+                </span>
+            </div>
+            <BadgeFaceEditor
+                {...props}
+                key={back ? 'back' : 'front'}
+                form={back ? backForm(form) : form}
+                setForm={back ? changeBack : setForm}
+                existingBackground={back ? form.back?.background_path : props.existingBackground}
+                existingBackgroundUrl={
+                    back ? props.existingBackBackground : props.existingBackgroundUrl
+                }
+            />
+        </div>
+    );
+}
+
+function BadgeFaceEditor({
     form,
     layoutDefaults,
     tenantLogo,
@@ -88,6 +188,12 @@ export default function BadgeDesignEditor({
         setForm((current) => {
             const next = { ...current, [key]: value };
             if (['width_mm', 'height_mm'].includes(key))
+                next.background_settings = {
+                    ...current.background_settings,
+                    fit: 'contain',
+                    position: current.background_settings?.position || 'center',
+                };
+            if (['width_mm', 'height_mm'].includes(key))
                 next.orientation = next.width_mm > next.height_mm ? 'landscape' : 'portrait';
             return next;
         });
@@ -132,6 +238,12 @@ export default function BadgeDesignEditor({
                                 onClick={() =>
                                     setForm((current) => ({
                                         ...current,
+                                        background_settings: {
+                                            ...current.background_settings,
+                                            fit: 'contain',
+                                            position:
+                                                current.background_settings?.position || 'center',
+                                        },
                                         width_mm: preset.width,
                                         height_mm: preset.height,
                                         orientation:

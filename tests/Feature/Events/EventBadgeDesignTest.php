@@ -255,3 +255,37 @@ test('removed backgrounds survive save and reopen and can be restored', function
     $this->postJson($url, validBadgeDesign(['background_settings' => ['fit' => 'contain', 'position' => 'center', 'removed' => false, 'visible' => true]]), ['HTTP_HOST' => $host])->assertOk();
     expect($template->fresh()->backgroundSettings()['visible'])->toBeTrue();
 });
+
+test('badge back artwork and layout are independently validated and stored', function (): void {
+    Storage::fake('public');
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign();
+    $payload['back'] = ['layout' => $payload['layout'], 'background_settings' => ['fit' => 'contain', 'position' => 'center']];
+    $payload['back_background'] = UploadedFile::fake()->image('back.png', 540, 850);
+    $payload['sheet_settings']['duplex'] = 'long-edge';
+    $response = $this->actingAs($user)->post("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host]);
+    $response->assertOk()->assertJsonPath('template.back.layout.attendee_name.font_size', 22)->assertJsonPath('template.sheet_settings.duplex', 'long-edge');
+    $template = EventBadgeTemplate::where('event_id', $event->id)->firstOrFail();
+    Storage::disk('public')->assertExists($template->back['background_path']);
+    $payload['back']['background_path'] = '/arbitrary.png';
+    $this->postJson("http://{$host}/events/{$event->id}/badges/template", $payload)->assertUnprocessable();
+});
+
+test('back uploads require a back face and removed back artwork is cleaned up', function (): void {
+    Storage::fake('public');
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $url = "http://{$host}/events/{$event->id}/badges/template";
+    $payload = validBadgeDesign();
+    $payload['back_background'] = UploadedFile::fake()->image('back.png', 540, 850);
+    $this->actingAs($user)->post($url, $payload, ['HTTP_HOST' => $host, 'Accept' => 'application/json'])->assertUnprocessable();
+    $payload['back'] = ['layout' => $payload['layout']];
+    $this->post($url, $payload, ['HTTP_HOST' => $host, 'Accept' => 'application/json'])->assertOk();
+    $template = EventBadgeTemplate::where('event_id', $event->id)->firstOrFail();
+    $path = $template->backSettings()['background_path'];
+    $this->postJson($url, validBadgeDesign(['remove_back' => true]))->assertOk();
+    Storage::disk('public')->assertMissing($path);
+});
