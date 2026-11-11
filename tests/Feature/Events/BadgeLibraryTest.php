@@ -204,3 +204,8 @@ test('post-commit artwork cleanup failure cannot fail an applied design or delet
     $revision = \App\Models\BadgeDesignRevision::where('event_id', $this->event->id)->firstOrFail()->snapshotSettings();
     expect($disk->exists($revision['background_path']))->toBeTrue();
 });
+
+test('valid numeric form strings work for saving and applying a design', function (): void {
+    $saved = $this->postJson($this->base, ['name' => 'Form values', 'scope' => 'event', 'expected_version' => '1'])->assertCreated();
+    $this->postJson($this->base.'/apply', ['version_id' => $saved->json('version.id'), 'expected_version' => '1'])->assertOk()->assertJsonPath('template.design_version', 2);
+});

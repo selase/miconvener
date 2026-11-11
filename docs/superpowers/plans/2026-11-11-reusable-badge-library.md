@@ -95,4 +95,5 @@ Files include `BadgeDesignLibrary.jsx`, `BadgesPanel.jsx`, component tests and b
 - The initial baseline and first new-test run briefly overlapped on the dedicated test database and were invalidated. All subsequent PHP tests ran sequentially. A later PostgreSQL connection timeout under host load passed on rerun, followed by the clean 92-test run.
 - Source event deletion now cleans private event library versions and their artwork, while organisation-shared copies survive. Post-commit cleanup failures are reported without turning a committed application into a failure or deleting its newly stored copies.
 - A generic design preserves the destination event's reviewed category labels when the source has no matching labels. An explicit source match or organiser edit remains visible before replacement.
+- Valid numeric form strings are normalised before optimistic-version comparison. The regression failed with a server error first, then passed with save/apply/restore/replacement checks (five tests, 20 assertions).
 - Work is submitted for review with no merge or production deployment in this task.

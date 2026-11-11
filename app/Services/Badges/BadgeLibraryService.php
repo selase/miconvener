@@ -46,7 +46,7 @@ final class BadgeLibraryService
         try {
             return $template->getConnection()->transaction(function () use ($template, $event, $input, &$files): BadgeLibraryVersion {
                 $current = $template->newQuery()->whereKey($template->id)->lockForUpdate()->firstOrFail();
-                $this->assertVersion($current, $input['expected_version']);
+                $this->assertVersion($current, (int) $input['expected_version']);
                 $design = isset($input['design_id']) ? $this->visible($event)->whereKey($input['design_id'])->lockForUpdate()->firstOrFail() : null;
                 if ($design !== null && ($design->tenant_id !== ($input['scope'] === 'platform' ? null : $event->tenant_id) || $design->scope !== $input['scope'])) {
                     throw ValidationException::withMessages(['design_id' => 'Save a new design to change its sharing scope.']);
@@ -99,7 +99,7 @@ final class BadgeLibraryService
         try {
             return $template->getConnection()->transaction(function () use ($event, $template, $snapshot, $revision, $input, &$files): EventBadgeTemplate {
                 $current = $template->newQuery()->whereKey($template->id)->lockForUpdate()->firstOrFail();
-                $this->assertVersion($current, $input['expected_version']);
+                $this->assertVersion($current, (int) $input['expected_version']);
                 $cleanup = app(\App\Services\Design\ArtifactArtworkCleanup::class);
                 $oldAssets = $cleanup->assets($current);
                 $previous = $this->snapshot($event, $current);
