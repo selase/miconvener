@@ -209,3 +209,16 @@ test('valid numeric form strings work for saving and applying a design', functio
     $saved = $this->postJson($this->base, ['name' => 'Form values', 'scope' => 'event', 'expected_version' => '1'])->assertCreated();
     $this->postJson($this->base.'/apply', ['version_id' => $saved->json('version.id'), 'expected_version' => '1'])->assertOk()->assertJsonPath('template.design_version', 2);
 });
+
+test('applying another design keeps immutable artwork available to an in-flight badge render', function (): void {
+    \Illuminate\Support\Facades\Storage::fake('public');
+    \Illuminate\Support\Facades\Storage::fake('local');
+    $artwork = app(\App\Services\Design\ArtifactArtworkService::class);
+    $asset = $artwork->store(\Illuminate\Http\UploadedFile::fake()->image('original.png', 540, 850), $this->tenant->id, $this->event->id, 'badge-background');
+    $this->design->update(['background_disk' => $asset->disk, 'background_path' => $asset->path]);
+    $renderSnapshot = $this->design->fresh();
+    $expected = $artwork->dataUri($renderSnapshot->background_disk, $renderSnapshot->background_path);
+    $version = \App\Models\BadgeLibraryDesign::where('name', 'Essential')->firstOrFail()->versions()->firstOrFail();
+    $this->postJson($this->base.'/apply', ['version_id' => $version->id, 'expected_version' => 1])->assertOk();
+    expect($artwork->dataUri($renderSnapshot->background_disk, $renderSnapshot->background_path))->toBe($expected);
+});

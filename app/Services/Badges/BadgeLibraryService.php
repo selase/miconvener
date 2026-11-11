@@ -104,7 +104,13 @@ final class BadgeLibraryService
                 $oldAssets = $cleanup->assets($current);
                 $previous = $this->snapshot($event, $current);
                 $previous['sheet_settings']['category_labels'] = $current->sheetSettings()['category_labels'];
-                $previous = $this->copyAssets($previous, (string) $event->tenant_id, $files);
+                if (! in_array($current->logo_source, ['custom', 'none'], true) && is_string($previous['logo_path'] ?? null)) {
+                    $logo = $this->copyAssets([
+                        'logo_disk' => $previous['logo_disk'],
+                        'logo_path' => $previous['logo_path'],
+                    ], (string) $event->tenant_id, $files);
+                    $previous = array_replace($previous, $logo);
+                }
                 $next = array_replace($this->templates->defaults($event), [
                     'background_disk' => null, 'background_path' => null,
                     'logo_disk' => null, 'logo_path' => null, 'logo_source' => 'organization',
