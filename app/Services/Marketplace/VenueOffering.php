@@ -175,6 +175,11 @@ final class VenueOffering implements CommerceOffering
         }
     }
 
+    public function refundAllocation(StoreOrder $order, StorePaymentObservation $capture, bool $sale): CommerceRefundAllocation
+    {
+        return CommerceRefundAllocation::merchant($order, $capture, $sale);
+    }
+
     public function applyRefund(StoreRefund $refund, StoreOrder $order): void
     {
         $charge = $this->charge($order);

@@ -63,6 +63,13 @@ final class StoreBalance
     public function refundBacked(StoreRefund $refund): bool
     {
         $seller = $refund->order->tenant;
+        if ($refund->order->offering_type === 'badge_template') {
+            $reserved = StoreRefund::query()->where('tenant_id', $seller->id)->whereKeyNot($refund->id)
+                ->where('status', '<>', 'confirmed')->whereHas('order', fn ($query) => $query->where('offering_type', 'badge_template'))
+                ->sum('amount_pesewas');
+
+            return $this->account($seller, LedgerAccount::CODE_TEMPLATE_REFUND_RESERVE) - $reserved >= $refund->amount_pesewas;
+        }
         $bufferRequired = $refund->amount_pesewas - $refund->seller_debit_pesewas - $refund->review_liability_pesewas;
 
         return $refund->seller_debit_pesewas <= $this->available($seller, excludeRefund: $refund->id, forRefund: true)

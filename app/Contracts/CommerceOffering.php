@@ -68,6 +68,8 @@ interface CommerceOffering
      */
     public function assertRefund(StoreOrder $order): void;
 
+    public function refundAllocation(StoreOrder $order, StorePaymentObservation $capture, bool $sale): \App\Services\Marketplace\CommerceRefundAllocation;
+
     /**
      * Apply a confirmed refund's effect on the order.
      */

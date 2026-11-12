@@ -58,6 +58,8 @@ final class LedgerService
         ];
 
         if ($category === LedgerCategoryEnum::Commerce) {
+            $definitions[LedgerAccount::CODE_TEMPLATE_REVENUE] = ['name' => 'Platform Badge Template Revenue', 'type' => LedgerAccount::TYPE_REVENUE];
+            $definitions[LedgerAccount::CODE_TEMPLATE_REFUND_RESERVE] = ['name' => 'Platform Template Refund Cash Reserve', 'type' => LedgerAccount::TYPE_ASSET];
             $definitions[LedgerAccount::CODE_BUYER_REFUNDS] = ['name' => 'Buyer Refund Liability', 'type' => LedgerAccount::TYPE_LIABILITY];
             $definitions[LedgerAccount::CODE_SECURITY_DEPOSITS] = ['name' => 'Refundable Security Deposits', 'type' => LedgerAccount::TYPE_LIABILITY];
         }
@@ -527,6 +529,33 @@ final class LedgerService
         return $transaction;
     }
 
+    public function recordBadgeTemplateSale(\App\Models\StoreOrder $order, \App\Models\StorePaymentAttempt $attempt, \App\Models\StorePaymentObservation $capture): LedgerTransaction
+    {
+        $order = \App\Models\StoreOrder::query()->findOrFail($order->id);
+        $attempt = \App\Models\StorePaymentAttempt::query()->findOrFail($attempt->id);
+        $capture = \App\Models\StorePaymentObservation::query()->findOrFail($capture->id);
+        if ($order->offering_type !== 'badge_template' || ! \App\Models\BadgeTemplatePurchase::query()->where('order_id', $order->id)->exists()
+            || $attempt->order_id !== $order->id || $capture->order_id !== $order->id || $capture->attempt_id !== $attempt->id
+            || $order->provider !== 'paystack' || $attempt->provider !== $order->provider
+            || $order->settlement_mode !== 'platform_default' || $attempt->settlement_mode !== $order->settlement_mode
+            || ! hash_equals($order->account_fingerprint, $attempt->account_fingerprint)
+            || $capture->integrity_errors !== [] || ! $capture->account_matches || ! $capture->reference_matches
+            || $capture->reference !== $attempt->reference || ! hash_equals($order->account_fingerprint, $capture->account_fingerprint)
+            || $order->currency !== 'GHS' || $capture->currency !== 'GHS' || $attempt->currency !== 'GHS'
+            || $order->charged_pesewas !== 5000 || $order->platform_fee_pesewas !== 0 || $capture->amount_pesewas !== 5000
+            || $attempt->amount_pesewas !== 5000 || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas >= 5000) {
+            throw new InvalidArgumentException('Template sales require the original verified GH₵50 capture.');
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => 5000 - $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_TEMPLATE_REVENUE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => 5000],
+        ];
+
+        return $this->postTransaction($order->tenant, null, 'badge_template_sale', 'Badge template licence '.$order->id, $attempt->reference,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
     /** @param array<string, mixed> $verifiedAmounts */
     public function recordStoreSale(\App\Models\StoreOrder $order, \App\Models\StorePaymentAttempt $attempt, array $verifiedAmounts): LedgerTransaction
     {
@@ -575,8 +604,38 @@ final class LedgerService
             array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, $order->currency, LedgerCategoryEnum::Commerce);
     }
 
+    public function recordBadgeTemplateRefund(\App\Models\StoreRefund $refund): LedgerTransaction
+    {
+        $refund = \App\Models\StoreRefund::query()->with(['order', 'observation'])->findOrFail($refund->id);
+        $capture = $refund->observation;
+        if ($refund->order->offering_type !== 'badge_template' || $refund->provider_status !== 'processed' || $refund->provider_processed_at === null
+            || $capture === null || ! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS'
+            || $capture->order_id !== $refund->order_id || $capture->attempt_id !== $refund->attempt_id
+            || $refund->amount_pesewas < 1 || $refund->amount_pesewas !== $capture->amount_pesewas
+            || ! hash_equals($refund->account_fingerprint, $capture->account_fingerprint)
+            || $refund->seller_debit_pesewas !== 0 || $refund->commission_return_pesewas !== 0 || $refund->restock || $refund->fee_bearer !== 'platform') {
+            throw new InvalidArgumentException('Digital refunds require full verified original-account completion.');
+        }
+        $source = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $refund->tenant_id)
+            ->where('category', LedgerCategoryEnum::Commerce->value)->findOrFail($capture->ledger_transaction_id);
+        if (! in_array($source->transaction_type, ['badge_template_sale', 'commerce_capture_review'], true)) {
+            throw new InvalidArgumentException('The digital capture has no refundable accounting source.');
+        }
+        $entries = [
+            ['code' => $source->transaction_type === 'badge_template_sale' ? LedgerAccount::CODE_TEMPLATE_REVENUE : LedgerAccount::CODE_BUYER_REFUNDS,
+                'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->amount_pesewas],
+            ['code' => LedgerAccount::CODE_TEMPLATE_REFUND_RESERVE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->amount_pesewas],
+        ];
+
+        return $this->postTransaction($refund->order->tenant, null, 'badge_template_refund', 'Badge template refund '.$refund->id,
+            'badge-template-refund:'.$refund->operation_key, $entries, null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
     public function recordStoreRefund(\App\Models\StoreRefund $refund): LedgerTransaction
     {
+        if (\App\Models\StoreOrder::query()->whereKey($refund->order_id)->value('offering_type') === 'badge_template') {
+            return $this->recordBadgeTemplateRefund($refund);
+        }
         $capture = $refund->observation;
         if ($refund->amount_pesewas < 1 || $refund->provider_status !== 'processed' || $refund->provider_processed_at === null || $capture === null
             || $capture->order_id !== $refund->order_id || $capture->attempt_id !== $refund->attempt_id || $capture->amount_pesewas !== $refund->amount_pesewas

@@ -44,6 +44,10 @@ final class LedgerAccount extends Model
 
     public const CODE_PLATFORM_REVENUE = '4000'; // Revenue
 
+    public const CODE_TEMPLATE_REVENUE = '4010';
+
+    public const CODE_TEMPLATE_REFUND_RESERVE = '1020';
+
     public const CODE_GATEWAY_FEES = '5000';     // Expense
 
     protected $connection = 'landlord';

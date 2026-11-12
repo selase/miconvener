@@ -2,7 +2,7 @@
 
 > **For agentic workers** use `superpowers:executing-plans` for the native implementation, task by task. Track each step in its implementation commit. Use test-first development and one focused whole-change review before merge.
 
-**Status** Awaiting owner review. This document authorises planning only.
+**Status** Owner approved native implementation and recommendations on 12 November 2026. Implementation in progress. Merge, production setup and activation retain their explicit release gates.
 
 **Goal** Sell a reusable design-family licence for GH₵50 per event, with unlimited edits and reprints, through the badge library.
 
@@ -97,11 +97,11 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 
 **Lock order** Seller tenant, buyer tenant when distinct, order, licence slot and use/refund claim. Always take seller before buyer for digital orders. Existing goods/venue ordering stays intact. Badge edit/export operations lock only the event template then licence slot, and never request a tenant/order lock afterwards. Licence issuance never waits for the template. Document and test this acyclic order before coding the writers.
 
-- [ ] Add failing `BadgeTemplateAccountingTest.php` and extend `CommerceOfferingDispatchTest.php`. Assert exact 5,000 sale journal, provider fee, zero merchant payable/commission, digital exclusion from payouts, review-liability journal, balanced refund and original-account matching. Unknown types still fail closed.
-- [ ] Run and record failures.
-- [ ] Implement offering/lock/accounting hooks, scoped agreement validation and platform-reserve policy. Preserve original merchandise/venue journal allocations and permission checks.
-- [ ] Run affected Marketplace accounting, dispatch, reference, refund and payout tests. Require unchanged existing assertions.
-- [ ] Commit and tick.
+- [x] Add failing `BadgeTemplateAccountingTest.php` and extend `CommerceOfferingDispatchTest.php`. Assert exact 5,000 sale journal, provider fee, zero merchant payable/commission, digital exclusion from payouts, review-liability journal, balanced refund and original-account matching. Unknown types still fail closed.
+- [x] Run and record failures.
+- [x] Implement offering/lock/accounting hooks, scoped agreement validation and platform-reserve policy. Preserve original merchandise/venue journal allocations and permission checks.
+- [x] Run affected Marketplace accounting, dispatch, reference, refund and payout tests. Require unchanged existing assertions.
+- [x] Commit and tick.
 
 ### Task 3 — Authorised purchase creation and explicit checkout
 
