@@ -192,6 +192,20 @@ export default function BadgeTemplatePurchase({
             ) : (
                 <>
                     <p className="text-sm">{purchase.terms.event_name} · GH₵50 total</p>
+                    <dl className="space-y-2 border border-border p-3 text-sm">
+                        <div>
+                            <dt className="font-medium">Seller</dt>
+                            <dd>{purchase.terms.seller_name}</dd>
+                        </div>
+                        <div>
+                            <dt className="font-medium">Support</dt>
+                            <dd>{purchase.terms.support_contact}</dd>
+                        </div>
+                        <div>
+                            <dt className="font-medium">Receipt terms</dt>
+                            <dd>{purchase.terms.receipt_terms}</dd>
+                        </div>
+                    </dl>
                     <p className="text-sm">{purchase.terms.licence}</p>
                     <p className="text-sm text-ink-secondary">{purchase.terms.refund_terms}</p>
                     <label className="flex gap-2 text-sm">

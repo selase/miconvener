@@ -163,3 +163,10 @@ test('platform finance can approve a digital refund through the real desk while 
     expect(App\Models\StoreRefund::query()->where('order_id', $this->purchase->order_id)->count())->toBe(1);
     Http::assertNothingSent();
 });
+
+test('platform digital finance actions use the accessible high contrast button treatment', function (): void {
+    $this->actingAs($this->actor)->get('/admin/badge-template-sales')->assertOk()
+        ->assertSee('<button class="btn btn-sm btn-light-dark">Verify original payment</button>', false)
+        ->assertSee('<button class="btn btn-sm btn-light-dark">Approve full refund</button>', false);
+    expect(file_get_contents(resource_path('views/admin/badge-template-sales.blade.php')))->not->toContain('btn-light-warning');
+});

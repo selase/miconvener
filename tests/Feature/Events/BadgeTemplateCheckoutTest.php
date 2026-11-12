@@ -255,3 +255,33 @@ test('platform sales history does not borrow a newer purchases licence status or
         ->assertSee('cancelled · Licence cancelled')
         ->assertSee('No clean output requested · Purchase '.$purchase->id);
 });
+
+test('an expired definitively refused initialization permits a fresh paid design quote', function (): void {
+    Illuminate\Support\Facades\Http::preventStrayRequests();
+    Illuminate\Support\Facades\Http::fake([
+        '*api.paystack.co/customer*' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => ['customer_code' => 'CUS_BADGE', 'email' => 'buyer@example.test']]),
+        '*api.paystack.co/transaction/initialize' => Illuminate\Support\Facades\Http::response(['status' => false, 'message' => 'Invalid Email Address Passed'], 400),
+    ]);
+    $service = app(BadgeTemplatePurchases::class);
+    $first = $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $this->actingAs($this->actor);
+    $session = app('session.store');
+    $session->put(proofFor('buyer@example.test'));
+    $attempt = app(App\Services\Marketplace\StorePayments::class)->start($first->order, $session, (string) Str::uuid(), $first->order->terms_hash);
+    expect($attempt->status)->toBe('failed')->and($first->order->fresh()->state)->toBe('awaiting_payment');
+    $this->travel(11)->minutes();
+    $next = $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    expect($next->id)->not->toBe($first->id)->and($first->fresh()->state)->toBe('cancelled')->and($next->state)->toBe('pending');
+});
+
+test('another authorised payer can replace an expired untouched design quote', function (): void {
+    $service = app(BadgeTemplatePurchases::class);
+    $first = $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $other = User::factory()->create(['tenant_id' => $this->buyer->id]);
+    $this->buyer->users()->attach($other->id);
+    $other->assignRole('Org Superadmin');
+    $this->travel(11)->minutes();
+    $next = $service->quote($this->event, $this->version, $other, 'other-payer@example.test', (string) Str::uuid());
+    expect($next->id)->not->toBe($first->id)->and($first->fresh()->state)->toBe('cancelled')
+        ->and($next->order->buyer_email)->toBe('other-payer@example.test')->and($first->order->fresh()->buyer_email)->toBe('buyer@example.test');
+});

@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BadgeDesignLibrary from '@/Pages/Tenant/Events/Badges/BadgeDesignLibrary';
 import csrfFetch from '@/lib/csrfFetch';
 vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn() }));
+vi.mock('@/Pages/Tenant/Events/Badges/BadgeTemplatePurchase', () => ({
+    default: ({ draft }) => <output data-testid="paid-draft">{JSON.stringify(draft)}</output>,
+}));
 const json = (body) => ({ ok: true, json: async () => body });
 const design = {
     id: 'design',
@@ -171,4 +174,92 @@ it('keeps this event’s reviewed category labels when a generic design has no m
     expect((await screen.findByRole('textbox', { name: 'In-person doctor ticket' })).value).toBe(
         'Doctor'
     );
+});
+
+it('shares composition attendee and category choices with paid previews and application', async () => {
+    const paid = {
+        ...design,
+        scope: 'platform',
+        price_pesewas: 5000,
+        purchased: true,
+        versions: [{ ...design.versions[0], compositions: ['portrait', 'landscape'] }],
+    };
+    csrfFetch.mockImplementation((url, options) =>
+        Promise.resolve(
+            json(
+                options
+                    ? { template: {} }
+                    : url.includes('preview')
+                      ? {
+                            preview_image: 'data:image/png;base64,c2FtcGxl',
+                            preview_settings: url.includes('composition=landscape')
+                                ? { width_mm: 85, height_mm: 54 }
+                                : { width_mm: 54, height_mm: 85 },
+                        }
+                      : url.includes('draft')
+                        ? { draft: null }
+                        : { designs: [paid], revisions: [], can_purchase: true }
+            )
+        )
+    );
+    render(
+        <BadgeDesignLibrary
+            event={{ id: 'event' }}
+            template={{ design_version: 1 }}
+            ticketTypes={[{ id: 'nurse', name: 'Nurse' }]}
+            badges={[
+                {
+                    id: 'first',
+                    full_name: 'First attendee',
+                    ticket_type_id: 'nurse',
+                    ticket_type_name: 'Nurse',
+                },
+                {
+                    id: 'second',
+                    full_name: 'Second attendee',
+                    ticket_type_id: 'nurse',
+                    ticket_type_name: 'Nurse',
+                },
+            ]}
+            onApplied={onApplied}
+        />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Conference' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Landscape composition' }));
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Preview attendee' }), {
+        target: { value: 'second' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nurse' }), {
+        target: { value: 'Faculty' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Update watermarked preview' }));
+    await waitFor(() =>
+        expect(
+            csrfFetch.mock.calls.some(
+                ([url]) =>
+                    url.includes('sample_name=Second+attendee') &&
+                    url.includes('sample_category=Faculty') &&
+                    url.includes('composition=landscape')
+            )
+        ).toBe(true)
+    );
+    expect(JSON.parse(screen.getByTestId('paid-draft').textContent)).toMatchObject({
+        composition: 'landscape',
+        width_mm: 85,
+        height_mm: 54,
+        category_labels: { nurse: 'Faculty' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply purchased design to this event' }));
+    await waitFor(() => expect(onApplied).toHaveBeenCalled());
+    const payload = JSON.parse(
+        csrfFetch.mock.calls.find(
+            ([url, options]) => url.includes('.apply') && options?.method === 'POST'
+        )[1].body
+    );
+    expect(payload).toMatchObject({
+        composition: 'landscape',
+        width_mm: 85,
+        height_mm: 54,
+        category_labels: { nurse: 'Faculty' },
+    });
 });

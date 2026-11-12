@@ -240,3 +240,15 @@ test('one paid event licence prints fifty nine badges on A4 in portrait duplex a
     expect(BadgeTemplatePurchase::query()->where('event_id', $this->event->id)->count())->toBe(1)
         ->and(BadgeTemplateUse::query()->where('purchase_id', $this->purchase->id)->count())->toBe(4);
 });
+
+test('paid landscape previews return safe selected composition dimensions without raw artwork', function (): void {
+    $snapshot = app(App\Services\Badges\BadgeLibraryService::class)->snapshot($this->event, $this->template);
+    $portrait = [...$snapshot, 'width_mm' => 54, 'height_mm' => 85, 'orientation' => 'portrait'];
+    $landscape = [...$snapshot, 'width_mm' => 85, 'height_mm' => 54, 'orientation' => 'landscape'];
+    $version = $this->purchase->version->design->versions()->create(['version' => 2, 'snapshot' => [...$portrait, 'compositions' => ['portrait' => $portrait, 'landscape' => $landscape]]]);
+    $host = eventSubdomainHost($this->tenant->slug);
+    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host])
+        ->getJson("http://{$host}/events/{$this->event->id}/badges/library/versions/{$version->id}?composition=landscape")
+        ->assertOk()->assertJsonPath('preview_settings.width_mm', 85)->assertJsonPath('preview_settings.height_mm', 54)
+        ->assertJsonMissingPath('template')->assertJsonMissingPath('background');
+});

@@ -104,8 +104,14 @@ export default function BadgeDesignLibrary({
             setComposition(nextComposition);
             setPreviewFace('front');
             setSize({
-                width_mm: result.template?.width_mm || version.width_mm,
-                height_mm: result.template?.height_mm || version.height_mm,
+                width_mm:
+                    result.template?.width_mm ||
+                    result.preview_settings?.width_mm ||
+                    version.width_mm,
+                height_mm:
+                    result.template?.height_mm ||
+                    result.preview_settings?.height_mm ||
+                    version.height_mm,
             });
             const labels = {};
             for (const ticket of ticketTypes) {
@@ -116,7 +122,7 @@ export default function BadgeDesignLibrary({
                 );
                 if (matches.length === 1) labels[ticket.id] = matches[0].label;
             }
-            setMapping(labels);
+            if (selected?.id !== design.id) setMapping(labels);
         });
     const save = () =>
         run(async () => {
@@ -520,6 +526,65 @@ export default function BadgeDesignLibrary({
                     >
                         {selected.name}
                     </h3>
+                    <div className="flex flex-wrap gap-3">
+                        {(selected.versions[0]?.compositions || []).map((option) => (
+                            <Button
+                                key={option}
+                                disabled={busy}
+                                aria-pressed={composition === option}
+                                onClick={() => choose(selected, option)}
+                            >
+                                {option === 'portrait'
+                                    ? 'Portrait composition'
+                                    : 'Landscape composition'}
+                            </Button>
+                        ))}
+                        {!preview.preview_image && displayTemplate?.back && (
+                            <Select
+                                aria-label="Preview face"
+                                value={previewFace}
+                                onChange={(e) => setPreviewFace(e.target.value)}
+                            >
+                                <option value="front">Front</option>
+                                <option value="back">Back</option>
+                            </Select>
+                        )}
+                    </div>
+                    {badges.length > 0 && (
+                        <label className="block max-w-sm text-sm">
+                            Preview attendee
+                            <Select value={attendee} onChange={(e) => setAttendee(e.target.value)}>
+                                {badges.map((badge) => (
+                                    <option value={badge.id} key={badge.id}>
+                                        {badge.full_name}
+                                    </option>
+                                ))}
+                            </Select>
+                        </label>
+                    )}
+                    {ticketTypes.length > 0 && (
+                        <fieldset className="grid gap-3 sm:grid-cols-2">
+                            <legend className="mb-2 text-sm font-semibold">
+                                Printed category labels for this event
+                            </legend>
+                            {ticketTypes.map((ticket) => (
+                                <label key={ticket.id} className="text-sm">
+                                    {ticket.name}
+                                    <Input
+                                        value={mapping[ticket.id] || ''}
+                                        placeholder={ticket.name}
+                                        maxLength={80}
+                                        onChange={(e) =>
+                                            setMapping((value) => ({
+                                                ...value,
+                                                [ticket.id]: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </label>
+                            ))}
+                        </fieldset>
+                    )}
                     {preview.preview_image ? (
                         <>
                             <img
@@ -573,7 +638,10 @@ export default function BadgeDesignLibrary({
                                                 ...size,
                                                 sample_name:
                                                     previewBadge?.full_name || 'Sample attendee',
-                                                sample_category: 'Participant',
+                                                sample_category:
+                                                    mapping[previewBadge?.ticket_type_id] ||
+                                                    previewBadge?.ticket_type_name ||
+                                                    'Participant',
                                             });
                                             setPreview(result);
                                         })
@@ -630,45 +698,6 @@ export default function BadgeDesignLibrary({
                         </>
                     ) : (
                         <>
-                            <div className="flex flex-wrap gap-3">
-                                {(selected.versions[0]?.compositions || []).map((option) => (
-                                    <Button
-                                        key={option}
-                                        disabled={busy}
-                                        aria-pressed={composition === option}
-                                        onClick={() => choose(selected, option)}
-                                    >
-                                        {option === 'portrait'
-                                            ? 'Portrait composition'
-                                            : 'Landscape composition'}
-                                    </Button>
-                                ))}
-                                {displayTemplate?.back && (
-                                    <Select
-                                        aria-label="Preview face"
-                                        value={previewFace}
-                                        onChange={(e) => setPreviewFace(e.target.value)}
-                                    >
-                                        <option value="front">Front</option>
-                                        <option value="back">Back</option>
-                                    </Select>
-                                )}
-                            </div>
-                            {badges.length > 0 && (
-                                <label className="block max-w-sm text-sm">
-                                    Preview attendee
-                                    <Select
-                                        value={attendee}
-                                        onChange={(e) => setAttendee(e.target.value)}
-                                    >
-                                        {badges.map((badge) => (
-                                            <option value={badge.id} key={badge.id}>
-                                                {badge.full_name}
-                                            </option>
-                                        ))}
-                                    </Select>
-                                </label>
-                            )}
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div className="mx-auto w-full max-w-[240px]">
                                     <p className="mb-2 text-sm text-ink-secondary">
@@ -727,29 +756,6 @@ export default function BadgeDesignLibrary({
                                 paper. Background artwork uses Contain when resizing. Review the fit
                                 before applying.
                             </p>
-                            {ticketTypes.length > 0 && (
-                                <fieldset className="grid gap-3 sm:grid-cols-2">
-                                    <legend className="mb-2 text-sm font-semibold">
-                                        Printed category labels for this event
-                                    </legend>
-                                    {ticketTypes.map((ticket) => (
-                                        <label key={ticket.id} className="text-sm">
-                                            {ticket.name}
-                                            <Input
-                                                value={mapping[ticket.id] || ''}
-                                                placeholder={ticket.name}
-                                                maxLength={80}
-                                                onChange={(e) =>
-                                                    setMapping((value) => ({
-                                                        ...value,
-                                                        [ticket.id]: e.target.value,
-                                                    }))
-                                                }
-                                            />
-                                        </label>
-                                    ))}
-                                </fieldset>
-                            )}
                             <p className="text-sm text-ink-secondary">
                                 Replace this event’s saved design? The current design will remain
                                 available in Saved revisions.

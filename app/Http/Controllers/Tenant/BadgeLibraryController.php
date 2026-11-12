@@ -89,15 +89,21 @@ final class BadgeLibraryController extends Controller
     {
         $event = $this->event($event, 'read badge-template');
         $version = $this->library->visibleVersion($event, $version);
-        if (app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id) !== []) {
-            return response()->json(['preview_image' => $this->library->previewImage($version->snapshotSettings(), true, [...$request->validated(), 'tenant_id' => $event->tenant_id])])->header('Cache-Control', 'private, no-store');
-        }
         $snapshot = $version->snapshotSettings();
         $composition = $request->query('composition');
         if (is_string($composition) && isset($snapshot['compositions'][$composition])) {
             $snapshot = $snapshot['compositions'][$composition];
         }
         unset($snapshot['compositions']);
+        if (app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id) !== []) {
+            return response()->json([
+                'preview_image' => $this->library->previewImage($snapshot, true, [...$request->validated(), 'tenant_id' => $event->tenant_id]),
+                'preview_settings' => [
+                    'width_mm' => (float) ($request->validated('width_mm') ?? $snapshot['width_mm']),
+                    'height_mm' => (float) ($request->validated('height_mm') ?? $snapshot['height_mm']),
+                ],
+            ])->header('Cache-Control', 'private, no-store');
+        }
         $template = new EventBadgeTemplate(array_intersect_key($snapshot, array_flip(BadgeLibraryService::FIELDS)));
         $background = is_string($template->background_disk) && is_string($template->background_path) ? app(ArtifactArtworkService::class)->dataUri($template->background_disk, $template->background_path) : null;
         $logo = app(BadgeTemplateService::class)->badgeLogo($event, $template);

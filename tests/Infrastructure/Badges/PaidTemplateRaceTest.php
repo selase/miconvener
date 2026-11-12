@@ -179,8 +179,12 @@ test('two purchasers of the same event design share one pending licence quote', 
     App\Models\StoreCommercialAgreement::factory()->create(['tenant_id' => $seller->id, 'shop_id' => $purchase->order->shop_id, 'version' => 2, 'offering_scope' => 'badge_template', 'percentage' => '0.00', 'refund_gateway_fee_bearer' => 'platform', 'account_fingerprint' => hash('sha256', app(App\Services\Giving\GivingGateways::class)->platformIdentity())]);
     $purchase->event->tenant->features()->create(['feature_key' => 'paid_badge_templates', 'enabled' => true]);
     app(App\Services\Finance\LedgerService::class)->postTransaction($seller, null, 'badge_template_reserve_funding', 'Synthetic race reserve', 'race-reserve', [['code' => '1020', 'direction' => 'debit', 'amount' => 10000], ['code' => '1010', 'direction' => 'credit', 'amount' => 10000]], null, 'GHS', App\Enum\LedgerCategoryEnum::Commerce);
+    $otherBuyer = App\Models\User::factory()->create(['tenant_id' => $purchase->buyer_tenant_id]);
+    $otherBuyer->tenants()->attach($purchase->buyer_tenant_id);
+    setPermissionsTeamId($purchase->buyer_tenant_id);
+    $otherBuyer->givePermissionTo('purchase badge-templates');
     $job = ['action' => 'quote', 'event' => $purchase->event_id, 'version' => $purchase->version_id, 'seller' => $seller->id, 'actor' => $buyer->id];
-    $results = paidBadgeRace($purchase->event_id, [[...$job, 'key' => (string) Illuminate\Support\Str::uuid()], [...$job, 'key' => (string) Illuminate\Support\Str::uuid()]]);
+    $results = paidBadgeRace($purchase->event_id, [[...$job, 'key' => (string) Illuminate\Support\Str::uuid()], [...$job, 'actor' => $otherBuyer->id, 'key' => (string) Illuminate\Support\Str::uuid()]]);
     expect($results[0])->toBe($results[1])->and(BadgeTemplatePurchase::query()->where('state', 'pending')->count())->toBe(1);
 });
 

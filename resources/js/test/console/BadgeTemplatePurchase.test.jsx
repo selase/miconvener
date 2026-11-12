@@ -173,3 +173,36 @@ it('rotates the payment key only after a definitive failed initialisation', asyn
         .map(([, options]) => JSON.parse(options.body).operation_key);
     expect(keys[0]).not.toBe(keys[1]);
 });
+
+it('shows the frozen seller and support terms before purchase acceptance', async () => {
+    csrfFetch.mockImplementation((url) =>
+        Promise.resolve(
+            json(
+                url.includes('payer')
+                    ? { verified_email: 'payer@example.test' }
+                    : url.includes('draft')
+                      ? { draft: null }
+                      : {
+                            purchase_id: 'purchase',
+                            state: 'pending',
+                            terms_hash: 'hash',
+                            version_id: 'version',
+                            terms: {
+                                event_name: 'Conference',
+                                licence: 'One event licence',
+                                refund_terms: 'Seven days unused',
+                                seller_name: 'MiConvener Design Studio',
+                                support_contact: 'designs@example.test',
+                                receipt_terms: 'Approved receipt terms for this test',
+                            },
+                        }
+            )
+        )
+    );
+    render(<BadgeTemplatePurchase {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Review GH₵50 purchase' }));
+    expect(await screen.findByText('MiConvener Design Studio')).toBeTruthy();
+    expect(screen.getByText('designs@example.test')).toBeTruthy();
+    expect(screen.getByText('Approved receipt terms for this test')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Pay GH₵50' }).disabled).toBe(true);
+});

@@ -21,7 +21,7 @@
             <p>Payment {{ $attempt->reference }} · {{ $attempt->status }}</p>
             <form method="POST" action="{{ route('admin.badge-template-sales.update', $purchase->id) }}" class="mb-4">
                 @csrf<input type="hidden" name="action" value="verify"><input type="hidden" name="attempt_id" value="{{ $attempt->id }}"><input type="hidden" name="operation_key" value="{{ Str::uuid() }}"><input type="hidden" name="reason" value="Finance verification">
-                <button class="btn btn-sm btn-light-primary">Verify original payment</button>
+                <button class="btn btn-sm btn-light-dark">Verify original payment</button>
             </form>
             @foreach($attempt->observations as $capture)
             <p>{{ $capture->processing_state }} · {{ $capture->currency }} {{ number_format(($capture->amount_pesewas ?? 0) / 100, 2) }} · {{ $capture->review_reason }}</p>
@@ -30,7 +30,7 @@
                 @csrf<input type="hidden" name="action" value="refund"><input type="hidden" name="capture_id" value="{{ $capture->id }}"><input type="hidden" name="operation_key" value="{{ Str::uuid() }}">
                 <label>Reason for full refund<input class="form-control" name="reason" required maxlength="500"></label>
                 <label class="form-check"><input class="form-check-input" type="checkbox" name="exception" value="1"><span class="form-check-label">Approve a support exception for a used or older licence. This is audited.</span></label>
-                <button class="btn btn-sm btn-light-danger">Approve full refund</button>
+                <button class="btn btn-sm btn-light-dark">Approve full refund</button>
             </form>
             @endif
             @endforeach
@@ -42,9 +42,9 @@
             <form method="POST" action="{{ route('admin.badge-template-sales.update', $purchase->id) }}" class="d-grid gap-3">
                 @csrf<input type="hidden" name="refund_id" value="{{ $refund->id }}"><input type="hidden" name="operation_key" value="{{ Str::uuid() }}">
                 <label>Review reason<input class="form-control" name="reason" required maxlength="500"></label>
-                <button name="action" value="refresh" class="btn btn-sm btn-light-primary">Refresh refund status</button>
+                <button name="action" value="refresh" class="btn btn-sm btn-light-dark">Refresh refund status</button>
                 @if($refund->provider_status === 'failed' && $purchase->licence->state === 'suspended')
-                <button name="action" value="restore" class="btn btn-sm btn-light-warning">Verify failure and restore licence</button>
+                <button name="action" value="restore" class="btn btn-sm btn-light-dark">Verify failure and restore licence</button>
                 @endif
             </form>
             @endif

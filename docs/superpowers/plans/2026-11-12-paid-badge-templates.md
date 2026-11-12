@@ -2,7 +2,7 @@
 
 > **For agentic workers** use `superpowers:executing-plans` for the native implementation, task by task. Track each step in its implementation commit. Use test-first development and one focused whole-change review before merge.
 
-**Status** Owner approved native implementation and recommendations on 12 November 2026. Implementation built locally. Final regressions and independent review are in progress. Hosted-provider acceptance, merge, production setup and activation retain their explicit release gates.
+**Status** Owner approved native implementation and recommendations on 12 November 2026. Implementation built locally. Independent whole-branch review completed and its four corrections passed focused regressions. CI on the final correction head is tracked in PR #100. Hosted-provider acceptance, merge, production setup and activation retain their explicit release gates.
 
 **Goal** Sell a reusable design-family licence for GH₵50 per event, with unlimited edits and reprints, through the badge library.
 
@@ -174,7 +174,7 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 - [ ] Run the affected badge/commerce/venue tests locally once, then full CI on the final head. Run `vendor/bin/pint --dirty`, PHPStan on affected code, frontend lint/tests, build and whitespace checks. Record unrelated failures honestly and reproduce before attributing them.
 - [ ] Use isolated test accounts/recipients and test-mode provider credentials for full purchase, interrupted return, repeated callbacks, unused refund, failed/unknown refund, used-refund exception and receipt recovery. Human completes hosted provider steps when required. No real attendee is involved.
 - [x] Verify exact 54 × 85 mm badges, A4 seven-page front/14-page duplex outputs for the 59-person synthetic roster, long names, both flip modes, custom landscape and repeated exports without another payment. A physical actual-size paper proof remains a printer acceptance step.
-- [ ] Perform one author self-review of all touchpoints and one independent whole-change review. Fix findings with targeted regressions. Record actual counts and unresolved limitations, then submit for owner merge approval.
+- [x] Perform one author self-review of all touchpoints and one independent whole-change review. Fix findings with targeted regressions. Record actual counts and unresolved limitations, then submit for owner merge approval.
 
 ### Task 9 — Controlled release and live acceptance
 
@@ -209,7 +209,7 @@ The local browser run used a separate synthetic organisation, 59 synthetic atten
 
 - Seven real PostgreSQL-worker races passed with 64 assertions, including the event/revision foreign-key deadlock reproduction.
 - Combined local regressions ran 435 tests. 434 passed with 1,786 assertions. The one failure caught four unsupported console Button variants. They now use the existing `default` variant, then passed the 43-test correction run (131 assertions), including the console component contract, platform refund POST and historical-purchase display regression.
-- The three focused frontend files passed 35 tests. PHPStan on affected application files reports zero errors. Frontend lint passed. Assets are rebuilt for the final reviewed head.
+- The final four focused frontend files passed 43 tests, including the existing library UI suite. After independent review, 87 affected PHP tests passed with 307 assertions, and all seven worker races passed again with two distinct staff identities in the purchase race. PHPStan on affected application files reports zero errors. Frontend lint passed. Assets are rebuilt for the final reviewed head.
 - Native browser PDFs contain all 59 names and five categories. Front-only output is seven A4 pages. Both duplex flip modes produce fourteen A4 pages. Programmatic custom-landscape coverage produces eight A4 pages. A physical actual-size printer proof remains open.
 - Hosted payment/refund acceptance, actual legal-seller/tax/receipt approval, reserve funding and production enablement remain explicit gates. No production setting or financial operation was performed during implementation.
 
@@ -251,3 +251,18 @@ Confirm the actual platform seller, tax/receipt wording and backed reserve. Comp
 **Scope notes**
 
 MiPrinting, paid production services and paraphernalia remain later milestones. Existing free/private designs and event printing continue through their established routes. The local simulated capture is recorded separately from future provider acceptance.
+
+### Independent review and correction pass
+
+One fresh-context reviewer inspected `656e3ec8..78ced1be` and reported no critical findings and four important corrections. Each correction has a regression that failed before the fix. No second reviewer was dispatched.
+
+1. Expired, definitively refused checkouts can now be replaced when every attempt is inactive, payment is still awaiting and no capture observation exists. An expired untouched quote may also be replaced by another authorised, independently verified payer. The original purchase/order/evidence stays retained. Unknown or captured payments continue to block replacement. The regression also exposed an unloaded database-default purchase state, corrected by refreshing the created purchase before returning it.
+2. Paid and free previews now share composition, attendee and category controls. Paid responses include only safe selected dimensions alongside the flattened raster. Landscape dimensions, category/name samples, private draft inputs and explicit apply are tested together. Same-family composition changes preserve reviewed category labels.
+3. The purchase confirmation shows frozen seller, support and receipt terms before the acceptance checkbox.
+4. Platform finance verification, refund and restoration controls use the existing high-contrast neutral treatment. Browser measurements changed from text22/143/127 on241/250/255 to text24/28/50 on239/242/245, exceeding normal-text contrast requirements.
+
+Final local correction evidence is 87 PHP tests/307 assertions, 43 frontend tests, seven real-worker races/64 assertions, clean affected PHPStan/lint/Pint and a rebuilt asset bundle. Browser checks confirm paid 85×54 landscape selection, attendee/category changes, seller/support/receipt disclosure and a disabled payment button before acceptance. External hosted payment remains unperformed.
+
+The reviewer set aside the already explicit provider/legal/funding/activation and physical printer gates, the documented PDF core-font approximation, recoverable missing-back selection and retained failed-refund reserve. These remain documented release gates or accepted conservative behaviour. They are not reported as completed acceptance.
+
+A few UI/refactoring pieces were implemented alongside their tests rather than strictly test-first. The reviewed defects, financial guards and locking regressions have recorded failing-then-passing reproductions.

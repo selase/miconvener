@@ -65,7 +65,9 @@ final class BadgeTemplatePurchases
                 if ($prior->state === 'review' || $order->state === 'review' || $order->attempts()->whereIn('status', ['initializing', 'unknown', 'ready', 'captured', 'review', 'succeeded'])->exists()) {
                     throw ValidationException::withMessages(['checkout' => 'The existing payment needs verification before another purchase.']);
                 }
-                if ($order->buyer_email !== $email || $order->state !== 'quoted') {
+                if ($order->expires_at->isFuture() || ! in_array($order->state, ['quoted', 'awaiting_payment'], true)
+                    || $order->payment_state !== 'awaiting'
+                    || \App\Models\StorePaymentObservation::query()->where('order_id', $order->id)->exists()) {
                     $this->refuse();
                 }
                 $prior->update(['state' => 'cancelled']);
@@ -96,7 +98,7 @@ final class BadgeTemplatePurchases
             $order->lines()->create(['shop_id' => $agreement->shop_id, 'offering_type' => 'badge_template', 'badge_purchase_id' => $purchase->id,
                 'title_snapshot' => $family->name, 'sku_snapshot' => 'badge-template-'.$family->id, 'options_snapshot' => [], 'quantity' => 1, 'unit_price_pesewas' => $price->minor, 'line_amount_pesewas' => $price->minor]);
 
-            return $purchase;
+            return $purchase->refresh();
         });
     }
 
