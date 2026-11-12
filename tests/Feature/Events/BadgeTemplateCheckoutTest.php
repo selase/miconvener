@@ -256,6 +256,22 @@ test('platform sales history does not borrow a newer purchases licence status or
         ->assertSee('No clean output requested · Purchase '.$purchase->id);
 });
 
+test('a badge purchase started on an organisation host gives Paystack a platform callback', function (): void {
+    Illuminate\Support\Facades\Http::preventStrayRequests();
+    Illuminate\Support\Facades\Http::fake([
+        '*api.paystack.co/customer*' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => ['customer_code' => 'CUS_BADGE', 'email' => 'buyer@example.test']]),
+        '*api.paystack.co/transaction/initialize' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/test-badge']]),
+    ]);
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $host = eventSubdomainHost($this->buyer->slug);
+    $this->actingAs($this->actor)->withSession(proofFor('buyer@example.test'))
+        ->postJson("http://{$host}/events/{$this->event->id}/badges/library/purchases/{$purchase->id}/checkout", [
+            'version_id' => $this->version->id, 'operation_key' => (string) Str::uuid(), 'accepted_terms_hash' => $purchase->order->terms_hash,
+        ])->assertOk()->assertJsonPath('status', 'ready');
+    Illuminate\Support\Facades\Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/transaction/initialize')
+        && str_starts_with($request['callback_url'], mb_rtrim((string) config('app.url'), '/').'/marketplace/checkout/'));
+});
+
 test('an expired definitively refused initialization permits a fresh paid design quote', function (): void {
     Illuminate\Support\Facades\Http::preventStrayRequests();
     Illuminate\Support\Facades\Http::fake([

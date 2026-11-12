@@ -2,7 +2,7 @@
 
 > **For agentic workers** use `superpowers:executing-plans` for the native implementation, task by task. Track each step in its implementation commit. Use test-first development and one focused whole-change review before merge.
 
-**Status** Owner approved native implementation and recommendations on 12 November 2026. Implementation built locally. Independent whole-branch review completed and its four corrections passed focused regressions. CI on the final correction head is tracked in PR #100. Hosted-provider acceptance, merge, production setup and activation retain their explicit release gates.
+**Status** PR #100 merged as `5ef3652c` and deployed on 12 November 2026. Hosted Paystack test payment succeeded. Its full refund is pending provider processing. Acceptance found a tenant-host return-page error, corrected and regression-tested in the follow-up branch. Production seller setup and paid activation remain pending.
 
 **Goal** Sell a reusable design-family licence for GH₵50 per event, with unlimited edits and reprints, through the badge library.
 
@@ -264,6 +264,18 @@ One fresh-context reviewer inspected `656e3ec8..78ced1be` and reported no critic
 Final local correction evidence is 87 PHP tests/307 assertions, 43 frontend tests, seven real-worker races/64 assertions, clean affected PHPStan/lint/Pint and a rebuilt asset bundle. Browser checks confirm paid 85×54 landscape selection, attendee/category changes, seller/support/receipt disclosure and a disabled payment button before acceptance. External hosted payment remains unperformed.
 
 The reviewer set aside the already explicit provider/legal/funding/activation and physical printer gates, the documented PDF core-font approximation, recoverable missing-back selection and retained failed-refund reserve. These remain documented release gates or accepted conservative behaviour. They are not reported as completed acceptance.
+
+## Hosted-provider acceptance on 12 November 2026
+
+The owner completed one GH₵50 hosted Paystack test-mode card purchase for the synthetic local event. The database was `miconvener_acceptance_codex_20261102`, with test credentials, a synthetic seller and logged mail. Purchase `01a1cf73-0ace-72c5-955a-b2e56270efce` received one verified 5,000-pesewa GHS capture, a 98-pesewa gateway fee, one active unused event licence and one durable receipt. The receipt delivery job completed through the log mailer.
+
+The browser returned to an organisation-hosted private receipt and received 404. `GuardAttendeePortalHost` correctly requires the platform hostname for private `/my/*` pages. Checkout initialization, callback redirection and digital receipt mail now build their URLs from the configured platform URL and named route path. Three regressions failed before the correction. The affected checkout, payments, refunds and store-receipt suites then passed 67 tests with 232 assertions. A replay of the existing callback reached the receipt in the browser.
+
+One full unused-licence refund was submitted through the native refund service against the original test account and capture. Refund `01a1cf79-b215-731e-8c11-7ed4e5a332f3` remains provider-pending. The licence is suspended. Completed provider refund, refund ledger reversal and final licence revocation remain unverified until Paystack reports processing complete.
+
+### Acceptance correction self-review
+
+All three URL-producing touchpoints were checked. Purchase authorization, original-payer receipt ownership, receipt history, money locking and permission definitions continue through their existing services. Configuration, dependencies, seeders, navigation, frontend assets and environment variables require no additions for this URL correction. The browser receipt retains its existing responsive layout, loading/error handling and keyboard controls. The new tests cover organisation-host initialization, callback routing and mail rendering. Paid activation, actual seller tax details, real reserve backing and the physical print proof remain outstanding.
 
 A few UI/refactoring pieces were implemented alongside their tests rather than strictly test-first. The reviewed defects, financial guards and locking regressions have recorded failing-then-passing reproductions.
 

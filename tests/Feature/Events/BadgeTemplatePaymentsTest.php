@@ -96,6 +96,29 @@ test('signed webhook and callback delivery in either order issue one licence', f
         ->and(App\Models\LedgerTransaction::withoutGlobalScopes()->where('reference', $this->attempt->reference)->where('transaction_type', 'badge_template_sale')->count())->toBe(1);
 })->with([true, false]);
 
+test('a tenant-hosted payment callback returns to the canonical licence receipt', function (): void {
+    $data = ['id' => 4242, 'status' => 'success', 'reference' => $this->attempt->reference, 'amount' => 5000, 'fees' => 100,
+        'currency' => 'GHS', 'paid_at' => now()->toIso8601String(),
+        'metadata' => app(App\Services\Marketplace\BadgeTemplateOffering::class)->expectedMetadata($this->attempt)];
+    Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/verify/*' => Illuminate\Support\Facades\Http::response(['data' => $data])]);
+    $host = eventSubdomainHost($this->purchase->event->tenant->slug);
+    $path = route('store.checkout.callback', ['reference' => $this->attempt->reference], false);
+    $this->get("http://{$host}{$path}")->assertRedirect(mb_rtrim((string) config('app.url'), '/')."/my/badge-template-purchases/{$this->purchase->id}");
+});
+
+test('digital receipt mail uses the canonical platform host during tenant requests', function (): void {
+    $capture = StorePaymentObservation::factory()->create(['attempt_id' => $this->attempt->id]);
+    app(StorePaymentConfirmer::class)->confirm($capture);
+    $receipt = StoreReceipt::query()->where('order_id', $this->purchase->order_id)->firstOrFail();
+    Illuminate\Support\Facades\URL::forceRootUrl('http://'.eventSubdomainHost($this->purchase->event->tenant->slug));
+    try {
+        expect((new App\Mail\StoreOrderReceipt($receipt))->content()->with['orderUrl'])
+            ->toBe(mb_rtrim((string) config('app.url'), '/')."/my/badge-template-purchases/{$this->purchase->id}");
+    } finally {
+        Illuminate\Support\Facades\URL::forceRootUrl(null);
+    }
+});
+
 test('the exact payment deadline is held for review and grants no licence', function (): void {
     $this->travelTo($this->purchase->order->expires_at);
     $capture = StorePaymentObservation::factory()->create(['attempt_id' => $this->attempt->id]);
