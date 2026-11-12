@@ -266,3 +266,7 @@ Final local correction evidence is 87 PHP tests/307 assertions, 43 frontend test
 The reviewer set aside the already explicit provider/legal/funding/activation and physical printer gates, the documented PDF core-font approximation, recoverable missing-back selection and retained failed-refund reserve. These remain documented release gates or accepted conservative behaviour. They are not reported as completed acceptance.
 
 A few UI/refactoring pieces were implemented alongside their tests rather than strictly test-first. The reviewed defects, financial guards and locking regressions have recorded failing-then-passing reproductions.
+
+### Final CI fixture correction
+
+CI on `2b91beec` passed code quality and 4,942 PHP tests, with one badge-layout failure. The paper-size test had inherited a randomly generated event title. A deterministic title, `Reprehenderit voluptates consequatur voluptatem.`, reproduced the same text-fit error after the first three print modes passed and the compact landscape mode began. The positive printing fixture now uses `Preterm Newborns`. A separate oversized-title test checks the `layout.event_name` refusal and retained paid use claim. All 22 tests in that file passed with 79 assertions. No application text-fit rule was changed. The final CI result is recorded on PR #100.

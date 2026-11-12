@@ -215,6 +215,7 @@ test('an archived event with digital purchase history explains why permanent pur
 });
 
 test('one paid event licence prints fifty nine badges on A4 in portrait duplex and custom landscape', function (): void {
+    $this->event->update(['name' => 'Preterm Newborns']);
     $tickets = collect(['Doctor', 'Nurse', 'Physician Assistant', 'Faculty', 'Host'])->map(fn (string $name) => App\Models\EventTicketType::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'name' => $name]));
     $registrations = collect();
     for ($index = 0; $index < 59; $index++) {
@@ -251,4 +252,20 @@ test('paid landscape previews return safe selected composition dimensions withou
         ->getJson("http://{$host}/events/{$this->event->id}/badges/library/versions/{$version->id}?composition=landscape")
         ->assertOk()->assertJsonPath('preview_settings.width_mm', 85)->assertJsonPath('preview_settings.height_mm', 54)
         ->assertJsonMissingPath('template')->assertJsonMissingPath('background');
+});
+
+test('an oversized event title is rejected while its paid render claim remains recorded', function (): void {
+    $this->event->update(['name' => str_repeat('Long conference title ', 8)]);
+    $this->template->update(['width_mm' => 85, 'height_mm' => 54]);
+    $ticket = App\Models\EventTicketType::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'name' => 'Doctor']);
+    $registration = App\Models\EventRegistration::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'ticket_type_id' => $ticket->id, 'full_name' => 'Synthetic attendee', 'ticket_code' => 'EVT-TEST-001']);
+    $claim = app(BadgeTemplateAccess::class)->claimUse($this->event, $this->actor, [], 'badge_pdf', (string) Str::uuid());
+    try {
+        app(App\Services\Badges\BadgePdfService::class)->generate($this->event, $claim['template'], collect([$registration]), $claim['uses']);
+        $this->fail('An event title that cannot fit must stop the render.');
+    } catch (ValidationException $error) {
+        expect($error->errors())->toHaveKey('layout.event_name');
+    }
+    expect($this->purchase->licence->fresh()->first_used_at)->not->toBeNull()
+        ->and(BadgeTemplateUse::query()->where('purchase_id', $this->purchase->id)->count())->toBe(1);
 });
