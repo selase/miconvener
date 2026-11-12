@@ -18,7 +18,7 @@ final class StoreOrderReceipt extends Mailable
 
     public function envelope(): Envelope
     {
-        return app(TenantMailIdentity::class)->tenantEnvelope('Your store order receipt', Tenant::query()->findOrFail($this->receipt->tenant_id));
+        return app(TenantMailIdentity::class)->tenantEnvelope(isset($this->receipt->snapshot['digital_licence']) ? 'Your badge template licence receipt' : 'Your store order receipt', Tenant::query()->findOrFail($this->receipt->tenant_id));
     }
 
     public function headers(): Headers
@@ -43,7 +43,10 @@ final class StoreOrderReceipt extends Mailable
         return new Content(markdown: 'emails.store-order-receipt', with: [
             'receipt' => $snapshot,
             'isVenue' => $isVenue,
-            'orderUrl' => $isVenue ? route('marketplace.bookings.show', $charge->booking->booking_reference) : route('store.orders.show', $this->receipt->order_id),
+            'isDigital' => isset($snapshot['digital_licence']),
+            'orderUrl' => isset($snapshot['digital_licence'])
+                ? route('badge-template-purchases.show', \App\Models\BadgeTemplatePurchase::query()->where('order_id', $this->receipt->order_id)->firstOrFail()->id)
+                : ($isVenue ? route('marketplace.bookings.show', $charge->booking->booking_reference) : route('store.orders.show', $this->receipt->order_id)),
         ]);
     }
 }

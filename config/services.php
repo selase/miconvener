@@ -211,4 +211,9 @@ return [
         'return_on_cancelled_event' => (bool) env('COMMISSION_RETURNED_ON_CANCELLED_EVENT', true),
     ],
 
+    'badge_templates' => [
+        'seller_tenant_id' => env('BADGE_TEMPLATE_SELLER_TENANT_ID'),
+        'commercial_approval' => env('BADGE_TEMPLATE_COMMERCIAL_APPROVAL'),
+    ],
+
 ];

@@ -43,6 +43,8 @@ final class StoreCommercialAgreement extends Model
 
     public const SCOPE_RESERVATION = 'reservation';
 
+    public const SCOPE_BADGE_TEMPLATE = 'badge_template';
+
     protected $connection = 'landlord';
 
     protected $table = 'store_commercial_agreements';

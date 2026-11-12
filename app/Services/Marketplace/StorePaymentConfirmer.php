@@ -23,7 +23,7 @@ final class StorePaymentConfirmer
             if ($capture->processing_state === 'posted') {
                 return $order;
             }
-            if ($capture->processing_state === 'review' && $order->offering_type === 'reservation') {
+            if ($capture->processing_state === 'review' && in_array($order->offering_type, ['reservation', 'badge_template'], true)) {
                 return $order;
             }
             if (StorePaymentObservation::query()->where('attempt_id', $attempt->id)->where('observation_version', '>', $capture->observation_version)->exists()) {

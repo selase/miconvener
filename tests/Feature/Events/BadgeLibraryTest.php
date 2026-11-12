@@ -90,7 +90,8 @@ test('event organisers can use shared designs but cannot promote private designs
 test('paid designs cannot expose clean assets or apply through forged requests', function (): void {
     $saved = $this->postJson($this->base, ['name' => 'Premium', 'scope' => 'organisation', 'expected_version' => 1])->assertCreated();
     $version = \App\Models\BadgeLibraryVersion::findOrFail($saved->json('version.id'));
-    $version->design->update(['scope' => 'platform', 'tenant_id' => null, 'price_pesewas' => 5000]);
+    $paid = \App\Models\BadgeLibraryDesign::query()->create(['scope' => 'platform', 'name' => 'Premium', 'price_pesewas' => 5000]);
+    $version = $paid->versions()->create(['version' => 1, 'snapshot' => $version->snapshotSettings()]);
     $this->postJson($this->base.'/apply', ['version_id' => $version->id, 'expected_version' => 1])->assertUnprocessable();
     $this->getJson($this->base.'/versions/'.$version->id)->assertOk()->assertJsonStructure(['preview_image'])->assertJsonMissingPath('template')->assertJsonMissingPath('background');
 });

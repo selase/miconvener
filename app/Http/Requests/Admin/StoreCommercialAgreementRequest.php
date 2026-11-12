@@ -20,10 +20,10 @@ final class StoreCommercialAgreementRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'offering_scope' => ['sometimes', Rule::in([StoreCommercialAgreement::SCOPE_PURCHASE, StoreCommercialAgreement::SCOPE_RESERVATION])],
+            'offering_scope' => ['sometimes', Rule::in([StoreCommercialAgreement::SCOPE_PURCHASE, StoreCommercialAgreement::SCOPE_RESERVATION, StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE])],
             'percentage' => ['required', 'numeric', 'decimal:0,2', 'between:0,100'],
             'cap_pesewas' => ['nullable', 'integer', 'min:0', 'max:9007199254740991'],
-            'fee_bearer' => ['required', Rule::in($this->input('offering_scope') === StoreCommercialAgreement::SCOPE_RESERVATION ? ['organizer'] : ['organizer', 'attendee'])],
+            'fee_bearer' => ['required', Rule::in(in_array($this->input('offering_scope'), [StoreCommercialAgreement::SCOPE_RESERVATION, StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE], true) ? ['organizer'] : ['organizer', 'attendee'])],
             'gateway_estimate_rate' => ['required', 'numeric', 'decimal:0,2', 'between:0,100'],
             'refund_gateway_fee_bearer' => ['required', Rule::in(['seller', 'platform'])],
             'collection_terms' => ['required', 'string', 'max:4000'],

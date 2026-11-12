@@ -32,6 +32,11 @@ final class PriceBook
         return $this->pick($config['unit_price'] * $multiplier, $config['usd_unit_price'] * $multiplier, $currency);
     }
 
+    public function badgeTemplate(): Money
+    {
+        return $this->pick(5000, null, 'GHS');
+    }
+
     public function tokenPack(string $key, string $currency): Money
     {
         $pack = (array) config("llm.token_packs.{$key}");

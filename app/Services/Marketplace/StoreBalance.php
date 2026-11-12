@@ -63,6 +63,9 @@ final class StoreBalance
     public function refundBacked(StoreRefund $refund): bool
     {
         $seller = $refund->order->tenant;
+        if ($refund->order->offering_type === 'badge_template') {
+            return app(\App\Services\Badges\BadgeTemplateReserve::class)->refundBacked($refund);
+        }
         $bufferRequired = $refund->amount_pesewas - $refund->seller_debit_pesewas - $refund->review_liability_pesewas;
 
         return $refund->seller_debit_pesewas <= $this->available($seller, excludeRefund: $refund->id, forRefund: true)

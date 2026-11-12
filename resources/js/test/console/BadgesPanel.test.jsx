@@ -354,3 +354,32 @@ it('refreshes saved logo metadata and keeps imported fonts when the designer reo
     fireEvent.click(screen.getByRole('button', { name: 'Design badges' }));
     expect(screen.getByRole('option', { name: 'Brand Font' })).toBeTruthy();
 });
+
+it('asks before first paid output and sends explicit use acknowledgement', async () => {
+    const data = {
+        ...dataFor(1),
+        paid_design: { present: true, watermarked: true, can_confirm_use: true },
+    };
+    csrfFetch.mockImplementation((url, options) =>
+        options
+            ? Promise.resolve({
+                  ok: true,
+                  headers: { get: () => 'application/pdf' },
+                  blob: async () => new Blob(['pdf']),
+              })
+            : Promise.resolve(response(data))
+    );
+    render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
+    await screen.findByText('Person 0');
+    fireEvent.click(screen.getByRole('button', { name: /Download .* PDF/ }));
+    expect(await screen.findByText(/records use/)).toBeTruthy();
+    expect(csrfFetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm use and download' }));
+    await waitFor(() =>
+        expect(csrfFetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true)
+    );
+    expect(
+        JSON.parse(csrfFetch.mock.calls.find(([, options]) => options?.method === 'POST')[1].body)
+            .confirm_paid_use
+    ).toBe(true);
+});

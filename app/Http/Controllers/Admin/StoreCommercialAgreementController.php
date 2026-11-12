@@ -22,6 +22,7 @@ final class StoreCommercialAgreementController extends Controller
         $agreements = StoreCommercialAgreement::query()->where('tenant_id', $tenant->id)->orderByDesc('version')->get()->groupBy('offering_scope');
 
         return view('admin.store-agreements', ['seller' => $tenant,
+            'badgeAgreements' => $agreements->get(StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE, collect()),
             'agreements' => $agreements->get(StoreCommercialAgreement::SCOPE_PURCHASE, collect()),
             'reservationAgreements' => $agreements->get(StoreCommercialAgreement::SCOPE_RESERVATION, collect())]);
     }

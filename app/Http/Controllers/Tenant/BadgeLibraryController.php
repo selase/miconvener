@@ -26,12 +26,31 @@ final class BadgeLibraryController extends Controller
         $event = $this->event($event, 'read badge-template');
         $designs = $this->library->visible($event)->with(['versions' => fn ($query) => $query->orderByDesc('version')->limit(1)])->orderBy('name')->get();
 
+        $licences = \App\Models\BadgeTemplateLicence::query()->where('buyer_tenant_id', $event->tenant_id)->where('event_id', $event->id)->with('currentPurchase')->get()->keyBy('family_id');
+        $canPurchase = true;
+        $checkoutReady = true;
+        try {
+            app(\App\Services\Badges\BadgeTemplatePurchases::class)->authorize(request()->user(), $event);
+        } catch (\Illuminate\Auth\Access\AuthorizationException|\Symfony\Component\HttpKernel\Exception\HttpException) {
+            $canPurchase = false;
+        }
+        try {
+            app(\App\Services\Badges\BadgeTemplateReadiness::class)->agreement($event->tenant);
+        } catch (\Illuminate\Validation\ValidationException) {
+            $checkoutReady = false;
+        }
+
         return response()->json([
             'designs' => $designs->map(fn (\App\Models\BadgeLibraryDesign $design): array => [
+                ...$this->licensing($event, $design->versions->first(), $licences),
+                'licence_state' => $licences->get($design->id)?->state,
                 'id' => $design->id, 'name' => $design->name, 'scope' => $design->scope, 'price_pesewas' => $design->price_pesewas,
                 'versions' => $design->versions->map(fn (\App\Models\BadgeLibraryVersion $version): array => ['id' => $version->id, 'version' => $version->version, 'width_mm' => $version->snapshotSettings()['width_mm'], 'height_mm' => $version->snapshotSettings()['height_mm'], 'orientation' => $version->snapshotSettings()['orientation'], 'compositions' => array_keys($version->snapshotSettings()['compositions'] ?? [])]),
             ]),
             'revisions' => BadgeDesignRevision::query()->where('tenant_id', $event->tenant_id)->where('event_id', $event->id)->latest()->limit(30)->get(['id', 'design_version', 'created_at']),
+            'purchases' => $canPurchase ? \App\Models\BadgeTemplatePurchase::query()->where('buyer_tenant_id', $event->tenant_id)->where('event_id', $event->id)->with(['order.receipt.outbox', 'order.attempts', 'licence', 'event.tenant', 'version'])->withExists('uses')->latest()->orderByDesc('id')->limit(20)->get()->map(fn ($purchase): array => app(\App\Services\Badges\BadgeTemplatePurchasePayload::class)->forPurchase($purchase)) : [],
+            'can_purchase' => $canPurchase,
+            'checkout_ready' => $checkoutReady,
             'can_share' => request()->user()->can('manage badge-library'),
             'can_publish' => request()->user()->isGlobalSuperAdmin(),
         ])->header('Cache-Control', 'private, no-store');
@@ -66,19 +85,25 @@ final class BadgeLibraryController extends Controller
         return $this->apply($request, $subdomain, $event);
     }
 
-    public function preview(Request $request, string $subdomain, string $event, string $version): JsonResponse
+    public function preview(\App\Http\Requests\Tenant\PreviewBadgeLibraryRequest $request, string $subdomain, string $event, string $version): JsonResponse
     {
         $event = $this->event($event, 'read badge-template');
         $version = $this->library->visibleVersion($event, $version);
-        if ($version->design->price_pesewas > 0) {
-            return response()->json(['preview_image' => $this->library->previewImage($version->snapshotSettings())])->header('Cache-Control', 'private, no-store');
-        }
         $snapshot = $version->snapshotSettings();
         $composition = $request->query('composition');
         if (is_string($composition) && isset($snapshot['compositions'][$composition])) {
             $snapshot = $snapshot['compositions'][$composition];
         }
         unset($snapshot['compositions']);
+        if (app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id) !== []) {
+            return response()->json([
+                'preview_image' => $this->library->previewImage($snapshot, true, [...$request->validated(), 'tenant_id' => $event->tenant_id]),
+                'preview_settings' => [
+                    'width_mm' => (float) ($request->validated('width_mm') ?? $snapshot['width_mm']),
+                    'height_mm' => (float) ($request->validated('height_mm') ?? $snapshot['height_mm']),
+                ],
+            ])->header('Cache-Control', 'private, no-store');
+        }
         $template = new EventBadgeTemplate(array_intersect_key($snapshot, array_flip(BadgeLibraryService::FIELDS)));
         $background = is_string($template->background_disk) && is_string($template->background_path) ? app(ArtifactArtworkService::class)->dataUri($template->background_disk, $template->background_path) : null;
         $logo = app(BadgeTemplateService::class)->badgeLogo($event, $template);
@@ -96,7 +121,7 @@ final class BadgeLibraryController extends Controller
     {
         $event = $this->event($event, 'read badge-template');
         $version = $this->library->visibleVersion($event, $version);
-        $uri = $this->library->previewImage($version->snapshotSettings(), $version->design->price_pesewas > 0);
+        $uri = $this->library->previewImage($version->snapshotSettings(), app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id) !== []);
 
         return response(base64_decode(explode(',', $uri, 2)[1], true), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
     }
@@ -113,6 +138,26 @@ final class BadgeLibraryController extends Controller
         $design->update(['withdrawn_at' => now()]);
 
         return response()->json(['message' => 'Design withdrawn. Existing event copies are preserved.']);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<string, \App\Models\BadgeTemplateLicence>  $licences
+     * @return array<string, mixed>
+     */
+    private function licensing(Event $event, ?\App\Models\BadgeLibraryVersion $version, \Illuminate\Support\Collection $licences): array
+    {
+        $families = $version === null ? [] : app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id);
+        $requirements = [];
+        foreach ($families as $family) {
+            $licence = $licences->get($family);
+            if ($licence?->state === 'active' && $licence->currentPurchase?->state === 'paid') {
+                continue;
+            }
+            $root = \App\Models\BadgeLibraryVersion::query()->with('design')->where('design_id', $family)->latest('version')->firstOrFail();
+            $requirements[] = ['family_id' => $family, 'version_id' => $root->id, 'name' => $root->design->name];
+        }
+
+        return ['requires_licence' => $families !== [], 'purchased' => $families !== [] && $requirements === [], 'purchase_requirements' => $requirements];
     }
 
     private function event(string $id, string $permission): Event

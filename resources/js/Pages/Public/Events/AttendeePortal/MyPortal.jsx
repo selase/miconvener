@@ -62,6 +62,12 @@ function LegacyMyPortal({
         typeof window !== 'undefined' &&
         /^\/my\/join\//.test(new URLSearchParams(window.location.search).get('return_to') || '');
 
+    const returningToTemplates =
+        typeof window !== 'undefined' &&
+        /^\/my\/badge-template-purchases(?:\/|$)/.test(
+            new URLSearchParams(window.location.search).get('return_to') || ''
+        );
+
     const returningToStore =
         typeof window !== 'undefined' &&
         /^\/my\/store-orders(?:\/|$)/.test(
@@ -201,7 +207,9 @@ function LegacyMyPortal({
         // back where they were going. The target is only ever followed when it
         // is a path on this portal, so a crafted ?return_to cannot bounce a
         // just-verified visitor off to somewhere else.
-        const requested = safePortalReturn(new URLSearchParams(window.location.search).get('return_to'));
+        const requested = safePortalReturn(
+            new URLSearchParams(window.location.search).get('return_to')
+        );
         if (requested) {
             window.location.assign(requested);
             return;
@@ -331,9 +339,13 @@ function LegacyMyPortal({
     return (
         <PublicLayout
             headerActions={
-                <a href="/my/store-orders" className="text-sm text-accent underline">
-                    Store orders
-                </a>
+                <nav
+                    className="flex flex-wrap gap-4 text-sm text-accent underline"
+                    aria-label="Purchase history"
+                >
+                    <a href="/my/store-orders">Store orders</a>
+                    <a href="/my/badge-template-purchases">Badge licences</a>
+                </nav>
             }
         >
             <Head title="My MiConvener">
@@ -354,24 +366,28 @@ function LegacyMyPortal({
                 )}
                 <div className="space-y-1 mb-8">
                     <h1 className="text-2xl font-normal tracking-tight text-ink">
-                        {returningToStore && !verifiedEmail
-                            ? 'Your MiConvener store orders'
-                            : joiningEvent && !verifiedEmail
-                              ? 'Verify your registration email'
-                              : selectedOrganiser?.name
-                                ? `Your events with ${selectedOrganiser.name}`
-                                : phoneVerified && !verifiedEmail
-                                  ? 'Your MiConvener Communities'
-                                  : 'Your MiConvener events'}
+                        {returningToTemplates && !verifiedEmail
+                            ? 'Your badge template licences'
+                            : returningToStore && !verifiedEmail
+                              ? 'Your MiConvener store orders'
+                              : joiningEvent && !verifiedEmail
+                                ? 'Verify your registration email'
+                                : selectedOrganiser?.name
+                                  ? `Your events with ${selectedOrganiser.name}`
+                                  : phoneVerified && !verifiedEmail
+                                    ? 'Your MiConvener Communities'
+                                    : 'Your MiConvener events'}
                     </h1>
                     <p className="text-[13.5px] text-ink-secondary">
-                        {returningToStore && !verifiedEmail
-                            ? 'Verify the email used for your quote or order to review the details, pay and track collection or delivery.'
-                            : joiningEvent && !verifiedEmail
-                              ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
-                              : phoneVerified && !verifiedEmail
-                                ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
-                                : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
+                        {returningToTemplates && !verifiedEmail
+                            ? 'Verify the original payer email to open your event design licences and receipts.'
+                            : returningToStore && !verifiedEmail
+                              ? 'Verify the email used for your quote or order to review the details, pay and track collection or delivery.'
+                              : joiningEvent && !verifiedEmail
+                                ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
+                                : phoneVerified && !verifiedEmail
+                                  ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
+                                  : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
                     </p>
                 </div>
 
@@ -616,7 +632,7 @@ function LegacyMyPortal({
                         <VerifyPrompt
                             onVerified={handleVerified}
                             organiserSlug={selectedOrganiser?.slug}
-                            allowPhone={!joiningEvent}
+                            allowPhone={!joiningEvent && !returningToTemplates}
                         />
                         {joiningEvent && joinEvent && (
                             <p className="mt-6 text-sm text-ink-secondary">

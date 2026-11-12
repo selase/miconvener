@@ -40,7 +40,16 @@ final class StoreCommercialTerms
         $this->assertScope($scope);
         Gate::forUser($actor)->authorize('access-superadmin-dashboard');
         $request = new StoreCommercialAgreementRequest;
+        $request->merge(['offering_scope' => $scope]);
         $data = Validator::make($input, $request->rules(), $request->messages())->validate();
+
+        if ($scope === StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE && (
+            $seller->id !== config('services.badge_templates.seller_tenant_id')
+            || (float) $data['percentage'] !== 0.0 || $data['fee_bearer'] !== 'organizer'
+            || $data['refund_gateway_fee_bearer'] !== 'platform' || ($data['cap_pesewas'] ?? null) !== null
+        )) {
+            throw ValidationException::withMessages(['agreement' => 'Paid template terms belong to the configured platform seller, with zero commission, no buyer surcharge and platform-funded processing and refunds.']);
+        }
 
         return $seller->getConnection()->transaction(function () use ($seller, $actor, $data, $scope): StoreCommercialAgreement {
             $current = Tenant::query()->lockForUpdate()->findOrFail($seller->id);
@@ -61,7 +70,7 @@ final class StoreCommercialTerms
 
     private function assertScope(string $scope): void
     {
-        if (! in_array($scope, [StoreCommercialAgreement::SCOPE_PURCHASE, StoreCommercialAgreement::SCOPE_RESERVATION], true)) {
+        if (! in_array($scope, [StoreCommercialAgreement::SCOPE_PURCHASE, StoreCommercialAgreement::SCOPE_RESERVATION, StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE], true)) {
             throw new InvalidArgumentException("Unknown commercial agreement scope [{$scope}].");
         }
     }

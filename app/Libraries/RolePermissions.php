@@ -168,6 +168,8 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            'manage template refunds',
+            'purchase badge-templates',
             'manage badge-library',
             'moderate public attendee profiles',
             'manage public attendee profiles',
@@ -271,6 +273,7 @@ final class RolePermissions
     private static function organizationSuperadminPermissions(): array
     {
         return [
+            'purchase badge-templates',
             'manage badge-library',
             'manage public attendee profiles',
             'manage store catalog',

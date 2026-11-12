@@ -25,8 +25,11 @@ final class BadgePdfService
         private readonly ArtifactLayoutValidator $layouts,
     ) {}
 
-    /** @param Collection<int, EventRegistration> $registrations */
-    public function generate(Event $event, EventBadgeTemplate $template, Collection $registrations): DomPDF
+    /**
+     * @param  Collection<int, EventRegistration>  $registrations
+     * @param  list<string>  $useIds
+     */
+    public function generate(Event $event, EventBadgeTemplate $template, Collection $registrations, array $useIds = []): DomPDF
     {
         $paper = $template->sheetSettings()['paper'] === 'letter' ? 'letter' : 'a4';
 
@@ -35,15 +38,19 @@ final class BadgePdfService
             $fontLayout['back_'.$key] = $item;
         }
 
-        return app(ArtifactFontRegistry::class)->preparePdf(Pdf::loadHTML($this->renderHtml($event, $template, $registrations)), $fontLayout, (string) $event->tenant_id)
+        return app(ArtifactFontRegistry::class)->preparePdf(Pdf::loadHTML($this->renderHtml($event, $template, $registrations, $useIds)), $fontLayout, (string) $event->tenant_id)
             ->setPaper($paper, 'portrait')
             ->setOption('isHtml5ParserEnabled', true)
             ->setOption('isRemoteEnabled', false);
     }
 
-    /** @param Collection<int, EventRegistration> $registrations */
-    public function renderHtml(Event $event, EventBadgeTemplate $template, Collection $registrations): string
+    /**
+     * @param  Collection<int, EventRegistration>  $registrations
+     * @param  list<string>  $useIds
+     */
+    public function renderHtml(Event $event, EventBadgeTemplate $template, Collection $registrations, array $useIds = []): string
     {
+        app(BadgeTemplateAccess::class)->assertOutputClaim($event, $template, $useIds);
         $settings = $template->sheetSettings();
         $paper = $settings['paper'] === 'letter' ? [215.9, 279.4] : [210.0, 297.0];
         $margin = $settings['margin_mm'];
@@ -155,7 +162,7 @@ final class BadgePdfService
     }
 
     /** @return array{x: float, y: float, width: float, height: float} */
-    private function backgroundBox(EventBadgeTemplate $template, ?string $background): array
+    public function backgroundBox(EventBadgeTemplate $template, ?string $background): array
     {
         $width = (float) $template->width_mm;
         $height = (float) $template->height_mm;

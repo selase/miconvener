@@ -254,6 +254,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('admin/attendee-profiles/{tenant}', [App\Http\Controllers\Admin\AttendeeProfileModerationController::class, 'index'])->name('admin.attendee-profiles.index');
     Route::post('admin/attendee-profiles/{tenant}/{profile}/release', [App\Http\Controllers\Admin\AttendeeProfileModerationController::class, 'release'])->whereUuid('profile')->name('admin.attendee-profiles.release');
 
+    Route::get('admin/badge-template-sales', [App\Http\Controllers\Admin\BadgeTemplateSalesController::class, 'index'])->name('admin.badge-template-sales.index');
+    Route::post('admin/badge-template-sales/{purchase}', [App\Http\Controllers\Admin\BadgeTemplateSalesController::class, 'update'])->whereUuid('purchase')->name('admin.badge-template-sales.update');
     Route::get('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'index'])
         ->name('admin.store-agreements.index');
     Route::post('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'store'])
@@ -348,6 +350,8 @@ Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCe
 Route::post('/my/store-orders/{order}/collection-pass', [App\Http\Controllers\Marketplace\StoreCollectionPassController::class, 'store'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.collection-pass');
 Route::post('/my/store-orders/{order}/fulfilment', [App\Http\Controllers\Marketplace\StoreFulfilmentChoiceController::class, 'store'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.fulfilment');
 Route::post('/my/store-orders/{order}/cancel', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'cancel'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.cancel');
+Route::get('/my/badge-template-purchases', [App\Http\Controllers\Marketplace\BadgeTemplateReceiptController::class, 'index'])->name('badge-template-purchases.index');
+Route::get('/my/badge-template-purchases/{purchase}', [App\Http\Controllers\Marketplace\BadgeTemplateReceiptController::class, 'show'])->whereUuid('purchase')->name('badge-template-purchases.show');
 Route::get('/my/store-orders', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'index'])->name('store.orders.index');
 Route::get('/my/store-orders/{order}/receipt', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'receipt'])->whereUuid('order')->name('store.orders.receipt');
 Route::get('/my/store-orders/{order}', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'show'])->whereUuid('order')->name('store.orders.show');

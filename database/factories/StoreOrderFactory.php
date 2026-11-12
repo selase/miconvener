@@ -29,6 +29,17 @@ final class StoreOrderFactory extends Factory
         ];
     }
 
+    public function badgeTemplate(): static
+    {
+        return $this->state(fn (): array => [
+            'offering_type' => 'badge_template',
+            'agreement_id' => StoreCommercialAgreement::factory()->state(['offering_scope' => 'badge_template', 'percentage' => '0.00', 'refund_gateway_fee_bearer' => 'platform']),
+            'principal_pesewas' => 5000,
+            'platform_fee_pesewas' => 0,
+            'charged_pesewas' => 5000,
+        ]);
+    }
+
     /** A venue reservation payment order resting on the shop's reservation agreement. */
     public function reservation(): static
     {

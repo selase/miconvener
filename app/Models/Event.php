@@ -880,6 +880,12 @@ final class Event extends Model
      */
     public function canBeDeleted(?string &$reason = null): bool
     {
+        if ($this->trashed() && BadgeTemplatePurchase::query()->where('event_id', $this->id)->exists()) {
+            $reason = 'This archived event retains paid template purchase and licence history and cannot be permanently purged.';
+
+            return false;
+        }
+
         if ($this->trashed() && CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->where('event_id', $this->id)->exists()) {
             $reason = 'This archived event has retained community service notes and cannot be permanently purged.';
 

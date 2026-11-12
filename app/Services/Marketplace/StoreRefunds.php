@@ -20,14 +20,14 @@ final class StoreRefunds
 {
     public function __construct(private readonly CommerceOrderLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreBalance $balance, private readonly StoreGateways $gateways, private readonly LedgerService $ledger, private readonly CommerceOfferingRegistry $offerings) {}
 
-    public function request(StoreOrder $order, User $actor, string $operationKey, string $reason, ?string $observationId = null): StoreRefund
+    public function request(StoreOrder $order, User $actor, string $operationKey, string $reason, ?string $observationId = null, bool $exception = false): StoreRefund
     {
         $this->authorize($order, $actor);
         $reason = mb_trim($reason);
         if (! Str::isUuid($operationKey) || $reason === '' || mb_strlen($reason) > 500) {
             $this->refuse('Provide a reason and a valid refund operation key.');
         }
-        $refund = $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason, $observationId): StoreRefund {
+        $refund = $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason, $observationId, $exception): StoreRefund {
             $order = $this->locks->order($order);
             $this->authorize($order, $actor);
             $this->offerings->for($order)->assertRefund($order);
@@ -53,22 +53,18 @@ final class StoreRefunds
                 return $existing;
             }
             $txn = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $order->tenant_id)->where('reference', $capture->reference)->where('category', 'commerce')->findOrFail($capture->ledger_transaction_id);
-            $sale = $txn->transaction_type === 'commerce_sale';
+            $sale = in_array($txn->transaction_type, ['commerce_sale', 'badge_template_sale'], true);
             if ((! $sale && ! in_array($txn->transaction_type, ['commerce_capture_review', 'venue_security_capture'], true)) || ($sale && ($order->ledger_state === 'review' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) || $order->payment_state !== 'paid'))) {
                 $this->refuse('Collected or unreconciled orders require an approved support review.');
             }
-            $bearer = $order->terms_snapshot['refund_gateway_fee_bearer'] ?? null;
-            if (! in_array($bearer, ['seller', 'platform'], true)) {
-                $this->refuse('Refund funding ownership must be approved before a refund.');
-            }
+            $allocation = $this->offerings->for($order)->refundAllocation($order, $capture, $sale);
             $amount = $capture->amount_pesewas;
-            $commission = $sale ? $order->platform_fee_pesewas : 0;
-            $sellerDebit = $sale ? $amount - $commission - ($bearer === 'platform' ? $capture->gateway_fee_pesewas : 0) : ($bearer === 'seller' ? $capture->gateway_fee_pesewas : 0);
             $refund = StoreRefund::query()->create(['order_id' => $order->id, 'tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id,
                 'attempt_id' => $capture->attempt_id, 'observation_id' => $capture->id, 'operation_key' => $operationKey, 'reason' => $reason,
                 'requested_by' => $actor->id, 'account_fingerprint' => $capture->account_fingerprint, 'amount_pesewas' => $amount,
-                'seller_debit_pesewas' => $sellerDebit, 'commission_return_pesewas' => $commission, 'gateway_fee_pesewas' => $capture->gateway_fee_pesewas,
-                'review_liability_pesewas' => $sale ? 0 : $amount, 'fee_bearer' => $bearer, 'restock' => $sale, 'status' => 'needs_funding']);
+                'seller_debit_pesewas' => $allocation->sellerDebitPesewas, 'commission_return_pesewas' => $allocation->commissionReturnPesewas, 'gateway_fee_pesewas' => $capture->gateway_fee_pesewas,
+                'review_liability_pesewas' => $allocation->reviewLiabilityPesewas, 'fee_bearer' => $allocation->feeBearer, 'restock' => $allocation->restock, 'status' => 'needs_funding']);
+            $this->offerings->for($order)->prepareRefund($refund, $exception);
             if ($sale) {
                 app(StoreCollectionPasses::class)->revoke($order, 'primary_refund');
                 $order->update(['payment_state' => 'refund_pending']);
@@ -228,6 +224,11 @@ final class StoreRefunds
 
     private function authorize(StoreOrder $order, User $actor): void
     {
+        if (StoreOrder::query()->whereKey($order->id)->value('offering_type') === 'badge_template') {
+            app(\App\Services\Badges\BadgeTemplateRefunds::class)->authorize($actor);
+
+            return;
+        }
         $permission = StoreOrder::query()->whereKey($order->id)->value('offering_type') === 'reservation' ? VenueMoneyPermissions::REFUNDS : 'manage store finance';
         if (! $this->access->staff($order, $order->tenant, $actor, $permission)) {
             throw new AuthorizationException;

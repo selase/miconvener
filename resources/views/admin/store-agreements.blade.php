@@ -3,7 +3,7 @@
 @section('content')
 <div class="container-xxl">
     <h1 class="mb-4">Commerce agreement · {{ $seller->name }}</h1>
-    <p class="text-muted">GHS · Platform-default Paystack. Merchandise and venue bookings each have their own terms: approving one never changes the other. Approving terms does not enable checkout or venue payments. Existing quotes keep their approved version.</p>
+    <p class="text-muted">GHS · Platform-default Paystack. Merchandise, venue bookings and badge template licences each have separate terms. Paid badge licences require the configured platform seller, zero commission, platform-funded processing and refunds. Approving terms does not enable checkout or venue payments. Existing quotes keep their approved version.</p>
     @if(session('success'))<div class="alert alert-success" role="status">{{ session('success') }}</div>@endif
     @if($errors->any())<div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>@endif
     <div class="card mb-6"><div class="card-body">
@@ -11,7 +11,7 @@
         <form method="POST" action="{{ route('admin.store-agreements.store', $seller) }}">
             @csrf
             <div class="row g-5">
-                <div class="col-md-12"><label class="form-label" for="offering_scope">These terms are for</label><select class="form-select" id="offering_scope" name="offering_scope" required><option value="purchase" @selected(old('offering_scope', 'purchase') === 'purchase')>Merchandise (store checkout)</option><option value="reservation" @selected(old('offering_scope') === 'reservation')>Venue bookings (deposit, balance and security payments; the commission is always taken from the venue's side)</option></select></div>
+                <div class="col-md-12"><label class="form-label" for="offering_scope">These terms are for</label><select class="form-select" id="offering_scope" name="offering_scope" required><option value="purchase" @selected(old('offering_scope', 'purchase') === 'purchase')>Merchandise (store checkout)</option><option value="reservation" @selected(old('offering_scope') === 'reservation')>Venue bookings (deposit, balance and security payments; the commission is always taken from the venue's side)</option><option value="badge_template" @selected(old('offering_scope') === 'badge_template')>Paid badge template licences</option></select></div>
                 @foreach(['percentage' => 'Commission percentage (0 is an explicit waiver)', 'cap_pesewas' => 'Commission cap (minor units; blank for uncapped)', 'gateway_estimate_rate' => 'Gateway estimate percentage'] as $field => $label)
                 <div class="col-md-4"><label class="form-label" for="{{ $field }}">{{ $label }}</label><input class="form-control" id="{{ $field }}" name="{{ $field }}" type="number" min="0" step="{{ $field === 'cap_pesewas' ? '1' : '0.01' }}" value="{{ old($field) }}" @required($field !== 'cap_pesewas')></div>
                 @endforeach
@@ -34,5 +34,9 @@
     @forelse($reservationAgreements as $agreement)
     <article class="card mb-4"><div class="card-body"><h3>Version {{ $agreement->version }}</h3><p>Approved {{ $agreement->approved_at->format('j M Y H:i') }} UTC · {{ $agreement->percentage }}% · Refund fees: {{ $agreement->refund_gateway_fee_bearer }} · Reserve: GHS {{ number_format(($agreement->payout_policy['holdback_pesewas'] ?? 0) / 100, 2) }}</p><p>{{ $agreement->collection_terms }}</p><p>{{ $agreement->refund_terms }}</p><p>{{ $agreement->support_contact }}</p><p>{{ $agreement->receipt_terms }}</p></div></article>
     @empty<p class="text-muted">No approved venue agreement. Venue payments cannot be enabled for this organisation.</p>@endforelse
+    <h2 class="mt-8">Badge template licence agreements</h2>
+    @forelse($badgeAgreements as $agreement)
+        <p>Version {{ $agreement->version }} · {{ $agreement->approved_at }} · {{ $agreement->receipt_terms }} · {{ $agreement->support_contact }}</p>
+    @empty<p class="text-muted">No approved paid badge licence agreement.</p>@endforelse
 </div>
 @endsection

@@ -15,7 +15,7 @@ use LogicException;
  */
 final class CommerceOfferingRegistry
 {
-    public function __construct(private readonly PurchaseOffering $purchase, private readonly VenueOffering $venue) {}
+    public function __construct(private readonly PurchaseOffering $purchase, private readonly VenueOffering $venue, private readonly BadgeTemplateOffering $badgeTemplate) {}
 
     public function for(StoreOrder $order): CommerceOffering
     {
@@ -28,6 +28,10 @@ final class CommerceOfferingRegistry
             throw new LogicException('A reservation order needs its venue charge.');
         }
 
+        if ($offering instanceof BadgeTemplateOffering && ! $this->badgeTemplate->hasPurchase($order)) {
+            throw new LogicException('A digital order needs its typed template purchase.');
+        }
+
         return $offering;
     }
 
@@ -36,6 +40,7 @@ final class CommerceOfferingRegistry
         return match ($type) {
             'purchase' => $this->purchase,
             'reservation' => $this->venue,
+            'badge_template' => $this->badgeTemplate,
             default => throw new LogicException("Unsupported order type [{$type}]."),
         };
     }

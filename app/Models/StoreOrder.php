@@ -85,6 +85,12 @@ final class StoreOrder extends Model
         return $this->hasOne(StoreReceipt::class, 'order_id');
     }
 
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<StoreRefund, $this> */
+    public function refunds(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(StoreRefund::class, 'order_id');
+    }
+
     /** @return \Illuminate\Database\Eloquent\Relations\HasMany<StorePaymentAttempt, $this> */
     public function attempts(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

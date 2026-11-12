@@ -9,6 +9,9 @@ use App\Http\Requests\Tenant\StoreTeamMemberRequest;
 use App\Http\Requests\Tenant\UpdateTeamMemberRequest;
 use App\Libraries\Helper;
 use App\Mail\Users\SendAccountDetails;
+use App\Models\BadgeTemplateLicenceEvent;
+use App\Models\BadgeTemplatePurchase;
+use App\Models\BadgeTemplateUse;
 use App\Models\Event;
 use App\Models\EventStaffAssignment;
 use App\Models\Role;
@@ -191,6 +194,12 @@ final class UserController extends Controller
 
         if ($this->isFinalActiveOrgSuperadmin($user, $tenant->id)) {
             return back()->with('error', 'Assign another active Org Superadmin before removing the final owner.');
+        }
+
+        if (BadgeTemplateLicenceEvent::query()->where('actor_id', $user->id)->exists()
+            || BadgeTemplateUse::query()->where('actor_id', $user->id)->exists()
+            || BadgeTemplatePurchase::query()->where('terms_snapshot->requested_by', (string) $user->id)->exists()) {
+            return back()->with('error', 'This account has paid badge template audit history. Deactivate its access instead of deleting the retained account.');
         }
 
         $user->tenants()->detach($tenant->id);

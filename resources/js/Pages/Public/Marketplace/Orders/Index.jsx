@@ -297,7 +297,9 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                 throw new Error('Checkout needs review. Refresh your order before trying again.');
             if (result.checkout_url) window.location.assign(result.checkout_url);
             else if (result.status === 'failed')
-                setError('The payment provider could not start this payment. Check your details and try again.');
+                setError(
+                    'The payment provider could not start this payment. Check your details and try again.'
+                );
             else setRevision((v) => v + 1);
         } catch (e) {
             if (!controller.signal.aborted) setError(e.message);
@@ -315,6 +317,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                 >
                     <a href="/my?section=money">My MiConvener</a>
                     <a href="/my/store-orders">All store orders</a>
+                    <a href="/my/badge-template-purchases">Badge licences</a>
                 </nav>
                 <p className="text-xs uppercase tracking-widest text-accent">Your purchases</p>
                 <h1 className="mt-3 text-3xl font-semibold tracking-tight">

@@ -35,6 +35,7 @@ final class CommerceOrderLocks
         return match ($type) {
             'purchase' => $this->inventory->order($order),
             'reservation' => $this->reservation($order),
+            'badge_template' => $this->badgeTemplate($order),
             default => throw new LogicException('The order type could not be resolved.'),
         };
     }
@@ -61,6 +62,24 @@ final class CommerceOrderLocks
 
             return $callback($listing, $this->calendar->booking($listing, $booking->id));
         });
+    }
+
+    private function badgeTemplate(StoreOrder $order): StoreOrder
+    {
+        $purchase = \App\Models\BadgeTemplatePurchase::query()->where('order_id', $order->id)->first();
+        $persisted = StoreOrder::query()->findOrFail($order->id);
+        if ($purchase === null) {
+            throw new LogicException('A digital order needs its typed template purchase.');
+        }
+        $this->inventory->tenant($persisted->tenant_id);
+        if ($purchase->buyer_tenant_id !== $persisted->tenant_id) {
+            $this->inventory->tenant($purchase->buyer_tenant_id);
+        }
+        \App\Models\Event::withoutGlobalScopes()->whereKey($purchase->event_id)->lock('for no key update')->firstOrFail();
+        $locked = StoreOrder::query()->lockForUpdate()->findOrFail($persisted->id);
+        \App\Models\BadgeTemplateLicence::query()->lockForUpdate()->findOrFail($purchase->licence_id);
+
+        return $locked;
     }
 
     private function reservation(StoreOrder $order): StoreOrder
