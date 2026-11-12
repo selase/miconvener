@@ -51,7 +51,18 @@ final class BadgeTemplateOffering implements CommerceOffering
 
     public function captureIssues(StoreOrder $order, StorePaymentObservation $capture): array
     {
-        return ['badge_template_capture_unavailable'];
+        $purchase = BadgeTemplatePurchase::query()->with(['event', 'version.design', 'licence'])->where('order_id', $order->id)->firstOrFail();
+        if ($purchase->event === null || $purchase->event->tenant_id !== $purchase->buyer_tenant_id || $purchase->version->design->withdrawn_at !== null) {
+            return ['template_target_unavailable'];
+        }
+        if ($purchase->state !== 'pending' || ! in_array($purchase->licence->state, ['pending', 'refunded', 'revoked'], true)) {
+            return ['template_licence_unavailable'];
+        }
+        if ($capture->paid_at === null || $capture->paid_at->greaterThanOrEqualTo($order->expires_at)) {
+            return ['capture_after_expiry'];
+        }
+
+        return [];
     }
 
     public function importsHistoricalCapture(StoreOrder $order): bool
@@ -66,7 +77,12 @@ final class BadgeTemplateOffering implements CommerceOffering
 
     public function applyCapture(StoreOrder $order, StorePaymentAttempt $attempt, StorePaymentObservation $capture): void
     {
-        throw new LogicException('Digital payment confirmation requires the licence issuer.');
+        $transaction = app(\App\Services\Finance\LedgerService::class)->recordBadgeTemplateSale($order, $attempt, $capture);
+        $capture->update(['ledger_transaction_id' => $transaction->id, 'processing_state' => 'posted', 'review_reason' => null]);
+        $order->update(['state' => 'confirmed', 'payment_state' => 'paid', 'ledger_state' => 'posted', 'paid_at' => $capture->paid_at, 'review_reason' => null]);
+        $attempt->update(['status' => 'succeeded', 'last_verified_at' => now()]);
+        app(\App\Services\Badges\BadgeTemplateLicences::class)->grant(BadgeTemplatePurchase::query()->where('order_id', $order->id)->firstOrFail(), $capture);
+        app(StoreReceipts::class)->capture($order);
     }
 
     public function expectedMetadata(StorePaymentAttempt $attempt): array
@@ -100,7 +116,7 @@ final class BadgeTemplateOffering implements CommerceOffering
         return ['number' => $order->id, 'seller' => $order->seller_snapshot['name'], 'currency' => $order->currency,
             'total_pesewas' => $order->charged_pesewas,
             'lines' => [['title' => $purchase->terms_snapshot['design_name'] ?? 'Badge template licence', 'quantity' => 1, 'amount_pesewas' => $order->charged_pesewas]],
-            'collection_terms' => 'Digital licence for '.$purchase->event->name.'. Unlimited badge reprints for this event.',
+            'digital_licence' => ['event' => $purchase->event->name, 'family_id' => $purchase->family_id, 'version_id' => $purchase->version_id, 'terms' => $purchase->terms_snapshot['licence'] ?? 'Unlimited badge reprints for this event.'],
             'refund_terms' => $order->terms_snapshot['refund_terms'] ?? '', 'support_contact' => $order->terms_snapshot['support_contact'] ?? ''];
     }
 }

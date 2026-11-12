@@ -40,7 +40,7 @@ final class BadgeTemplatePurchaseController extends Controller
         abort_unless($purchase->version_id === $request->validated('version_id'), 422);
         $attempt = app(StorePayments::class)->start($purchase->order, $request->session(), $request->validated('operation_key'), $request->validated('accepted_terms_hash'));
 
-        return response()->json(['status' => $attempt?->status, 'checkout_url' => $attempt?->checkout_url])->header('Cache-Control', 'private, no-store');
+        return response()->json(['status' => $attempt?->status, 'checkout_url' => $attempt?->status === 'ready' ? $attempt->checkout_url : null])->header('Cache-Control', 'private, no-store');
     }
 
     private function payload(BadgeTemplatePurchase $purchase): JsonResponse

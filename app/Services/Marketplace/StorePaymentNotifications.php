@@ -47,7 +47,7 @@ final class StorePaymentNotifications
     public function paystack(array $data, string $accountIdentity): bool
     {
         $metadata = WebhookController::metadata($data['metadata'] ?? null);
-        if (! in_array($metadata['source'] ?? null, ['miconvener_store', 'miconvener_venue'], true)) {
+        if (! in_array($metadata['source'] ?? null, ['miconvener_store', 'miconvener_venue', 'miconvener_badge_template'], true)) {
             return false;
         }
         $reference = $data['reference'] ?? null;

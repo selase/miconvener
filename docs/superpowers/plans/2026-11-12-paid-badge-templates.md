@@ -121,11 +121,11 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 
 **Interfaces** `BadgeTemplateLicences::grant(BadgeTemplatePurchase $purchase, StorePaymentObservation $capture): BadgeTemplateLicence`, invoked only inside the confirmed sale transaction. ReceiptContext contains seller identity, event, family/version, GH₵50 and the licence/refund terms snapshot.
 
-- [ ] Add failing `BadgeTemplatePaymentTest.php` for callback/webhook in either order, repeated observations, double payment, wrong amount/currency/reference/account/metadata, missing fees, ledger failure and a later reconciliation retry. Assert one sale, one active licence and one receipt outbox record.
-- [ ] Run red tests.
-- [ ] Route signed digital metadata through existing server verification. A browser success return grants nothing by itself. Commit ledger, attempt/order status, purchase and licence together after durable evidence capture. Extra/late/ambiguous captures stay in review. A capture after quote expiry follows the existing conservative review policy; staff may refund, and no stock/date assumption applies.
+- [x] Add failing `BadgeTemplatePaymentTest.php` for callback/webhook in either order, repeated observations, double payment, wrong amount/currency/reference/account/metadata, missing fees, ledger failure and a later reconciliation retry. Assert one sale, one active licence and one receipt outbox record.
+- [x] Run red tests.
+- [x] Route signed digital metadata through existing server verification. A browser success return grants nothing by itself. Commit ledger, attempt/order status, purchase and licence together after durable evidence capture. Extra/late/ambiguous captures stay in review. A capture after quote expiry follows the existing conservative review policy; staff may refund, and no stock/date assumption applies.
 - [ ] Preserve transactional email recovery when queue dispatch fails. Capture payer email immutably and provide receipt access to the buying organisation’s currently authorised event staff and original payer, without exposing seller finance data.
-- [ ] Run payment, signed-webhook, receipt/outbox and account-change tests; commit and tick.
+- [x] Run payment, signed-webhook, receipt/outbox and account-change tests; commit and tick.
 
 ### Task 5 — Adaptable preview, paid provenance and clean-output enforcement
 

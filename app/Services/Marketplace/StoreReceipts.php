@@ -27,7 +27,7 @@ final class StoreReceipts
                 return $existing;
             }
             $data = app(CommerceOfferingRegistry::class)->for($order)->receiptContext($order);
-            $snapshot = array_intersect_key($data, array_flip(['number', 'seller', 'currency', 'total_pesewas', 'lines', 'buyer_fee_pesewas', 'collection_terms', 'refund_terms', 'support_contact', 'charges', 'production_terms', 'customisation']));
+            $snapshot = array_intersect_key($data, array_flip(['digital_licence', 'number', 'seller', 'currency', 'total_pesewas', 'lines', 'buyer_fee_pesewas', 'collection_terms', 'refund_terms', 'support_contact', 'charges', 'production_terms', 'customisation']));
             $snapshot['issued_at'] = now()->toIso8601String();
             $snapshot['receipt_terms'] = $order->terms_snapshot['receipt_terms'] ?? '';
             $receipt = StoreReceipt::query()->create(['order_id' => $order->id, 'tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id,

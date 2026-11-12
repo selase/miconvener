@@ -1,5 +1,5 @@
 <x-mail::message>
-# {{ $isVenue ? 'Your venue payment receipt' : 'Your store order receipt' }}
+# {{ $isDigital ? 'Your badge template licence receipt' : ($isVenue ? 'Your venue payment receipt' : 'Your store order receipt') }}
 
 {{ $receipt['seller'] }} · Order {{ $receipt['number'] }}
 
@@ -24,10 +24,15 @@ Checkout fee: {{ $receipt['currency'] }} {{ number_format($receipt['buyer_fee_pe
 @endif
 **Total: {{ $receipt['currency'] }} {{ number_format($receipt['total_pesewas'] / 100, 2) }}**
 
-@unless ($isVenue)
+@if ($isDigital)
+## Event licence
+{{ $receipt['digital_licence']['event'] }}
+
+{{ $receipt['digital_licence']['terms'] }}
+@elseif (!$isVenue)
 ## Collection
 {{ $receipt['collection_terms'] }}
-@endunless
+@endif
 
 ## Refunds and support
 {{ $receipt['refund_terms'] }}
@@ -38,5 +43,9 @@ Checkout fee: {{ $receipt['currency'] }} {{ number_format($receipt['buyer_fee_pe
 
 <x-mail::button :url="$orderUrl">{{ $isVenue ? 'Read your booking' : 'Read your order' }}</x-mail::button>
 
+@if ($isDigital)
+Verify the original payer email to open this private payment record. Your organisation can apply the licensed design from the event badge library.
+@else
 Verify the original buyer email to open your private record. This receipt is a payment record, not a VAT invoice{{ $isVenue ? '.' : ' or proof of collection.' }} Refund updates appear on your {{ $isVenue ? 'booking' : 'order' }}.
+@endif
 </x-mail::message>
