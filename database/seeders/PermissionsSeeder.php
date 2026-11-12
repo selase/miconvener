@@ -285,6 +285,12 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'manage template refunds',
+                'guard_name' => 'web',
+                'category' => 'platform',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'purchase badge-templates',
                 'guard_name' => 'web',
                 'category' => 'event',

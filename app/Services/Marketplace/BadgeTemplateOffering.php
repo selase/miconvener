@@ -39,6 +39,7 @@ final class BadgeTemplateOffering implements CommerceOffering
 
     public function assertNewAttempt(StoreOrder $order): void
     {
+        app(\App\Services\Badges\BadgeTemplateReserve::class)->assertCapacity($order->tenant, $order->charged_pesewas, $order->id);
         if ($order->charged_pesewas !== 5000 || $order->currency !== 'GHS' || $order->platform_fee_pesewas !== 0) {
             throw ValidationException::withMessages(['checkout' => 'The paid template price is unavailable.']);
         }
@@ -90,10 +91,7 @@ final class BadgeTemplateOffering implements CommerceOffering
         return ['source' => 'miconvener_badge_template', 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id];
     }
 
-    public function assertRefund(StoreOrder $order): void
-    {
-        throw ValidationException::withMessages(['refund' => 'Digital refunds require the platform licence refund workflow.']);
-    }
+    public function assertRefund(StoreOrder $order): void {}
 
     public function refundAllocation(StoreOrder $order, StorePaymentObservation $capture, bool $sale): CommerceRefundAllocation
     {
@@ -104,9 +102,14 @@ final class BadgeTemplateOffering implements CommerceOffering
         return new CommerceRefundAllocation(0, 0, $sale ? 0 : $capture->amount_pesewas, 'platform', false);
     }
 
+    public function prepareRefund(StoreRefund $refund, bool $exception = false): void
+    {
+        app(\App\Services\Badges\BadgeTemplateRefunds::class)->prepare($refund, $exception);
+    }
+
     public function applyRefund(StoreRefund $refund, StoreOrder $order): void
     {
-        throw new LogicException('Digital refunds require the licence refund workflow.');
+        app(\App\Services\Badges\BadgeTemplateRefunds::class)->confirmed($refund, $order);
     }
 
     public function receiptContext(StoreOrder $order): array

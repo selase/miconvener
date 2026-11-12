@@ -73,6 +73,8 @@ interface CommerceOffering
     /**
      * Apply a confirmed refund's effect on the order.
      */
+    public function prepareRefund(StoreRefund $refund, bool $exception = false): void;
+
     public function applyRefund(StoreRefund $refund, StoreOrder $order): void;
 
     /**

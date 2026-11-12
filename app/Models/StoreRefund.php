@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $observation_id
  * @property string $operation_key
  * @property string $account_fingerprint
+ * @property int|null $requested_by
  * @property string $reason
  * @property int $amount_pesewas
  * @property int $seller_debit_pesewas

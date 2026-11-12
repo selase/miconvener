@@ -147,11 +147,11 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 **Interfaces** `BadgeTemplateRefunds::request(BadgeTemplatePurchase $purchase, User $actor, string $operationKey, string $reason, bool $exception = false): StoreRefund`. Buyer request records intent; only platform staff with the platform-scoped `manage template refunds` permission may authorise money movement.
 
 - [ ] Add failing `BadgeTemplateRefundTest.php` for unused within seven days, exact seven-day boundary, applied-but-unexported design, used/out-of-window support referral, confirmed/failed/unknown refunds, insufficient funding, duplicate operation keys, extra-capture refunds, refund/use race and repurchase after confirmed refund.
-- [ ] Run red tests.
-- [ ] Refund approval locks the licence slot, checks use history and immediately suspends output while funding/provider status is pending. A definitive refusal restores access only after terminal provider verification and an explicit recorded transition. Unknown stays suspended. Confirmed full refund revokes access and reverses only the refunded purchase’s applied sale. Refunding an extra capture leaves the valid licence active.
-- [ ] Freeze refund amount/account/fee bearer and reserve funding before provider submission outside business locks. Reuse stable operation identity and reconciliation. Return full GH₵50 on an approved primary refund. Retain first-use evidence and previous files/history. Require a reason and platform-only audited exception for a used licence.
+- [x] Run red tests.
+- [x] Refund approval locks the licence slot, checks use history and immediately suspends output while funding/provider status is pending. A definitive refusal restores access only after terminal provider verification and an explicit recorded transition. Unknown stays suspended. Confirmed full refund revokes access and reverses only the refunded purchase’s applied sale. Refunding an extra capture leaves the valid licence active.
+- [x] Freeze refund amount/account/fee bearer and reserve funding before provider submission outside business locks. Reuse stable operation identity and reconciliation. Return full GH₵50 on an approved primary refund. Retain first-use evidence and previous files/history. Require a reason and platform-only audited exception for a used licence.
 - [ ] Offer replacement/free-design restoration after refund, preserving the last paid revision as locked history. No partial refunds in this slice.
-- [ ] Verify existing store/venue refunds, fees, unknown results, funding and payout balances; commit and tick.
+- [x] Verify existing store/venue refunds, fees, unknown results, funding and payout balances; commit and tick.
 
 ### Task 7 — Buyer and platform operations UI
 

@@ -70,6 +70,7 @@ final class BadgeTemplatePurchases
             if (StoreOrder::query()->where('shop_id', $agreement->shop_id)->where('buyer_email', $email)->where('submission_key', $operationKey)->exists()) {
                 $this->refuse();
             }
+            app(BadgeTemplateReserve::class)->assertCapacity($agreement->tenant, $price->minor);
             $licence = BadgeTemplateLicence::query()->whereKey($licence->id)->lockForUpdate()->firstOrFail();
             $terms = ['requested_by' => $actor->id, 'seller_name' => $agreement->shop->name, 'commercial_policy_reference' => config('services.badge_templates.commercial_approval'), 'buyer_tenant_id' => $buyer->id, 'event_id' => $event->id, 'event_name' => $event->name,
                 'family_id' => $family->id, 'version_id' => $version->id, 'design_name' => $family->name,

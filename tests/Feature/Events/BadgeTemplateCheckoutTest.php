@@ -29,6 +29,7 @@ beforeEach(function (): void {
     config(['services.settlement.paystack.secret_key' => 'sk_test_badge', 'services.badge_templates.seller_tenant_id' => $this->seller->id,
         'services.badge_templates.commercial_approval' => 'owner-approved-test-policy']);
     $this->buyer->features()->create(['feature_key' => 'paid_badge_templates', 'enabled' => true]);
+    app(App\Services\Finance\LedgerService::class)->postTransaction($this->seller, null, 'badge_template_reserve_funding', 'Synthetic reserve funding', 'checkout-funding', [['code' => '1020', 'direction' => 'debit', 'amount' => 50000], ['code' => '1010', 'direction' => 'credit', 'amount' => 50000]], null, 'GHS', App\Enum\LedgerCategoryEnum::Commerce);
     StoreCommercialAgreement::factory()->create(['tenant_id' => $this->seller->id, 'shop_id' => $fixture->order->shop_id, 'version' => 2, 'offering_scope' => 'badge_template', 'percentage' => '0.00', 'refund_gateway_fee_bearer' => 'platform', 'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
 });
 
@@ -121,4 +122,14 @@ test('a later family version reuses the original pending licence checkout and de
     $this->travel(2)->minutes();
     $again = $service->quote($this->event, $later, $this->actor, 'buyer@example.test', (string) Str::uuid());
     expect($again->id)->toBe($first->id)->and($again->order->expires_at->equalTo($first->order->expires_at))->toBeTrue();
+});
+
+test('a new purchase cannot spend refund backing promised to an existing event', function (): void {
+    app(App\Services\Finance\LedgerService::class)->postTransaction($this->seller, null, 'badge_template_reserve_adjustment', 'Synthetic reserve adjustment', 'reduce-fixture', [
+        ['code' => '1010', 'direction' => 'debit', 'amount' => 45000], ['code' => '1020', 'direction' => 'credit', 'amount' => 45000],
+    ], null, 'GHS', App\Enum\LedgerCategoryEnum::Commerce);
+    $service = app(BadgeTemplatePurchases::class);
+    $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $other = App\Models\Event::factory()->create(['tenant_id' => $this->buyer->id]);
+    expect(fn () => $service->quote($other, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid()))->toThrow(ValidationException::class);
 });
