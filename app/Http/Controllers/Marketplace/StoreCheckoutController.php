@@ -44,7 +44,7 @@ final class StoreCheckoutController extends Controller
         if ($attempt->order->offering_type === 'badge_template') {
             $purchase = \App\Models\BadgeTemplatePurchase::query()->where('order_id', $attempt->order_id)->firstOrFail();
 
-            return redirect()->route('badge-template-purchases.show', $purchase->id);
+            return redirect()->to(mb_rtrim((string) config('app.url'), '/').route('badge-template-purchases.show', $purchase->id, false));
         }
 
         if ($attempt->order->offering_type === 'reservation') {

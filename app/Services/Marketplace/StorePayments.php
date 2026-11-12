@@ -74,9 +74,12 @@ final class StorePayments
         }
         try {
             $order = $attempt->order;
+            $callbackUrl = $order->offering_type === 'badge_template'
+                ? mb_rtrim((string) config('app.url'), '/').route('store.checkout.callback', ['reference' => $attempt->reference], false)
+                : route('store.checkout.callback', ['reference' => $attempt->reference]);
             $url = WithoutTelescope::run(fn () => $this->gateways->forAttempt($attempt)->createStoreCheckoutSession(
                 $order->buyer_email, $attempt->amount_pesewas, $attempt->currency,
-                route('store.checkout.callback', ['reference' => $attempt->reference]),
+                $callbackUrl,
                 $this->offerings->for($order)->expectedMetadata($attempt),
                 $attempt->reference,
             ));
