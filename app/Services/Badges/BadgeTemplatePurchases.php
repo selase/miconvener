@@ -40,6 +40,7 @@ final class BadgeTemplatePurchases
             if ($buyer->id !== $agreement->tenant_id) {
                 $this->locks->tenant($buyer->id);
             }
+            $event = Event::query()->whereKey($event->id)->lock('for no key update')->firstOrFail();
             $this->authorize($actor, $event);
             $agreement = $this->readiness->agreement($buyer);
             $version = BadgeLibraryVersion::query()->with('design')->whereKey($version->id)->firstOrFail();
@@ -49,6 +50,9 @@ final class BadgeTemplatePurchases
                 $this->refuse();
             }
             $licence = BadgeTemplateLicence::query()->firstOrCreate(['buyer_tenant_id' => $buyer->id, 'event_id' => $event->id, 'family_id' => $family->id]);
+            if ($licence->state === 'suspended') {
+                throw ValidationException::withMessages(['checkout' => 'Resolve the pending licence refund before making another purchase.']);
+            }
             $prior = BadgeTemplatePurchase::query()->where('licence_id', $licence->id)->whereIn('state', ['pending', 'review', 'paid'])->latest()->first();
             if ($prior !== null) {
                 $order = $this->orderLocks->order($prior->order);

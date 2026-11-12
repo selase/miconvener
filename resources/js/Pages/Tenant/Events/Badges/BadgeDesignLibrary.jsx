@@ -6,6 +6,7 @@ import Select from '@/Components/Console/Select';
 import SearchInput from '@/Components/Console/SearchInput';
 import ArtifactErrors from '../Certificates/ArtifactErrors';
 import BadgeLayoutPreview from './BadgeLayoutPreview';
+import BadgeTemplatePurchase from './BadgeTemplatePurchase';
 import csrfFetch from '@/lib/csrfFetch';
 import { artifactJson } from '@/lib/artifactResponse';
 
@@ -40,6 +41,8 @@ export default function BadgeDesignLibrary({
     }, [preview]);
     const [mapping, setMapping] = useState({});
     const [size, setSize] = useState({ width_mm: 54, height_mm: 85 });
+    const [expectedVersion, setExpectedVersion] = useState(template.design_version);
+    const [recoveryDraft, setRecoveryDraft] = useState(null);
     const [restore, setRestore] = useState('');
     const [attendee, setAttendee] = useState('');
     const [rights, setRights] = useState(false);
@@ -57,7 +60,16 @@ export default function BadgeDesignLibrary({
     const load = async () => {
         setError(null);
         try {
-            setData(await call('index'));
+            const loaded = await call('index');
+            setData(loaded);
+            if (loaded.can_purchase) {
+                const saved = await artifactJson(
+                    await csrfFetch(
+                        route('tenant.events.badges.purchases.draft', { event: event.id })
+                    )
+                );
+                setRecoveryDraft(saved.draft ? { ...saved.draft, version: saved.version } : null);
+            }
         } catch (reason) {
             setError(reason);
         }
@@ -86,6 +98,7 @@ export default function BadgeDesignLibrary({
                 composition: nextComposition,
             });
             setSelected(design);
+            setExpectedVersion(template.design_version);
             setPreview(result);
             setRestore('');
             setComposition(nextComposition);
@@ -124,7 +137,7 @@ export default function BadgeDesignLibrary({
         run(async () => {
             await call('apply', {
                 version_id: selected.versions[0].id,
-                expected_version: template.design_version,
+                expected_version: expectedVersion,
                 category_labels: mapping,
                 composition,
                 ...size,
@@ -150,7 +163,9 @@ export default function BadgeDesignLibrary({
         (design) =>
             design.name.toLowerCase().includes(query.toLowerCase()) &&
             (priceFilter === 'all' ||
-                (priceFilter === 'paid' ? design.price_pesewas > 0 : design.price_pesewas === 0)) &&
+                (priceFilter === 'paid'
+                    ? design.requires_licence || design.price_pesewas > 0
+                    : !design.requires_licence && design.price_pesewas === 0)) &&
             (source === 'all' ||
                 (source === 'platform'
                     ? design.scope === 'platform'
@@ -184,6 +199,42 @@ export default function BadgeDesignLibrary({
                     {message}
                 </p>
             )}
+            {recoveryDraft && (
+                <div className="space-y-2 border border-border p-4">
+                    <p className="text-sm">You have a saved paid-design proposal for this event.</p>
+                    <Button
+                        disabled={busy}
+                        onClick={async () => {
+                            let design = data.designs.find(
+                                (item) =>
+                                    item.id === recoveryDraft.version?.family_id ||
+                                    item.versions.some(
+                                        (version) => version.id === recoveryDraft.version_id
+                                    )
+                            );
+                            if (design && recoveryDraft.version) {
+                                design = { ...design, versions: [recoveryDraft.version] };
+                            }
+                            if (!design) {
+                                setMessage(
+                                    'The saved version is no longer available. Choose a current design.'
+                                );
+                                return;
+                            }
+                            await choose(design, recoveryDraft.composition);
+                            setSize({
+                                width_mm: recoveryDraft.width_mm,
+                                height_mm: recoveryDraft.height_mm,
+                            });
+                            setMapping(recoveryDraft.category_labels || {});
+                            setExpectedVersion(recoveryDraft.expected_version);
+                            setRecoveryDraft(null);
+                        }}
+                    >
+                        Resume saved proposal
+                    </Button>
+                </div>
+            )}
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
                 <div className="min-w-0 space-y-4">
                     <div className="flex flex-wrap gap-3">
@@ -209,7 +260,7 @@ export default function BadgeDesignLibrary({
                         >
                             <option value="all">Free and paid</option>
                             <option value="free">Free designs</option>
-                            <option value="paid">GH₵50 previews</option>
+                            <option value="paid">Paid designs</option>
                         </Select>
                         <Select
                             aria-label="Design orientation"
@@ -262,7 +313,12 @@ export default function BadgeDesignLibrary({
                                         : design.scope === 'event'
                                           ? 'This event only'
                                           : 'Organisation'}{' '}
-                                    · {design.price_pesewas ? 'GH₵50 · Preview only' : 'Free'}
+                                    ·{' '}
+                                    {design.purchased
+                                        ? 'Purchased'
+                                        : design.requires_licence || design.price_pesewas
+                                          ? 'GH₵50 per design family / event'
+                                          : 'Free'}
                                 </p>
                                 <Button
                                     className="mt-auto justify-center"
@@ -388,6 +444,70 @@ export default function BadgeDesignLibrary({
                     )}
                 </aside>
             </div>
+            {data?.purchases?.length > 0 && (
+                <section
+                    className="space-y-3 border-t border-border pt-5"
+                    aria-label="Event template purchase history"
+                >
+                    <h3 className="font-semibold">Template purchases and receipts</h3>
+                    {data.purchases.map((purchase) => (
+                        <details
+                            key={purchase.purchase_id}
+                            className="space-y-3 border border-border p-4"
+                        >
+                            <summary className="cursor-pointer text-sm font-medium">
+                                {purchase.terms.design_name || 'Badge template'} · GH₵50 ·{' '}
+                                {purchase.state}
+                            </summary>
+                            <p className="mt-3 text-sm">
+                                Licence {purchase.licence_state}.{' '}
+                                {purchase.used
+                                    ? 'Clean output has been requested.'
+                                    : 'Clean output has not been requested.'}
+                            </p>
+                            <p className="text-sm">{purchase.terms.licence}</p>
+                            <p className="text-sm">{purchase.terms.refund_terms}</p>
+                            {purchase.receipt ? (
+                                <p className="break-words text-sm">
+                                    Receipt {purchase.receipt.number} ·{' '}
+                                    {purchase.receipt.receipt_terms}
+                                </p>
+                            ) : (
+                                <p className="text-sm text-ink-secondary">
+                                    The receipt appears after payment confirmation.
+                                </p>
+                            )}
+                            <p className="text-sm">Support · {purchase.terms.support_contact}</p>
+                            <Button
+                                variant="default"
+                                disabled={busy}
+                                onClick={() =>
+                                    run(async () => {
+                                        const updated = await artifactJson(
+                                            await csrfFetch(
+                                                route('tenant.events.badges.purchases.show', {
+                                                    event: event.id,
+                                                    purchase: purchase.purchase_id,
+                                                })
+                                            )
+                                        );
+                                        setData((current) => ({
+                                            ...current,
+                                            purchases: current.purchases.map((item) =>
+                                                item.purchase_id === updated.purchase_id
+                                                    ? updated
+                                                    : item
+                                            ),
+                                        }));
+                                    })
+                                }
+                            >
+                                Refresh licence status
+                            </Button>
+                        </details>
+                    ))}
+                </section>
+            )}
             {selected && preview && (
                 <section
                     className="space-y-4 border-t border-border pt-5"
@@ -407,10 +527,106 @@ export default function BadgeDesignLibrary({
                                 alt="Watermarked paid design preview"
                                 className="mx-auto max-h-96"
                             />
-                            <p className="text-sm text-ink-secondary">
-                                GH₵50 per event with unlimited reprints. Purchasing will be
-                                available in the next stage.
-                            </p>
+                            <div className="flex flex-wrap items-end gap-3">
+                                <label className="text-sm">
+                                    Width (mm)
+                                    <Input
+                                        type="number"
+                                        min="40"
+                                        max="210"
+                                        value={size.width_mm}
+                                        onChange={(e) =>
+                                            setSize({ ...size, width_mm: Number(e.target.value) })
+                                        }
+                                    />
+                                </label>
+                                <label className="text-sm">
+                                    Height (mm)
+                                    <Input
+                                        type="number"
+                                        min="40"
+                                        max="210"
+                                        value={size.height_mm}
+                                        onChange={(e) =>
+                                            setSize({ ...size, height_mm: Number(e.target.value) })
+                                        }
+                                    />
+                                </label>
+                                <label className="text-sm">
+                                    Face
+                                    <Select
+                                        value={previewFace}
+                                        onChange={(e) => setPreviewFace(e.target.value)}
+                                    >
+                                        <option value="front">Front</option>
+                                        <option value="back">Back</option>
+                                    </Select>
+                                </label>
+                                <Button
+                                    disabled={busy}
+                                    onClick={() =>
+                                        run(async () => {
+                                            const result = await call('preview', null, {
+                                                version: selected.versions[0].id,
+                                                composition,
+                                                side: previewFace,
+                                                ...size,
+                                                sample_name:
+                                                    previewBadge?.full_name || 'Sample attendee',
+                                                sample_category: 'Participant',
+                                            });
+                                            setPreview(result);
+                                        })
+                                    }
+                                >
+                                    Update watermarked preview
+                                </Button>
+                            </div>
+                            {(selected.purchase_requirements?.length
+                                ? selected.purchase_requirements
+                                : [{ family_id: selected.id, version_id: selected.versions[0].id }]
+                            ).map((requirement) => (
+                                <BadgeTemplatePurchase
+                                    key={requirement.family_id}
+                                    event={event}
+                                    versionId={requirement.version_id}
+                                    draft={{
+                                        version_id: selected.versions[0].id,
+                                        expected_version: expectedVersion,
+                                        category_labels: mapping,
+                                        composition,
+                                        ...size,
+                                    }}
+                                    canPurchase={data?.can_purchase}
+                                    checkoutReady={data?.checkout_ready}
+                                    onPurchased={() => {
+                                        setSelected((current) => {
+                                            if (!current) return current;
+                                            const remaining = (
+                                                current.purchase_requirements || []
+                                            ).filter(
+                                                (item) => item.family_id !== requirement.family_id
+                                            );
+                                            return {
+                                                ...current,
+                                                purchase_requirements: remaining,
+                                                purchased: remaining.length === 0,
+                                            };
+                                        });
+                                    }}
+                                />
+                            ))}
+                            {selected.purchased && (
+                                <>
+                                    <p className="text-sm">
+                                        Replace this event’s current design? The previous version
+                                        will be saved.
+                                    </p>
+                                    <Button disabled={busy} onClick={replace}>
+                                        Apply purchased design to this event
+                                    </Button>
+                                </>
+                            )}
                         </>
                     ) : (
                         <>

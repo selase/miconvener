@@ -76,6 +76,7 @@ final class BadgeTemplateAccess
         }
 
         return $event->getConnection()->transaction(function () use ($event, $actor, $familyIds, $purpose, $outputKey, $context): array {
+            $event = Event::query()->whereKey($event->id)->lock('for no key update')->firstOrFail();
             $template = app(BadgeTemplateService::class)->forEvent($event);
             $template = EventBadgeTemplate::withoutGlobalScopes()->where('event_id', $event->id)->whereKey($template->id)->lockForUpdate()->firstOrFail();
             $this->authorize($actor, $event);

@@ -58,3 +58,27 @@ it('restores active recording after successful and failed operations', function 
         }
     }
 });
+
+it('excludes paid design payment and artwork responses from request diagnostics', function (): void {
+    if (! class_exists(Telescope::class)) {
+        test()->markTestSkipped('Telescope is absent from production dependencies.');
+    }
+    $filters = Telescope::$filterUsing;
+    $request = app('request');
+    $environment = app()->environment();
+    app()->instance('env', 'local');
+    try {
+        Telescope::$filterUsing = [];
+        (new App\Providers\TelescopeServiceProvider(app()))->register();
+        foreach (['events/event/badges/library/purchases/purchase/checkout', 'events/event/badges/library/payer', 'events/event/badges/library/purchase-draft', 'events/event/data/badges', 'events/event/badges/template/artwork', 'admin/badge-template-sales'] as $path) {
+            app()->instance('request', Illuminate\Http\Request::create('http://local.test/'.$path));
+            $entry = new Laravel\Telescope\IncomingEntry(['uri' => '/'.$path]);
+            $entry->type = 'request';
+            expect(collect(Telescope::$filterUsing)->every(fn ($filter) => $filter($entry)))->toBeFalse();
+        }
+    } finally {
+        Telescope::$filterUsing = $filters;
+        app()->instance('request', $request);
+        app()->instance('env', $environment);
+    }
+});

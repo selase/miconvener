@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $family_id
  * @property string $version_id
  * @property array<string, mixed> $terms_snapshot
+ * @property bool $uses_exists
  * @property string $state
  */
 final class BadgeTemplatePurchase extends Model
@@ -41,6 +42,12 @@ final class BadgeTemplatePurchase extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(StoreOrder::class, 'order_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<BadgeTemplateUse, $this> */
+    public function uses(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BadgeTemplateUse::class, 'purchase_id');
     }
 
     /** @return BelongsTo<Event, $this> */

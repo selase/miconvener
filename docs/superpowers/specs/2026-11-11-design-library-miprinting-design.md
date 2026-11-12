@@ -137,6 +137,8 @@ Acceptance covers cross-tenant access, restricted event staff, previous designs,
 
 ### M2 — GH₵50 access and purchase recovery
 
+Status on 12 November 2026 — native implementation built on `codex/paid-badge-templates`, pending final review/CI and owner merge approval. Paid production sales remain off. Hosted-provider acceptance, legal seller/tax approval and actual reserve funding remain release gates. See `plans/2026-11-12-paid-badge-templates.md` for the verification record.
+
 Implement server pricing, the agreed licence scope, explicit purchase permission, digital offering, platform commercial terms and seller identity, payment verification, atomic entitlement/receipt, refund semantics and recovery UI. A fully refunded, unused licence returns to preview-only access. Record first use when a clean asset download, clean PDF or licensed production pack is generated. Watermarked previews and provisional edits do not count as use. Define the refund treatment for a design already used before enabling sales. A receipt and purchase record identify the licensed event/version.
 
 Acceptance covers free use, preview watermark, clean-export protection, 5,000-pesewa pricing, double-click/retry/callback/webhook races, wrong account/amount/currency, pending provider outcomes, entitlement across orientation changes, staff revocation and the existing merchandise/venue finance regression suites. Verify the live licence purchase at an owner-approved amount after sandbox acceptance.

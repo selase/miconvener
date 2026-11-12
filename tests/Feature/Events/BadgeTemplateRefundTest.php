@@ -136,7 +136,30 @@ test('access can be restored only after the original provider confirms refund fa
         '*api.paystack.co/refund/124' => Http::response(['data' => ['id' => 124, 'status' => 'failed', 'amount' => 5000, 'currency' => 'GHS', 'merchant_note' => 'store:'.$refund->operation_key, 'transaction' => ['id' => 988]]]),
         '*api.paystack.co/transaction/verify/*' => Http::response(['data' => ['id' => 988, 'reference' => $this->attempt->reference, 'status' => 'success', 'amount' => 5000, 'fees' => 100, 'currency' => 'GHS']]),
     ]);
-    app(BadgeTemplateRefunds::class)->restore($refund, $this->actor, (string) Str::uuid(), 'Verified failure; reopen paid access');
+    $restoreKey = (string) Str::uuid();
+    app(BadgeTemplateRefunds::class)->restore($refund, $this->actor, $restoreKey, 'Verified failure; reopen paid access');
+    expect(fn () => app(BadgeTemplateRefunds::class)->restore($refund, $this->actor, $restoreKey, 'A changed restoration reason'))->toThrow(ValidationException::class);
     expect($this->purchase->licence->fresh()->state)->toBe('active')->and($this->purchase->order->fresh()->payment_state)->toBe('paid')
         ->and($refund->fresh()->status)->not->toBe('confirmed');
+});
+
+test('the platform digital sales desk requires platform finance and offers captured refunds', function (): void {
+    $this->actingAs($this->actor)->get('/admin/badge-template-sales')->assertOk()->assertSee('Badge template sales')->assertSee($this->purchase->event->name)->assertSee('<span class="menu-title">Badge template sales</span>', false);
+    $this->purchase->event->delete();
+    $this->get('/admin/badge-template-sales')->assertOk()->assertSee('Badge template sales');
+    $tenantActor = User::factory()->create(['tenant_id' => $this->purchase->buyer_tenant_id]);
+    $this->actingAs($tenantActor)->get('/admin/badge-template-sales')->assertForbidden();
+});
+
+test('platform finance can approve a digital refund through the real desk while tenant staff cannot', function (): void {
+    $path = '/admin/badge-template-sales/'.$this->purchase->id;
+    $data = ['action' => 'refund', 'capture_id' => $this->capture->id, 'operation_key' => (string) Str::uuid(), 'reason' => 'Unused event licence refund requested'];
+    $tenantActor = User::factory()->create(['tenant_id' => $this->purchase->buyer_tenant_id]);
+    $this->actingAs($tenantActor)->post($path, $data)->assertForbidden();
+    $this->actingAs($this->actor)->post($path, $data)->assertRedirect()->assertSessionHasNoErrors();
+    expect($this->purchase->licence->fresh()->state)->toBe('suspended')
+        ->and(App\Models\StoreRefund::query()->where('order_id', $this->purchase->order_id)->count())->toBe(1);
+    $this->post($path, $data)->assertRedirect()->assertSessionHasNoErrors();
+    expect(App\Models\StoreRefund::query()->where('order_id', $this->purchase->order_id)->count())->toBe(1);
+    Http::assertNothingSent();
 });

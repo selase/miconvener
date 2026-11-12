@@ -318,6 +318,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::get('/thumbnails/{version}', 'thumbnail')->middleware('throttle:60,1')->name('thumbnail');
         Route::post('/{design}/withdraw', 'withdraw')->name('withdraw');
     });
+    Route::get('events/{event}/badges/library/payer', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'payer'])->name('tenant.events.badges.purchases.payer');
+    Route::post('events/{event}/badges/library/payer', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'verifyPayer'])->middleware('throttle:10,1')->name('tenant.events.badges.purchases.verify-payer');
+    Route::get('events/{event}/badges/library/purchase-draft', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'draft'])->name('tenant.events.badges.purchases.draft');
+    Route::post('events/{event}/badges/library/purchase-draft', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'saveDraft'])->middleware('throttle:30,1')->name('tenant.events.badges.purchases.save-draft');
+    Route::get('events/{event}/badges/library/purchases/{purchase}', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'show'])->name('tenant.events.badges.purchases.show');
     Route::post('events/{event}/badges/library/purchases', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'store'])->middleware('throttle:10,1')->name('tenant.events.badges.purchases.store');
     Route::post('events/{event}/badges/library/purchases/{purchase}/checkout', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'checkout'])->middleware('throttle:10,1')->name('tenant.events.badges.purchases.checkout');
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');

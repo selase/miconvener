@@ -96,7 +96,9 @@ final class BadgeTemplateRefunds
             $purchase = BadgeTemplatePurchase::query()->with('licence')->where('order_id', $order->id)->firstOrFail();
             $key = (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'badge-refund-restore:'.$operationKey);
             $prior = BadgeTemplateLicenceEvent::query()->where('licence_id', $purchase->licence_id)->where('operation_key', $key)->first();
-            if ($prior !== null && ($prior->evidence['refund_id'] ?? null) === $refund->id && $purchase->licence->state === 'active' && $purchase->licence->current_purchase_id === $purchase->id) {
+            if ($prior !== null && ($prior->evidence['refund_id'] ?? null) === $refund->id
+                && ($prior->evidence['reason'] ?? null) === mb_trim($reason) && (string) $prior->actor_id === (string) $actor->id
+                && $purchase->licence->state === 'active' && $purchase->licence->current_purchase_id === $purchase->id) {
                 return $purchase->licence;
             }
             if ($purchase->licence->state !== 'suspended' || $purchase->licence->current_purchase_id !== $purchase->id || $purchase->state !== 'paid') {

@@ -2,7 +2,7 @@
 
 > **For agentic workers** use `superpowers:executing-plans` for the native implementation, task by task. Track each step in its implementation commit. Use test-first development and one focused whole-change review before merge.
 
-**Status** Owner approved native implementation and recommendations on 12 November 2026. Implementation in progress. Merge, production setup and activation retain their explicit release gates.
+**Status** Owner approved native implementation and recommendations on 12 November 2026. Implementation built locally. Final regressions and independent review are in progress. Hosted-provider acceptance, merge, production setup and activation retain their explicit release gates.
 
 **Goal** Sell a reusable design-family licence for GH₵50 per event, with unlimited edits and reprints, through the badge library.
 
@@ -95,7 +95,7 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 
 **Interfaces** `BadgeTemplateOffering` implements every existing CommerceOffering method. Add a single financial-policy result to the offering contract for sale/refund classification and funding, with existing purchase/venue adapters reproducing their current values exactly. Digital uses platform revenue/reserve and no restock. Do not branch money behaviour from client metadata.
 
-**Lock order** Seller tenant, buyer tenant when distinct, order, licence slot and use/refund claim. Always take seller before buyer for digital orders. Existing goods/venue ordering stays intact. Badge edit/export operations lock only the event template then licence slot, and never request a tenant/order lock afterwards. Licence issuance never waits for the template. Document and test this acyclic order before coding the writers.
+**Lock order** Seller tenant, buyer tenant when distinct, event (`FOR NO KEY UPDATE`), order, licence slot and use/refund claim. Always take seller before buyer for digital orders. Existing goods/venue ordering stays intact. Badge clean-output operations lock the event (`FOR NO KEY UPDATE`), event template, then sorted licence slots, and never request a tenant/order lock afterwards. Licence issuance never waits for the template. Document and test this acyclic order before coding the writers.
 
 - [x] Add failing `BadgeTemplateAccountingTest.php` and extend `CommerceOfferingDispatchTest.php`. Assert exact 5,000 sale journal, provider fee, zero merchant payable/commission, digital exclusion from payouts, review-liability journal, balanced refund and original-account matching. Unknown types still fail closed.
 - [x] Run and record failures.
@@ -124,7 +124,7 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 - [x] Add failing `BadgeTemplatePaymentTest.php` for callback/webhook in either order, repeated observations, double payment, wrong amount/currency/reference/account/metadata, missing fees, ledger failure and a later reconciliation retry. Assert one sale, one active licence and one receipt outbox record.
 - [x] Run red tests.
 - [x] Route signed digital metadata through existing server verification. A browser success return grants nothing by itself. Commit ledger, attempt/order status, purchase and licence together after durable evidence capture. Extra/late/ambiguous captures stay in review. A capture after quote expiry follows the existing conservative review policy; staff may refund, and no stock/date assumption applies.
-- [ ] Preserve transactional email recovery when queue dispatch fails. Capture payer email immutably and provide receipt access to the buying organisation’s currently authorised event staff and original payer, without exposing seller finance data.
+- [x] Preserve transactional email recovery when queue dispatch fails. Capture payer email immutably and provide receipt access to the buying organisation’s currently authorised event staff and original payer, without exposing seller finance data.
 - [x] Run payment, signed-webhook, receipt/outbox and account-change tests; commit and tick.
 
 ### Task 5 — Adaptable preview, paid provenance and clean-output enforcement
@@ -138,7 +138,7 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 - [x] Resolve original provenance server-side for save/apply/edit/restore. Bind the render snapshot and all source licences in one use claim before resolving clean bytes. Recheck entitlement for every subsequent request, including signed URLs/jobs. Queued outputs carry the claim/version identity and never extend access from an expired or revoked capability.
 - [x] Before purchase, expose allowlisted layout metadata and flattened watermarked previews rendered with provisional attendee, category, front/back, size and composition inputs. Reject arbitrary storage paths, remote URLs or fonts. Rate-limit/render-bound the endpoint. Use stored data for final apply. Reuse PDF text fitting and actual background-fit behaviour so previews reflect the chosen size. Never send paid raw artwork, clean background data URIs or clean screenshots to an unlicensed browser.
 - [x] Include all accepted family versions, dimensions, orientations and unlimited reprints under the active event licence. Withdrawal stops new sales; existing licensees may retrieve their retained purchased versions and reprint. No automatic migration to a later version.
-- [ ] Test A4 single/duplex output, all 59 categories/names, and in-flight old-artwork retention. Commit and tick.
+- [x] Test A4 single/duplex output, all 59 categories/names, and in-flight old-artwork retention. Commit and tick.
 
 ### Task 6 — Refunds, support exceptions and race-safe suspension
 
@@ -146,41 +146,42 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 
 **Interfaces** `BadgeTemplateRefunds::request(BadgeTemplatePurchase $purchase, User $actor, string $operationKey, string $reason, bool $exception = false): StoreRefund`. Buyer request records intent; only platform staff with the platform-scoped `manage template refunds` permission may authorise money movement.
 
-- [ ] Add failing `BadgeTemplateRefundTest.php` for unused within seven days, exact seven-day boundary, applied-but-unexported design, used/out-of-window support referral, confirmed/failed/unknown refunds, insufficient funding, duplicate operation keys, extra-capture refunds, refund/use race and repurchase after confirmed refund.
+- [x] Add failing `BadgeTemplateRefundTest.php` for unused within seven days, exact seven-day boundary, applied-but-unexported design, used/out-of-window support referral, confirmed/failed/unknown refunds, insufficient funding, duplicate operation keys, extra-capture refunds, refund/use race and repurchase after confirmed refund.
 - [x] Run red tests.
 - [x] Refund approval locks the licence slot, checks use history and immediately suspends output while funding/provider status is pending. A definitive refusal restores access only after terminal provider verification and an explicit recorded transition. Unknown stays suspended. Confirmed full refund revokes access and reverses only the refunded purchase’s applied sale. Refunding an extra capture leaves the valid licence active.
 - [x] Freeze refund amount/account/fee bearer and reserve funding before provider submission outside business locks. Reuse stable operation identity and reconciliation. Return full GH₵50 on an approved primary refund. Retain first-use evidence and previous files/history. Require a reason and platform-only audited exception for a used licence.
-- [ ] Offer replacement/free-design restoration after refund, preserving the last paid revision as locked history. No partial refunds in this slice.
+- [x] Offer replacement/free-design restoration after refund, preserving the last paid revision as locked history. No partial refunds in this slice.
 - [x] Verify existing store/venue refunds, fees, unknown results, funding and payout balances; commit and tick.
 
 ### Task 7 — Buyer and platform operations UI
 
 **Files** Modify `resources/js/console/components/BadgeDesignLibrary.jsx`, `BadgesPanel.jsx`, corresponding tests, `ConsoleApp.jsx` route wiring and existing platform console views/navigation. Add focused purchase/status/refund components under the existing badge component structure and controller routes. Rebuild `public/build`.
 
-- [ ] Write failing React/HTTP tests for Free/GH₵50/Purchased labels, permission denial, purchase confirmation, pending/unknown recovery, receipt, licence/refund status, used-output acknowledgement and staff support controls.
-- [ ] Run red tests.
-- [ ] Present the journey as preview → confirm event/licence and GH₵50 total → hosted payment → payment status → explicit Apply to this event. Never replace the current event design on payment return. Retain proposed edits across sign-in/payment return using a private server draft, bound to actor/event/version and a 24-hour expiry; validate again before applying.
-- [ ] Add an event purchase panel and platform digital-sales view with reconciliation/refund controls and original evidence. Suppress stock, pickup, shipping and venue wording. Adapt central buyer lists/type filters explicitly and retain original verified-payer access. No global seller list is exposed to buyers.
-- [ ] Warn before first clean output that it records use and affects ordinary refund eligibility. Output request supplies a stable confirmation key. Show a support action after use, and readable recovery when payment, render or receipt delivery is pending.
-- [ ] Browser-test desktop, 390px, light/dark, keyboard, stale tabs, denied roles, double click and navigation back from Paystack. Check actual raster previews and download PDFs. Run affected tests/build/lint; commit and tick.
+- [x] Write failing React/HTTP tests for Free/GH₵50/Purchased labels, permission denial, purchase confirmation, pending/unknown recovery, receipt, licence/refund status, used-output acknowledgement and staff support controls.
+- [x] Run red tests.
+- [x] Present the journey as preview → confirm event/licence and GH₵50 total → hosted payment → payment status → explicit Apply to this event. Never replace the current event design on payment return. Retain proposed edits across sign-in/payment return using a private server draft, bound to actor/event/version and a 24-hour expiry; validate again before applying.
+- [x] Add an event purchase panel and platform digital-sales view with reconciliation/refund controls and original evidence. Suppress stock, pickup, shipping and venue wording. Adapt central buyer lists/type filters explicitly and retain original verified-payer access. No global seller list is exposed to buyers.
+- [x] Warn before first clean output that it records use and affects ordinary refund eligibility. Output request supplies a stable confirmation key. Show a support action after use, and readable recovery when payment, render or receipt delivery is pending.
+- [x] Browser-check desktop, 390px, light/dark, keyboard, denied platform access, actual raster previews, private purchase history and downloaded A4 PDFs. Component/HTTP tests cover stale state, duplicate clicks and the native provider callback return.
+- [ ] Complete the actual hosted-provider interruption/return browser journey during the approved financial acceptance run.
 
 ### Task 8 — Concurrency, regression and financial acceptance
 
-**Files** Add `tests/Infrastructure/Marketplace/BadgeTemplateCommerceConcurrencyTest.php`; extend existing badge/commerce acceptance coverage and this plan’s run record.
+**Files** Add `tests/Infrastructure/Badges/PaidTemplateRaceTest.php`; extend existing badge/commerce acceptance coverage and this plan’s run record.
 
-- [ ] Write real PostgreSQL-worker races for two purchasers/same event, callback versus webhook, issue versus event deletion, refund versus use claim, two refunds, and duplicate/extra capture versus repurchase. Assert at most one entitlement and one financial posting per reference, no deadlock, balanced journals and the expected active/suspended state.
+- [x] Write real PostgreSQL-worker races for two purchasers/same event, callback versus webhook, issue versus event deletion, refund versus use claim, two refunds, and duplicate/extra capture versus repurchase. Assert at most one entitlement and one financial posting per reference, no deadlock, balanced journals and the expected active/suspended state.
 - [ ] Prove the critical guard tests fail when licence uniqueness, use/refund serialisation or original-account validation is removed, then restore and pass.
 - [ ] Run the affected badge/commerce/venue tests locally once, then full CI on the final head. Run `vendor/bin/pint --dirty`, PHPStan on affected code, frontend lint/tests, build and whitespace checks. Record unrelated failures honestly and reproduce before attributing them.
 - [ ] Use isolated test accounts/recipients and test-mode provider credentials for full purchase, interrupted return, repeated callbacks, unused refund, failed/unknown refund, used-refund exception and receipt recovery. Human completes hosted provider steps when required. No real attendee is involved.
-- [ ] Verify exact 54 × 85 mm badges, A4 seven-page front/14-page duplex outputs for the 59-person synthetic roster, long names, both flip modes, custom landscape and repeated exports without another payment. A physical actual-size paper proof remains a printer acceptance step.
+- [x] Verify exact 54 × 85 mm badges, A4 seven-page front/14-page duplex outputs for the 59-person synthetic roster, long names, both flip modes, custom landscape and repeated exports without another payment. A physical actual-size paper proof remains a printer acceptance step.
 - [ ] Perform one author self-review of all touchpoints and one independent whole-change review. Fix findings with targeted regressions. Record actual counts and unresolved limitations, then submit for owner merge approval.
 
 ### Task 9 — Controlled release and live acceptance
 
-**Files** Add dry-by-default `badge-templates:payments` readiness/enable command in the existing command structure, platform configuration, permission seeding and AGENTS.md invariants. Update the design spec milestone status and this plan.
+**Files** Add dry-by-default `badges:paid-templates` readiness/enable command in the existing command structure, platform configuration, permission seeding and AGENTS.md invariants. Update the design spec milestone status and this plan.
 
-- [ ] Test readiness refusals for missing seller/agreement/account, missing roles, absent approved commercial terms, unsupported currency and missing digital refund reserve. Flags default off and do not depend on a tenant’s merchandise flag.
-- [ ] Implement read-only readiness output and an explicit buyer-tenant pilot enable/off operation. Pausing refuses new purchases, while receipt, verification, reconciliation, refund and valid licensed reprint paths remain available.
+- [x] Test readiness refusals for missing seller/agreement/account, missing roles, absent approved commercial terms, unsupported currency and missing digital refund reserve. Flags default off and do not depend on a tenant’s merchandise flag.
+- [x] Implement read-only readiness output and an explicit buyer-tenant pilot enable/off operation. Pausing refuses new purchases, while receipt, verification, reconciliation, refund and valid licensed reprint paths remain available.
 - [ ] After owner merge/deploy approval, verify migrated constraints, role grants, flags, starter designs and existing badge output. Approve actual seller setup separately and activate Purpledot only after financial/browser acceptance and approved commercial decisions.
 - [ ] Ask approval for a named live recipient and amount before the live purchase/refund acceptance. Prefer the real GH₵50 licence total; use a small payment only with an explicit test price override restricted to an approved test record, never a hidden change to public pricing.
 - [ ] Confirm one payment, receipt, licence, repeated export and approved refund outcome in production; record evidence without secrets/private links. Expand rollout only after owner approval. Preserve financial history on rollback and disable new purchases instead of destructive migration rollback.
@@ -201,3 +202,52 @@ I stepped back and checked scope, interfaces, money and access boundaries.
 - Covered duplicate purchase, extra capture, repurchase, withdrawn designs, retained versions, event deletion, account changes, off switches and receipt outages.
 - Kept prices/tax, ordinary refund window, used-refund exceptions, seller identity and platform funding as visible owner decisions. No financial policy in this document is represented as already approved beyond GH₵50/event and unlimited reprints.
 - Implementation has not started. Only this plan was added during this request.
+
+## 5. Local implementation verification and release gates
+
+The local browser run used a separate synthetic organisation, 59 synthetic attendees, a synthetic platform seller/agreement, logged/faked mail and blocked external provider calls. A simulated capture was confirmed through the native confirmation, ledger, licence and receipt services. This establishes local application behaviour. It does not establish hosted Paystack payment/refund acceptance. The live neonatal event and its existing free organisation design were not modified.
+
+- Seven real PostgreSQL-worker races passed with 64 assertions, including the event/revision foreign-key deadlock reproduction.
+- Combined local regressions ran 435 tests. 434 passed with 1,786 assertions. The one failure caught four unsupported console Button variants. They now use the existing `default` variant, then passed the 43-test correction run (131 assertions), including the console component contract, platform refund POST and historical-purchase display regression.
+- The three focused frontend files passed 35 tests. PHPStan on affected application files reports zero errors. Frontend lint passed. Assets are rebuilt for the final reviewed head.
+- Native browser PDFs contain all 59 names and five categories. Front-only output is seven A4 pages. Both duplex flip modes produce fourteen A4 pages. Programmatic custom-landscape coverage produces eight A4 pages. A physical actual-size printer proof remains open.
+- Hosted payment/refund acceptance, actual legal-seller/tax/receipt approval, reserve funding and production enablement remain explicit gates. No production setting or financial operation was performed during implementation.
+
+### Implementation rulings
+
+- Reuse the existing badge service namespace and typed shared commerce path. Command name is `badges:paid-templates`. This follows existing application structure. The cost of a later naming change is route/command documentation updates.
+- Use a typed refund-allocation result so goods and venue arithmetic retains its existing behaviour. Digital revenue uses account 4010 and protected reserve cash 1020. Incorrect classification would affect statements, so goods/venue regression and balanced-journal tests remain release gates.
+- The digital event lock uses `FOR NO KEY UPDATE`. An exclusive `FOR UPDATE` event lock deadlocked against revision foreign-key checks. The chosen mode still serialises deletion and money/use decisions while permitting those checks, as proven with real workers.
+- Applying/editing remains unused. Clean-output claims count before rendering, including failed rendering, to prevent bytes escaping before refund exclusion. Support may assess an exceptional full refund if rendering failed.
+- Published family price classification stays immutable. Private copied versions/revisions preserve paid provenance and in-flight asset snapshots. A genuine free replacement clears only current event provenance, preserving locked paid history. The cost is retained storage and explicit replacement.
+- Same-family quote retries retain the original purchase version and ten-minute deadline. The separately saved proposal may target a newer version and requires explicit application after payment. No automatic replacement is performed.
+- Original financial and audit history is retained after event archival and repurchase. Accounts with paid-design history are deactivated instead of deleted. A payment can still settle if its original requesting account was already removed.
+- Verified-failed refund restoration restores access while retaining the approved refund reserve for finance resolution. This deliberately favours refund backing over spending availability. Retiring that retained obligation requires a later explicit financial-resolution policy.
+- Bundled fonts match the raster preview. Standard PDF core fonts use the existing raster approximation, and the PDF remains authoritative. A closer core-font preview would be presentation polish.
+
+### Self-Review Report
+
+**Touchpoints updated**
+
+- AGENTS.md records pricing, locks, provenance/use, accounting, privacy and rollout invariants.
+- Permission definitions, deploy seeder and built-in role defaults include delegated event purchases and platform-only template finance. The readiness command verifies definitions without reseeding deliberate grant removals.
+- Library purchase/history, My MiConvener licence navigation and the platform finance menu are linked from existing screens.
+- Configuration and `.env.example` list explicit seller identity and owner commercial approval, with empty defaults. No dependency was added.
+- Tests cover schema, ownership, quoted terms, capture, receipt, entitlement, output, refund, reserve, role/event scope, telemetry, frontend interaction and worker races. Existing badge, merchandise and venue coverage is retained.
+- No assistant memory file was changed. The repository plan and invariants carry the handover.
+
+**UI gap analysis**
+
+Discoverability, empty states, permission denial, loading/recovery and original-payer receipt access are present. Desktop and 390px checks cover previews, first-use confirmation, purchase history and finance controls. Light/dark and keyboard checks cover the React flow. Native HTTP tests cover provider-return routing. The actual hosted-provider browser acceptance remains open.
+
+**Solved during self-review**
+
+Event deletion and revision-FK lock races, immutable provenance/output claims, same-family deadline retries, failed-initialisation retry identity, suspended repurchase refusal, stale historical status, archived receipts, retained actor deletion, finance navigation and local Telescope filtering have regression coverage. Four unsupported Button variants were corrected to the existing console variant.
+
+**Recommended for owner decision before activation**
+
+Confirm the actual platform seller, tax/receipt wording and backed reserve. Complete the hosted test payment/refund journey and a physical 100% printer proof before enabling a named organisation. Timing depends on owner/provider participation. The recommendation is to keep the purchase switch off until these checks pass.
+
+**Scope notes**
+
+MiPrinting, paid production services and paraphernalia remain later milestones. Existing free/private designs and event printing continue through their established routes. The local simulated capture is recorded separately from future provider acceptance.

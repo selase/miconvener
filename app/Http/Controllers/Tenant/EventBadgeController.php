@@ -61,6 +61,12 @@ final class EventBadgeController extends Controller
         $template = $this->templates->forEvent($eventModel);
         $paidAccess = app(\App\Services\Badges\BadgeTemplateAccess::class);
         $hasPaidDesign = $paidAccess->eventFamilies($eventModel) !== [];
+        $canConfirmUse = true;
+        try {
+            $paidAccess->assertLicensed($eventModel, $paidAccess->eventFamilies($eventModel));
+        } catch (\Illuminate\Validation\ValidationException) {
+            $canConfirmUse = false;
+        }
         $watermarked = $hasPaidDesign && ! $paidAccess->cleanEnabled($eventModel);
         if ($hasPaidDesign && ! $watermarked) {
             $template = $paidAccess->claimUse($eventModel, request()->user(), [], 'clean_preview', (string) \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_URL, 'badge-preview:'.$template->id.':'.$template->design_version.':'.request()->user()->id))['template'];
@@ -68,7 +74,7 @@ final class EventBadgeController extends Controller
         $previewAsset = fn (?string $uri): ?string => $watermarked ? app(\App\Services\Badges\BadgeLibraryService::class)->watermarkedDataUri($uri) : $uri;
 
         return response()->json([
-            'paid_design' => ['present' => $hasPaidDesign, 'watermarked' => $watermarked, 'clean_enabled' => ! $watermarked],
+            'paid_design' => ['present' => $hasPaidDesign, 'watermarked' => $watermarked, 'clean_enabled' => ! $watermarked, 'can_confirm_use' => $canConfirmUse],
             'template' => $template,
             'back_background' => $previewAsset($template->backSettings() !== null && is_string($template->backSettings()['background_path'] ?? null) ? $this->artwork->dataUri($template->backSettings()['background_disk'], $template->backSettings()['background_path']) : null),
             'ticket_types' => $eventModel->ticketTypes()->get(['id', 'name']),

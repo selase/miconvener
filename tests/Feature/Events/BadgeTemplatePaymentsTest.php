@@ -87,10 +87,10 @@ test('signed webhook and callback delivery in either order issue one licence', f
     $payload = json_encode(['event' => 'charge.success', 'data' => $data], JSON_THROW_ON_ERROR);
     $headers = ['CONTENT_TYPE' => 'application/json', 'HTTP_X_PAYSTACK_SIGNATURE' => hash_hmac('sha512', $payload, 'sk_test_badge_payments')];
     if (! $webhookFirst) {
-        app(App\Services\Marketplace\StorePaymentNotifications::class)->reconcile($this->attempt);
+        $this->get(route('store.checkout.callback', ['reference' => $this->attempt->reference]))->assertRedirect(route('badge-template-purchases.show', $this->purchase->id));
     }
     $this->call('POST', route('webhooks.paystack'), [], [], [], $headers, $payload)->assertOk();
-    app(App\Services\Marketplace\StorePaymentNotifications::class)->reconcile($this->attempt);
+    $this->get(route('store.checkout.callback', ['reference' => $this->attempt->reference]))->assertRedirect(route('badge-template-purchases.show', $this->purchase->id));
     expect($this->purchase->licence->fresh()->state)->toBe('active')
         ->and(StoreReceipt::query()->where('order_id', $this->purchase->order_id)->count())->toBe(1)
         ->and(App\Models\LedgerTransaction::withoutGlobalScopes()->where('reference', $this->attempt->reference)->where('transaction_type', 'badge_template_sale')->count())->toBe(1);
@@ -113,4 +113,28 @@ test('ledger recovery retries the original capture without duplicate licence or 
     app(StorePaymentConfirmer::class)->confirm($capture);
     app(StorePaymentConfirmer::class)->confirm($capture->fresh());
     expect($this->purchase->licence->fresh()->state)->toBe('active')->and(StoreReceipt::query()->where('order_id', $this->purchase->order_id)->count())->toBe(1);
+});
+
+test('a historical refunded receipt never borrows the state or use of its replacement licence', function (): void {
+    $this->purchase->update(['state' => 'refunded']);
+    $replacement = BadgeTemplatePurchase::factory()->create(['licence_id' => $this->purchase->licence_id, 'version_id' => $this->purchase->version_id, 'state' => 'paid']);
+    $replacement->licence->update(['state' => 'active', 'current_purchase_id' => $replacement->id, 'first_used_at' => now()]);
+    App\Models\BadgeTemplateUse::factory()->create(['purchase_id' => $replacement->id]);
+    $payload = app(App\Services\Badges\BadgeTemplatePurchasePayload::class);
+    expect($payload->forPurchase($this->purchase)['licence_state'])->toBe('refunded')
+        ->and($payload->forPurchase($this->purchase)['used'])->toBeFalse()
+        ->and($payload->forPurchase($replacement)['licence_state'])->toBe('active')
+        ->and($payload->forPurchase($replacement)['used'])->toBeTrue();
+});
+
+test('removing the original requesting account cannot strand an already captured licence payment', function (): void {
+    $actor = App\Models\User::factory()->create();
+    $fingerprint = hash('sha256', app(App\Services\Giving\GivingGateways::class)->platformIdentity());
+    $purchase = BadgeTemplatePurchase::factory()->create(['order_id' => App\Models\StoreOrder::factory()->badgeTemplate()->state(['account_fingerprint' => $fingerprint]), 'terms_snapshot' => ['requested_by' => $actor->id, 'total_pesewas' => 5000, 'currency' => 'GHS']]);
+    $purchase->order->update(['accepted_at' => now()]);
+    $attempt = StorePaymentAttempt::factory()->create(['order_id' => $purchase->order_id]);
+    $capture = StorePaymentObservation::factory()->create(['attempt_id' => $attempt->id]);
+    $actor->delete();
+    app(StorePaymentConfirmer::class)->confirm($capture);
+    expect($purchase->licence->fresh()->state)->toBe('active')->and($capture->fresh()->processing_state)->toBe('posted');
 });

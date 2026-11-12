@@ -75,6 +75,7 @@ final class CommerceOrderLocks
         if ($purchase->buyer_tenant_id !== $persisted->tenant_id) {
             $this->inventory->tenant($purchase->buyer_tenant_id);
         }
+        \App\Models\Event::withoutGlobalScopes()->whereKey($purchase->event_id)->lock('for no key update')->firstOrFail();
         $locked = StoreOrder::query()->lockForUpdate()->findOrFail($persisted->id);
         \App\Models\BadgeTemplateLicence::query()->lockForUpdate()->findOrFail($purchase->licence_id);
 

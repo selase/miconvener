@@ -48,6 +48,9 @@ export default function BadgesPanel({ event }) {
     const [backBackground, setBackBackground] = useState(null);
     const [savingDesign, setSavingDesign] = useState(false);
     const [error, setError] = useState(null);
+    const [paidDesign, setPaidDesign] = useState(null);
+    const [confirmUse, setConfirmUse] = useState(false);
+    const [outputKind, setOutputKind] = useState('pdf');
     const [designForm, setDesignForm] = useState(null);
 
     const load = async () => {
@@ -61,6 +64,7 @@ export default function BadgesPanel({ event }) {
             );
             if (sequence !== loadSequence.current) return;
             setBadges(data.badges || []);
+            setPaidDesign(data.paid_design || null);
             setLayoutDefaults(data.layout_defaults || data.template?.layout || {});
             setTenantLogo(data.tenant_logo || null);
             setBadgeLogo(
@@ -107,7 +111,31 @@ export default function BadgesPanel({ event }) {
     const batchCount = Math.ceil(filtered.length / 100);
     const selectedBadges = filtered.slice(batch * 100, (batch + 1) * 100);
 
-    const downloadPdf = async () => {
+    const runCleanPreview = async () => {
+        if (downloadPending.current) return;
+        downloadPending.current = true;
+        setError(null);
+        try {
+            await artifactJson(
+                await csrfFetch(route('tenant.events.badges.clean-preview', { event: event.id }), {
+                    method: 'POST',
+                    body: JSON.stringify({ confirm_paid_use: true, output_key: exportReference() }),
+                })
+            );
+            await load();
+        } catch (reason) {
+            setError(reason);
+        } finally {
+            downloadPending.current = false;
+        }
+    };
+
+    const downloadPdf = async (confirmed = false) => {
+        if (paidDesign?.present && paidDesign.watermarked && confirmed !== true) {
+            setOutputKind('pdf');
+            setConfirmUse(true);
+            return;
+        }
         if (downloadPending.current || selectedBadges.length === 0) return;
         downloadPending.current = true;
         const ids = selectedBadges.map((badge) => badge.id);
@@ -123,7 +151,11 @@ export default function BadgesPanel({ event }) {
                 route('tenant.events.badges.sheet', { event: event.id }),
                 {
                     method: 'POST',
-                    body: JSON.stringify({ registration_ids: ids, export_reference: reference }),
+                    body: JSON.stringify({
+                        registration_ids: ids,
+                        export_reference: reference,
+                        ...(confirmed === true ? { confirm_paid_use: true } : {}),
+                    }),
                 }
             );
             downloadArtifact(
@@ -252,6 +284,64 @@ export default function BadgesPanel({ event }) {
     return (
         <div>
             <ArtifactFontStyles fonts={fonts} />
+            <Modal
+                open={confirmUse}
+                onClose={() => setConfirmUse(false)}
+                title="Confirm clean badge output"
+            >
+                <div className="space-y-4">
+                    {paidDesign?.can_confirm_use ? (
+                        <>
+                            <p className="text-sm">
+                                This records use of your paid event licence before generating the
+                                file. Ordinary unused-licence refunds will no longer be available. A
+                                failed render can be reviewed by support.
+                            </p>
+                            <Button
+                                disabled={printing}
+                                onClick={() => {
+                                    setConfirmUse(false);
+                                    if (outputKind === 'preview') {
+                                        runCleanPreview();
+                                    } else {
+                                        downloadPdf(true);
+                                    }
+                                }}
+                            >
+                                {outputKind === 'preview'
+                                    ? 'Confirm use and show clean preview'
+                                    : 'Confirm use and download'}
+                            </Button>
+                        </>
+                    ) : (
+                        <p className="text-sm">
+                            This design’s licence is unavailable or suspended. Choose a free design
+                            or contact platform support.
+                        </p>
+                    )}
+                    <Button variant="default" onClick={() => setConfirmUse(false)}>
+                        Cancel
+                    </Button>
+                </div>
+            </Modal>
+            {paidDesign?.present && paidDesign.watermarked && (
+                <div className="mb-4 space-y-3 border border-border p-4">
+                    <p className="text-sm">
+                        Paid design preview. Clean output needs an active event licence and records
+                        first use.
+                    </p>
+                    {paidDesign.can_confirm_use && can.update_badge_template && (
+                        <Button
+                            onClick={() => {
+                                setOutputKind('preview');
+                                setConfirmUse(true);
+                            }}
+                        >
+                            Show clean preview
+                        </Button>
+                    )}
+                </div>
+            )}
             <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p className="text-sm text-ink-secondary">
@@ -371,20 +461,31 @@ export default function BadgesPanel({ event }) {
             {filtered.length > 0 && (
                 <div className="print-area grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-2">
                     {selectedBadges.map((b) => (
-                        <BadgeLayoutPreview
-                            key={b.id}
-                            event={event}
-                            badge={b}
-                            template={template || {}}
-                            tenantLogo={badgeLogo}
-                            backgroundUrl={
-                                template?.background_path
-                                    ? route('tenant.events.badges.template.artwork', {
-                                          event: event.id,
-                                      })
-                                    : null
-                            }
-                        />
+                        <div key={b.id} className="relative">
+                            {paidDesign?.watermarked && (
+                                <div
+                                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden"
+                                    aria-hidden="true"
+                                >
+                                    <span className="-rotate-45 text-3xl font-bold tracking-widest text-ink/30">
+                                        SAMPLE · GH₵50
+                                    </span>
+                                </div>
+                            )}
+                            <BadgeLayoutPreview
+                                event={event}
+                                badge={b}
+                                template={template || {}}
+                                tenantLogo={badgeLogo}
+                                backgroundUrl={
+                                    template?.background_path
+                                        ? route('tenant.events.badges.template.artwork', {
+                                              event: event.id,
+                                          })
+                                        : null
+                                }
+                            />
+                        </div>
                     ))}
                 </div>
             )}

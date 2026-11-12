@@ -470,6 +470,11 @@ final class TenantController extends Controller
     {
         return (new Tenant)->getConnection()->transaction(function () use ($id): JsonResponse {
             $tenant = Tenant::query()->where('uuid', $id)->lockForUpdate()->firstOrFail();
+            if ($tenant->getConnection()->getSchemaBuilder()->hasTable('badge_template_licences')
+                && \App\Models\BadgeTemplateLicence::query()->where('buyer_tenant_id', $tenant->id)->exists()) {
+                return response()->json(['message' => 'Deactivate this organisation instead. Paid badge template purchase and licence history must be retained.'], 409);
+            }
+
             if (($tenant->getConnection()->getSchemaBuilder()->hasTable('store_merchandise')
                 && \App\Models\StoreMerchandise::query()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->exists())
                 || ($tenant->getConnection()->getSchemaBuilder()->hasTable('store_commercial_agreements')

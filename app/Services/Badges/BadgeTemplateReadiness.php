@@ -11,12 +11,12 @@ use Illuminate\Validation\ValidationException;
 
 final class BadgeTemplateReadiness
 {
-    public function agreement(Tenant $buyer): StoreCommercialAgreement
+    public function agreement(Tenant $buyer, bool $requireEnabled = true): StoreCommercialAgreement
     {
         $sellerId = config('services.badge_templates.seller_tenant_id');
         $seller = is_string($sellerId) ? Tenant::query()->whereKey($sellerId)->first() : null;
         if ($seller === null || blank(config('services.badge_templates.commercial_approval'))
-            || ! $buyer->features()->where('feature_key', 'paid_badge_templates')->where('enabled', true)->exists()) {
+            || ($requireEnabled && ! $buyer->features()->where('feature_key', 'paid_badge_templates')->where('enabled', true)->exists())) {
             $this->refuse();
         }
         $agreement = app(StoreCommercialTerms::class)->resolve($seller, StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE);

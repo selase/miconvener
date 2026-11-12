@@ -41,6 +41,12 @@ final class StoreCheckoutController extends Controller
         $attempt = \App\Models\StorePaymentAttempt::query()->where('reference', $reference)->firstOrFail();
         $notifications->reconcile($attempt);
 
+        if ($attempt->order->offering_type === 'badge_template') {
+            $purchase = \App\Models\BadgeTemplatePurchase::query()->where('order_id', $attempt->order_id)->firstOrFail();
+
+            return redirect()->route('badge-template-purchases.show', $purchase->id);
+        }
+
         if ($attempt->order->offering_type === 'reservation') {
             $charge = \App\Models\VenueBookingCharge::query()->with('booking')->where('order_id', $attempt->order_id)->firstOrFail();
 

@@ -133,3 +133,125 @@ test('a new purchase cannot spend refund backing promised to an existing event',
     $other = App\Models\Event::factory()->create(['tenant_id' => $this->buyer->id]);
     expect(fn () => $service->quote($other, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid()))->toThrow(ValidationException::class);
 });
+
+test('current event staff can recover a purchase status without exposing platform finance', function (): void {
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $host = eventSubdomainHost($this->buyer->slug);
+    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host])
+        ->getJson("http://{$host}/events/{$this->event->id}/badges/library/purchases/{$purchase->id}")
+        ->assertOk()->assertJsonPath('purchase_id', $purchase->id)->assertJsonPath('state', 'pending')
+        ->assertJsonMissingPath('account_identity')->assertJsonMissingPath('gateway_fee_pesewas');
+    $this->actor->syncRoles(['Org Admin']);
+    $this->getJson("http://{$host}/events/{$this->event->id}/badges/library/purchases/{$purchase->id}")->assertForbidden();
+});
+
+test('only the original independently verified payer can view a digital receipt page', function (): void {
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $path = "/my/badge-template-purchases/{$purchase->id}";
+    $this->get($path)->assertRedirect('/my?return_to='.rawurlencode($path));
+    $this->withSession(proofFor('other@example.test'))->getJson($path)->assertNotFound();
+    $this->withSession(proofFor('buyer@example.test'))->getJson($path)->assertOk()->assertJsonPath('purchase_id', $purchase->id)
+        ->assertJsonMissingPath('account_identity')->assertJsonMissingPath('gateway_fee_pesewas');
+    $this->event->delete();
+    $this->getJson($path)->assertOk()->assertJsonPath('event.archived', true);
+});
+
+test('a proposed paid design draft survives payment return only for its actor and event', function (): void {
+    $host = eventSubdomainHost($this->buyer->slug);
+    $path = "http://{$host}/events/{$this->event->id}/badges/library/purchase-draft";
+    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host]);
+    $draft = ['version_id' => $this->version->id, 'expected_version' => 1, 'width_mm' => 85, 'height_mm' => 54, 'composition' => 'landscape', 'category_labels' => []];
+    $this->postJson($path, $draft)->assertOk();
+    $this->version->design->versions()->create(['version' => 2, 'snapshot' => []]);
+    $this->getJson($path)->assertOk()->assertJsonPath('draft.width_mm', 85)->assertJsonPath('version.id', $this->version->id);
+    $this->travel(25)->hours();
+    $this->getJson($path)->assertOk()->assertJsonPath('draft', null);
+});
+
+test('payer verification status never treats a staff email as independent proof', function (): void {
+    $host = eventSubdomainHost($this->buyer->slug);
+    $path = "http://{$host}/events/{$this->event->id}/badges/library/payer";
+    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host])->getJson($path)->assertOk()->assertJsonPath('verified_email', null);
+    $this->withSession(proofFor('buyer@example.test'))->getJson($path)->assertOk()->assertJsonPath('verified_email', 'buyer@example.test');
+});
+
+test('paid template rollout is dry by default and refuses an unfunded explicit enable', function (): void {
+    $this->buyer->features()->where('feature_key', 'paid_badge_templates')->delete();
+    $this->artisan('badges:paid-templates', ['tenant' => $this->buyer->slug])->assertSuccessful();
+    expect($this->buyer->features()->where('feature_key', 'paid_badge_templates')->exists())->toBeFalse();
+    $this->artisan('badges:paid-templates', ['tenant' => $this->buyer->slug, '--enable' => true])->assertSuccessful();
+    expect($this->buyer->features()->where('feature_key', 'paid_badge_templates')->value('enabled'))->toBeTrue();
+    $this->artisan('badges:paid-templates', ['tenant' => $this->buyer->slug, '--off' => true])->assertSuccessful();
+    config(['services.badge_templates.commercial_approval' => null]);
+    $this->artisan('badges:paid-templates', ['tenant' => $this->buyer->slug, '--enable' => true])->assertFailed();
+    expect($this->buyer->features()->where('feature_key', 'paid_badge_templates')->value('enabled'))->toBeFalse();
+});
+
+test('digital agreements are restricted to the configured platform seller and fixed licence economics', function (): void {
+    $actor = User::factory()->create();
+    setPermissionsTeamId(null);
+    $actor->assignRole('Superadmin');
+    $input = ['percentage' => 0, 'cap_pesewas' => null, 'fee_bearer' => 'organizer', 'gateway_estimate_rate' => 0,
+        'refund_gateway_fee_bearer' => 'platform', 'collection_terms' => 'Digital event licence. Unlimited reprints.',
+        'refund_terms' => 'Seven calendar days while unused.', 'support_contact' => 'Platform support', 'receipt_terms' => 'Owner-approved receipt presentation',
+        'payout_policy' => ['holdback_pesewas' => 0, 'manual_release' => true]];
+    $service = app(App\Services\Marketplace\StoreCommercialTerms::class);
+    $agreement = $service->approve($this->seller, $actor, $input, 'badge_template');
+    expect($agreement->offering_scope)->toBe('badge_template')->and($agreement->percentage)->toBe('0.00');
+    expect(fn () => $service->approve($this->buyer, $actor, $input, 'badge_template'))->toThrow(ValidationException::class);
+    expect(fn () => $service->approve($this->seller, $actor, [...$input, 'percentage' => 3], 'badge_template'))->toThrow(ValidationException::class);
+});
+
+test('a buyer organisation with digital licence history receives a clear deletion refusal', function (): void {
+    $admin = User::factory()->create();
+    setPermissionsTeamId(null);
+    $admin->assignRole('Superadmin');
+    $this->actingAs($admin)->deleteJson('/tenants/'.$this->buyer->uuid)->assertStatus(409)->assertJsonPath('message', 'Deactivate this organisation instead. Paid badge template purchase and licence history must be retained.');
+    expect(Tenant::query()->whereKey($this->buyer->id)->exists())->toBeTrue();
+});
+
+test('a suspended event licence refuses another purchase while its refund is unresolved', function (): void {
+    $service = app(BadgeTemplatePurchases::class);
+    $purchase = $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $purchase->update(['state' => 'paid']);
+    $purchase->order->update(['payment_state' => 'refund_pending']);
+    $purchase->licence->update(['state' => 'suspended', 'current_purchase_id' => $purchase->id]);
+    expect(fn () => $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid()))->toThrow(ValidationException::class);
+    expect(BadgeTemplatePurchase::query()->where('event_id', $this->event->id)->where('state', 'pending')->count())->toBe(0);
+});
+
+test('the original payer can discover digital licence purchases separately from physical orders', function (): void {
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $this->withSession(proofFor('other@example.test'))->getJson('/my/badge-template-purchases')->assertOk()->assertJsonCount(0, 'purchases.data');
+    $this->withSession(proofFor('buyer@example.test'))->getJson('/my/badge-template-purchases')->assertOk()->assertJsonPath('purchases.data.0.purchase_id', $purchase->id);
+});
+
+test('paid checkout readiness refuses missing built in role definitions without seeding them', function (): void {
+    App\Models\Role::query()->whereNull('tenant_id')->where('name', 'Superadmin')->delete();
+    $this->artisan('badges:paid-templates', ['tenant' => $this->buyer->slug, '--enable' => true])->assertFailed();
+    expect(App\Models\Role::query()->whereNull('tenant_id')->where('name', 'Superadmin')->exists())->toBeFalse();
+});
+
+test('removing a staff account with paid design history leaves its membership intact with a clear explanation', function (): void {
+    $target = User::factory()->create(['tenant_id' => $this->buyer->id]);
+    $this->buyer->users()->attach($target->id);
+    setPermissionsTeamId($this->buyer->id);
+    $target->assignRole('Org Superadmin');
+    app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $target, 'buyer@example.test', (string) Str::uuid());
+    $host = eventSubdomainHost($this->buyer->slug);
+    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host])->delete("http://{$host}/users/{$target->uuid}")->assertRedirect()->assertSessionHas('error', 'This account has paid badge template audit history. Deactivate its access instead of deleting the retained account.');
+    expect($target->fresh())->not->toBeNull()->and($target->tenants()->whereKey($this->buyer->id)->exists())->toBeTrue();
+});
+
+test('platform sales history does not borrow a newer purchases licence status or clean use', function (): void {
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $purchase->update(['state' => 'cancelled']);
+    $replacement = BadgeTemplatePurchase::factory()->create(['licence_id' => $purchase->licence_id, 'version_id' => $purchase->version_id, 'state' => 'paid']);
+    $replacement->licence->update(['state' => 'active', 'current_purchase_id' => $replacement->id, 'first_used_at' => now()]);
+    $finance = User::factory()->create();
+    setPermissionsTeamId(null);
+    $finance->assignRole('Superadmin');
+    $this->actingAs($finance)->get('/admin/badge-template-sales')->assertOk()
+        ->assertSee('cancelled · Licence cancelled')
+        ->assertSee('No clean output requested · Purchase '.$purchase->id);
+});

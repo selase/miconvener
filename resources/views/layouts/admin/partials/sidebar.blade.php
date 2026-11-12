@@ -423,6 +423,9 @@
                 @endcan
 
                 @php($isSuper = auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
+                    @can('manage-template-refunds')
+                    <div class="menu-item"><a class="menu-link" href="{{ route('admin.badge-template-sales.index') }}"><span class="menu-title">Badge template sales</span></a></div>
+                    @endcan
                 @canany(['view platform finance', 'release payouts', 'manage invoices', 'manage commission credits', 'manage commission destinations'])
                      <!-- Billing & Finance Section -->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion {{ (request()->is('admin/billing*') || request()->is('admin/finance*')) ? 'show' : '' }}">

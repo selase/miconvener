@@ -207,3 +207,36 @@ test('current front back and logo assets stay watermarked until deliberate use a
     $this->purchase->licence->update(['state' => 'suspended']);
     expect($this->get($base.'/badges/template/artwork')->assertOk()->getContent())->not->toBe($original);
 });
+
+test('an archived event with digital purchase history explains why permanent purge is blocked', function (): void {
+    $this->event->delete();
+    $reason = null;
+    expect($this->event->canBeDeleted($reason))->toBeFalse()->and($reason)->toContain('licence history');
+});
+
+test('one paid event licence prints fifty nine badges on A4 in portrait duplex and custom landscape', function (): void {
+    $tickets = collect(['Doctor', 'Nurse', 'Physician Assistant', 'Faculty', 'Host'])->map(fn (string $name) => App\Models\EventTicketType::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'name' => $name]));
+    $registrations = collect();
+    for ($index = 0; $index < 59; $index++) {
+        $registrations->push(App\Models\EventRegistration::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'ticket_type_id' => $tickets[$index % 5]->id,
+            'full_name' => $index === 0 ? 'Alexandria Nana Akwasi Agyeman-Ababio' : 'Synthetic Person '.($index + 1), 'email' => 'badge-'.$index.'@example.test']));
+    }
+    $layout = $this->template->layoutSettings();
+    $layout['qr']['visible'] = false;
+    $this->template->update(['width_mm' => 54, 'height_mm' => 85, 'orientation' => 'portrait', 'layout' => $layout]);
+    $modes = [['width' => 54, 'height' => 85, 'back' => false, 'flip' => 'long-edge', 'pages' => 7],
+        ['width' => 54, 'height' => 85, 'back' => true, 'flip' => 'long-edge', 'pages' => 14],
+        ['width' => 54, 'height' => 85, 'back' => true, 'flip' => 'short-edge', 'pages' => 14],
+        ['width' => 85, 'height' => 54, 'back' => false, 'flip' => 'long-edge', 'pages' => 8]];
+    foreach ($modes as $mode) {
+        $this->template->update(['width_mm' => $mode['width'], 'height_mm' => $mode['height'], 'back' => $mode['back'] ? ['layout' => $layout] : null,
+            'sheet_settings' => ['paper' => 'a4', 'margin_mm' => 8, 'gap_mm' => 3, 'crop_marks' => true, 'duplex' => $mode['flip']], 'design_version' => $this->template->design_version + 1]);
+        $claim = app(BadgeTemplateAccess::class)->claimUse($this->event, $this->actor, [], 'badge_pdf', (string) Str::uuid());
+        $pdf = app(App\Services\Badges\BadgePdfService::class)->generate($this->event, $claim['template'], $registrations, $claim['uses']);
+        expect($pdf->output())->toStartWith('%PDF-');
+        expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe($mode['pages']);
+        unset($pdf);
+    }
+    expect(BadgeTemplatePurchase::query()->where('event_id', $this->event->id)->count())->toBe(1)
+        ->and(BadgeTemplateUse::query()->where('purchase_id', $this->purchase->id)->count())->toBe(4);
+});

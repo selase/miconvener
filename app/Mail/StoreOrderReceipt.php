@@ -44,7 +44,9 @@ final class StoreOrderReceipt extends Mailable
             'receipt' => $snapshot,
             'isVenue' => $isVenue,
             'isDigital' => isset($snapshot['digital_licence']),
-            'orderUrl' => $isVenue ? route('marketplace.bookings.show', $charge->booking->booking_reference) : route('store.orders.show', $this->receipt->order_id),
+            'orderUrl' => isset($snapshot['digital_licence'])
+                ? route('badge-template-purchases.show', \App\Models\BadgeTemplatePurchase::query()->where('order_id', $this->receipt->order_id)->firstOrFail()->id)
+                : ($isVenue ? route('marketplace.bookings.show', $charge->booking->booking_reference) : route('store.orders.show', $this->receipt->order_id)),
         ]);
     }
 }
