@@ -61,7 +61,7 @@ final class StoreCommercialTerms
 
     private function assertScope(string $scope): void
     {
-        if (! in_array($scope, [StoreCommercialAgreement::SCOPE_PURCHASE, StoreCommercialAgreement::SCOPE_RESERVATION], true)) {
+        if (! in_array($scope, [StoreCommercialAgreement::SCOPE_PURCHASE, StoreCommercialAgreement::SCOPE_RESERVATION, StoreCommercialAgreement::SCOPE_BADGE_TEMPLATE], true)) {
             throw new InvalidArgumentException("Unknown commercial agreement scope [{$scope}].");
         }
     }

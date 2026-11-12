@@ -19,6 +19,7 @@ final class EventOrganiserAccess
         'AbstractReviewController' => ['index', 'submit'],
         'ArtifactFontController' => ['face', 'index', 'store'],
         'EventAttendeeImportController' => ['confirm', 'export', 'index', 'invite', 'preview', 'resume', 'retryInvitations', 'show', 'template'],
+        'BadgeTemplatePurchaseController' => ['store', 'checkout'],
         'BadgeLibraryController' => ['index', 'thumbnail', 'store', 'preview', 'apply', 'restore', 'withdraw'],
         'EventBadgeController' => ['artwork', 'index', 'sheet', 'updateTemplate'],
         'EventBlastController' => ['cancel', 'index', 'store'],

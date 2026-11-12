@@ -285,6 +285,12 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'purchase badge-templates',
+                'guard_name' => 'web',
+                'category' => 'event',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'manage badge-library',
                 'guard_name' => 'web',
                 'category' => 'event',

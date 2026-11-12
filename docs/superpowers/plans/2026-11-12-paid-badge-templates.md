@@ -109,11 +109,11 @@ Refunds require an explicitly backed platform refund reserve. Neither unrelated 
 
 **Interfaces** `BadgeTemplatePurchases::quote(Event $event, BadgeLibraryVersion $version, User $actor, string $verifiedPayerEmail, string $operationKey): BadgeTemplatePurchase`. Controller POST endpoints under the tenant/event badge-library routes create and start the purchase. Return only safe order/attempt status and hosted checkout navigation.
 
-- [ ] Write failing `BadgeTemplateCheckoutTest.php`. Assert price 5,000/GHS, quantity one, own-gateway buyer allowed, correct platform seller, verified payer, exact accepted terms hash, tenant/event scope, purchase permission, duplicated/changed keys reusing a pending purchase, and an already-active licence returning Purchased without HTTP payment initialisation.
-- [ ] Run red tests.
-- [ ] Add `purchase badge-templates`, default Org Superadmin/Superadmin with explicit event-safe delegation. Keep buyer finance powers separate. Freeze legal seller, buyer tenant/event/family/version, total, currency, terms/refund policy version and original account before provider HTTP. Quote expiry is ten minutes and retries retain its deadline. Block a second unresolved attempt after an unknown outcome.
-- [ ] Recheck authorisation before every checkout replay. Refuse new checkout for withdrawn designs or deleted events. Existing attempts are verified and reconciled after flags/roles change. Route a captured payment for an unavailable target to review/refund rather than granting a new licence.
-- [ ] Run checkout, role, event-scope and existing merchandise replay tests; commit and tick.
+- [x] Write failing `BadgeTemplateCheckoutTest.php`. Assert price 5,000/GHS, quantity one, own-gateway buyer allowed, correct platform seller, verified payer, exact accepted terms hash, tenant/event scope, purchase permission, duplicated/changed keys reusing a pending purchase, and an already-active licence returning Purchased without HTTP payment initialisation.
+- [x] Run red tests.
+- [x] Add `purchase badge-templates`, default Org Superadmin/Superadmin with explicit event-safe delegation. Keep buyer finance powers separate. Freeze legal seller, buyer tenant/event/family/version, total, currency, terms/refund policy version and original account before provider HTTP. Quote expiry is ten minutes and retries retain its deadline. Block a second unresolved attempt after an unknown outcome.
+- [x] Recheck authorisation before every checkout replay. Refuse new checkout for withdrawn designs or deleted events. Existing attempts are verified and reconciled after flags/roles change. Route a captured payment for an unavailable target to review/refund rather than granting a new licence.
+- [x] Run checkout, role, event-scope and existing merchandise replay tests; commit and tick.
 
 ### Task 4 — Verified payment, atomic licence and durable receipt
 

@@ -318,6 +318,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::get('/thumbnails/{version}', 'thumbnail')->name('thumbnail');
         Route::post('/{design}/withdraw', 'withdraw')->name('withdraw');
     });
+    Route::post('events/{event}/badges/library/purchases', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'store'])->middleware('throttle:10,1')->name('tenant.events.badges.purchases.store');
+    Route::post('events/{event}/badges/library/purchases/{purchase}/checkout', [App\Http\Controllers\Tenant\BadgeTemplatePurchaseController::class, 'checkout'])->middleware('throttle:10,1')->name('tenant.events.badges.purchases.checkout');
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
     Route::post('events/{event}/badges/template', [EventBadgeController::class, 'updateTemplate'])->name('tenant.events.badges.template.update');
     Route::get('events/{event}/badges/template/artwork', [EventBadgeController::class, 'artwork'])->name('tenant.events.badges.template.artwork');

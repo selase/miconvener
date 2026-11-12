@@ -23,12 +23,25 @@ final class BadgeTemplateOffering implements CommerceOffering
 
     public function assertCheckout(StoreOrder $order, Session $session, ?string $acceptedHash): void
     {
-        throw ValidationException::withMessages(['checkout' => 'Paid badge templates are awaiting payment readiness approval.']);
+        $purchase = BadgeTemplatePurchase::query()->with('event')->where('order_id', $order->id)->firstOrFail();
+        $actor = auth()->user();
+        abort_if($actor === null, 403);
+        app(\App\Services\Badges\BadgeTemplatePurchases::class)->authorize($actor, $purchase->event);
+        app(\App\Services\Badges\BadgeTemplateReadiness::class)->agreement(\App\Models\Tenant::query()->whereKey($purchase->buyer_tenant_id)->firstOrFail());
+        $family = $purchase->version->design;
+        if ($family->withdrawn_at !== null || $family->scope !== 'platform' || $family->price_pesewas !== 5000) {
+            throw ValidationException::withMessages(['checkout' => 'This template is no longer available for a new payment.']);
+        }
+        if ($acceptedHash === null || ! hash_equals($order->terms_hash, $acceptedHash) || $purchase->state !== 'pending') {
+            throw ValidationException::withMessages(['checkout' => 'Review and accept the current event licence terms.']);
+        }
     }
 
     public function assertNewAttempt(StoreOrder $order): void
     {
-        throw ValidationException::withMessages(['checkout' => 'Paid badge templates are awaiting payment readiness approval.']);
+        if ($order->charged_pesewas !== 5000 || $order->currency !== 'GHS' || $order->platform_fee_pesewas !== 0) {
+            throw ValidationException::withMessages(['checkout' => 'The paid template price is unavailable.']);
+        }
     }
 
     public function settleWithoutPayment(StoreOrder $order): void
