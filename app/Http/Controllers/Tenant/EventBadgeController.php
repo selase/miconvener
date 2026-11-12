@@ -59,14 +59,22 @@ final class EventBadgeController extends Controller
             ->get();
 
         $template = $this->templates->forEvent($eventModel);
+        $paidAccess = app(\App\Services\Badges\BadgeTemplateAccess::class);
+        $hasPaidDesign = $paidAccess->eventFamilies($eventModel) !== [];
+        $watermarked = $hasPaidDesign && ! $paidAccess->cleanEnabled($eventModel);
+        if ($hasPaidDesign && ! $watermarked) {
+            $template = $paidAccess->claimUse($eventModel, request()->user(), [], 'clean_preview', (string) \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_URL, 'badge-preview:'.$template->id.':'.$template->design_version.':'.request()->user()->id))['template'];
+        }
+        $previewAsset = fn (?string $uri): ?string => $watermarked ? app(\App\Services\Badges\BadgeLibraryService::class)->watermarkedDataUri($uri) : $uri;
 
         return response()->json([
+            'paid_design' => ['present' => $hasPaidDesign, 'watermarked' => $watermarked, 'clean_enabled' => ! $watermarked],
             'template' => $template,
-            'back_background' => $template->backSettings() !== null && is_string($template->backSettings()['background_path'] ?? null) ? $this->artwork->dataUri($template->backSettings()['background_disk'], $template->backSettings()['background_path']) : null,
+            'back_background' => $previewAsset($template->backSettings() !== null && is_string($template->backSettings()['background_path'] ?? null) ? $this->artwork->dataUri($template->backSettings()['background_disk'], $template->backSettings()['background_path']) : null),
             'ticket_types' => $eventModel->ticketTypes()->get(['id', 'name']),
             'fonts' => app(ArtifactFontRegistry::class)->catalog((string) $tenant->id, (string) $eventModel->id),
-            'badge_logo' => $this->templates->badgeLogo($eventModel, $template),
-            'custom_logo' => $this->templates->storedLogo($template),
+            'badge_logo' => $previewAsset($this->templates->badgeLogo($eventModel, $template)),
+            'custom_logo' => $previewAsset($this->templates->storedLogo($template)),
             'layout_defaults' => $this->templates->defaults($eventModel)['layout'],
             'tenant_logo' => $this->templates->tenantLogo($eventModel),
             'badges' => $registrations->map(fn (EventRegistration $r): array => [
@@ -85,7 +93,17 @@ final class EventBadgeController extends Controller
                 'printed_by' => $p->printedBy ? mb_trim($p->printedBy->first_name.' '.$p->printedBy->last_name) : 'Unknown',
                 'printed_at' => $p->created_at->toIso8601String(),
             ])->values(),
-        ]);
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function confirmCleanPreview(\App\Http\Requests\Tenant\ConfirmBadgeOutputRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update badge-template');
+        $tenant = $this->getTenant();
+        $event = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
+        app(\App\Services\Badges\BadgeTemplateAccess::class)->claimUse($event, $request->user(), [], 'clean_preview', $request->validated('output_key'));
+
+        return response()->json(['message' => 'Clean preview enabled. Use has been recorded for this event licence.'])->header('Cache-Control', 'private, no-store');
     }
 
     public function updateTemplate(UpdateEventBadgeTemplateRequest $request, string $subdomain, string $event): JsonResponse
@@ -207,11 +225,20 @@ final class EventBadgeController extends Controller
         $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
         $template = $this->templates->forEvent($eventModel);
         abort_unless(is_string($template->background_disk) && is_string($template->background_path), 404);
+        $access = app(\App\Services\Badges\BadgeTemplateAccess::class);
+        if ($access->eventFamilies($eventModel) !== []) {
+            if (! $access->cleanEnabled($eventModel)) {
+                $uri = app(\App\Services\Badges\BadgeLibraryService::class)->watermarkedDataUri($this->artwork->dataUri($template->background_disk, $template->background_path));
+
+                return response(base64_decode(explode(',', $uri, 2)[1], true), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
+            }
+            $template = $access->claimUse($eventModel, request()->user(), [], 'artwork_download', (string) \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_URL, 'badge-artwork:'.$template->id.':'.$template->design_version.':'.request()->user()->id))['template'];
+        }
         $bytes = $this->artwork->contents($template->background_disk, $template->background_path);
         $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         abort_unless(is_string($mime) && in_array($mime, ['image/png', 'image/jpeg'], true), 404);
 
-        return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=300']);
+        return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => $access->eventFamilies($eventModel) === [] ? 'private, max-age=300' : 'private, no-store']);
     }
 
     public function sheet(GenerateBadgeSheetRequest $request, string $subdomain, string $event): Response
@@ -234,9 +261,19 @@ final class EventBadgeController extends Controller
         }
 
         $template = $this->templates->forEvent($eventModel);
-        $output = $this->pdfs->generate($eventModel, $template, $registrations)->output();
-
+        $access = app(\App\Services\Badges\BadgeTemplateAccess::class);
         $reference = $request->validated('export_reference') ?? (string) Str::uuid();
+        $useIds = [];
+        if ($access->eventFamilies($eventModel) !== []) {
+            if (! $access->cleanEnabled($eventModel) && ! $request->boolean('confirm_paid_use')) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['confirm_paid_use' => 'Confirm that requesting clean output records use and changes refund eligibility.']);
+            }
+            $claim = $access->claimUse($eventModel, $request->user(), [], 'badge_pdf', $reference, ['registration_ids' => $registrations->pluck('id')->sort()->values()->all()]);
+            $template = $claim['template'];
+            $useIds = $claim['uses'];
+        }
+        $output = $this->pdfs->generate($eventModel, $template, $registrations, $useIds)->output();
+
         $sortedIds = $registrations->pluck('id')->sort()->values()->all();
         $fingerprint = hash('sha256', json_encode([$request->user()->id, $template->design_version, $sortedIds], JSON_THROW_ON_ERROR));
         $now = now();

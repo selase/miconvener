@@ -66,12 +66,12 @@ final class BadgeLibraryController extends Controller
         return $this->apply($request, $subdomain, $event);
     }
 
-    public function preview(Request $request, string $subdomain, string $event, string $version): JsonResponse
+    public function preview(\App\Http\Requests\Tenant\PreviewBadgeLibraryRequest $request, string $subdomain, string $event, string $version): JsonResponse
     {
         $event = $this->event($event, 'read badge-template');
         $version = $this->library->visibleVersion($event, $version);
-        if ($version->design->price_pesewas > 0) {
-            return response()->json(['preview_image' => $this->library->previewImage($version->snapshotSettings())])->header('Cache-Control', 'private, no-store');
+        if (app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id) !== []) {
+            return response()->json(['preview_image' => $this->library->previewImage($version->snapshotSettings(), true, [...$request->validated(), 'tenant_id' => $event->tenant_id])])->header('Cache-Control', 'private, no-store');
         }
         $snapshot = $version->snapshotSettings();
         $composition = $request->query('composition');
@@ -96,7 +96,7 @@ final class BadgeLibraryController extends Controller
     {
         $event = $this->event($event, 'read badge-template');
         $version = $this->library->visibleVersion($event, $version);
-        $uri = $this->library->previewImage($version->snapshotSettings(), $version->design->price_pesewas > 0);
+        $uri = $this->library->previewImage($version->snapshotSettings(), app(\App\Services\Badges\BadgeTemplateAccess::class)->families('version', $version->id) !== []);
 
         return response(base64_decode(explode(',', $uri, 2)[1], true), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
     }

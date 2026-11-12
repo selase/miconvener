@@ -44,7 +44,8 @@ final class BadgeTemplatePurchases
             $agreement = $this->readiness->agreement($buyer);
             $version = BadgeLibraryVersion::query()->with('design')->whereKey($version->id)->firstOrFail();
             $family = $version->design;
-            if ($family->scope !== 'platform' || $family->price_pesewas !== 5000 || $family->withdrawn_at !== null) {
+            $price = app(\App\Services\Pricing\PriceBook::class)->badgeTemplate();
+            if ($family->scope !== 'platform' || $family->price_pesewas !== $price->minor || $family->tenant_id !== null || $family->withdrawn_at !== null) {
                 $this->refuse();
             }
             $licence = BadgeTemplateLicence::query()->firstOrCreate(['buyer_tenant_id' => $buyer->id, 'event_id' => $event->id, 'family_id' => $family->id]);
@@ -54,7 +55,7 @@ final class BadgeTemplatePurchases
                 if ($licence->fresh()->state === 'active' && $prior->state === 'paid') {
                     return $prior;
                 }
-                if ($order->expires_at->isFuture() && $order->buyer_email === $email && $prior->version_id === $version->id) {
+                if ($order->expires_at->isFuture() && $order->buyer_email === $email) {
                     return $prior;
                 }
                 if ($prior->state === 'review' || $order->state === 'review' || $order->attempts()->whereIn('status', ['initializing', 'unknown', 'ready', 'captured', 'review', 'succeeded'])->exists()) {
@@ -72,23 +73,23 @@ final class BadgeTemplatePurchases
             $licence = BadgeTemplateLicence::query()->whereKey($licence->id)->lockForUpdate()->firstOrFail();
             $terms = ['requested_by' => $actor->id, 'seller_name' => $agreement->shop->name, 'commercial_policy_reference' => config('services.badge_templates.commercial_approval'), 'buyer_tenant_id' => $buyer->id, 'event_id' => $event->id, 'event_name' => $event->name,
                 'family_id' => $family->id, 'version_id' => $version->id, 'design_name' => $family->name,
-                'total_pesewas' => 5000, 'currency' => 'GHS', 'refund_days' => 7,
+                'total_pesewas' => $price->minor, 'currency' => $price->currency, 'refund_days' => 7, 'licence_timezone' => \App\Models\CommunitySettings::for($buyer)->timezone,
                 'licence' => 'One event, unlimited attendees, edits and reprints. Later family versions may be explicitly applied.',
                 'refund_terms' => 'Full refund within seven calendar days while unused. Requesting clean output records use before download.',
                 'support_contact' => $agreement->support_contact, 'receipt_terms' => $agreement->receipt_terms,
                 'agreement_id' => $agreement->id, 'agreement_version' => $agreement->version,
                 'refund_gateway_fee_bearer' => 'platform'];
             $hash = hash('sha256', json_encode($terms, JSON_THROW_ON_ERROR));
-            $split = $this->fees->forTerms(5000, new FeeTerms(0, null, 'organizer', (float) $agreement->gateway_estimate_rate));
+            $split = $this->fees->forTerms($price->minor, new FeeTerms(0, null, 'organizer', (float) $agreement->gateway_estimate_rate));
             $order = StoreOrder::query()->create(['tenant_id' => $agreement->tenant_id, 'shop_id' => $agreement->shop_id, 'agreement_id' => $agreement->id,
-                'buyer_email' => $email, 'submission_key' => $operationKey, 'cart_hash' => $hash, 'currency' => 'GHS', 'offering_type' => 'badge_template',
-                'principal_pesewas' => 5000, 'platform_fee_pesewas' => 0, 'gateway_estimate_pesewas' => $split->gatewayFeeEstimate, 'charged_pesewas' => 5000, 'fee_bearer' => 'organizer',
+                'buyer_email' => $email, 'submission_key' => $operationKey, 'cart_hash' => $hash, 'currency' => $price->currency, 'offering_type' => 'badge_template',
+                'principal_pesewas' => $price->minor, 'platform_fee_pesewas' => 0, 'gateway_estimate_pesewas' => $split->gatewayFeeEstimate, 'charged_pesewas' => $price->minor, 'fee_bearer' => 'organizer',
                 'settlement_mode' => $agreement->settlement_mode, 'provider' => $agreement->provider, 'account_fingerprint' => $agreement->account_fingerprint,
                 'seller_snapshot' => ['name' => $agreement->shop->name], 'terms_snapshot' => $terms, 'terms_hash' => $hash, 'expires_at' => now()->addMinutes(10)]);
             $purchase = BadgeTemplatePurchase::query()->create(['licence_id' => $licence->id, 'order_id' => $order->id, 'buyer_tenant_id' => $buyer->id,
                 'event_id' => $event->id, 'family_id' => $family->id, 'version_id' => $version->id, 'terms_snapshot' => $terms]);
             $order->lines()->create(['shop_id' => $agreement->shop_id, 'offering_type' => 'badge_template', 'badge_purchase_id' => $purchase->id,
-                'title_snapshot' => $family->name, 'sku_snapshot' => 'badge-template-'.$family->id, 'options_snapshot' => [], 'quantity' => 1, 'unit_price_pesewas' => 5000, 'line_amount_pesewas' => 5000]);
+                'title_snapshot' => $family->name, 'sku_snapshot' => 'badge-template-'.$family->id, 'options_snapshot' => [], 'quantity' => 1, 'unit_price_pesewas' => $price->minor, 'line_amount_pesewas' => $price->minor]);
 
             return $purchase;
         });

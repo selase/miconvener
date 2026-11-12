@@ -108,3 +108,17 @@ test('an active event licence returns the existing purchase without another orde
     $first->licence->update(['state' => 'active', 'current_purchase_id' => $first->id]);
     expect($service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid())->id)->toBe($first->id);
 });
+
+test('the central platform price book owns the fixed template licence price', function (): void {
+    $price = app(App\Services\Pricing\PriceBook::class)->badgeTemplate();
+    expect($price->minor)->toBe(5000)->and($price->currency)->toBe('GHS');
+});
+
+test('a later family version reuses the original pending licence checkout and deadline', function (): void {
+    $service = app(BadgeTemplatePurchases::class);
+    $first = $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    $later = $this->version->design->versions()->create(['version' => 2, 'snapshot' => []]);
+    $this->travel(2)->minutes();
+    $again = $service->quote($this->event, $later, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    expect($again->id)->toBe($first->id)->and($again->order->expires_at->equalTo($first->order->expires_at))->toBeTrue();
+});

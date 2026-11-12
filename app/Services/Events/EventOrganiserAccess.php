@@ -21,7 +21,7 @@ final class EventOrganiserAccess
         'EventAttendeeImportController' => ['confirm', 'export', 'index', 'invite', 'preview', 'resume', 'retryInvitations', 'show', 'template'],
         'BadgeTemplatePurchaseController' => ['store', 'checkout'],
         'BadgeLibraryController' => ['index', 'thumbnail', 'store', 'preview', 'apply', 'restore', 'withdraw'],
-        'EventBadgeController' => ['artwork', 'index', 'sheet', 'updateTemplate'],
+        'EventBadgeController' => ['confirmCleanPreview', 'artwork', 'index', 'sheet', 'updateTemplate'],
         'EventBlastController' => ['cancel', 'index', 'store'],
         'EventCertificateController' => ['artwork', 'destroy', 'download', 'draftPreview', 'index', 'issue', 'preview', 'storeTemplate', 'updateTemplate'],
         'EventCheckInController' => ['checkIn', 'scan', 'search'],

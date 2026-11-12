@@ -27,7 +27,7 @@ final class BadgeLibraryService
     /** @return Builder<BadgeLibraryDesign> */
     public function visible(Event $event): Builder
     {
-        return BadgeLibraryDesign::query()->whereNull('withdrawn_at')->where(function (Builder $query) use ($event): void {
+        return BadgeLibraryDesign::query()->where(fn (Builder $availability) => $availability->whereNull('withdrawn_at')->orWhereIn('id', \App\Models\BadgeTemplateLicence::query()->where('buyer_tenant_id', $event->tenant_id)->where('event_id', $event->id)->where('state', 'active')->select('family_id')))->where(function (Builder $query) use ($event): void {
             $query->where(fn (Builder $global) => $global->where('scope', 'platform')->whereNull('tenant_id'))
                 ->orWhere(fn (Builder $own) => $own->where('tenant_id', $event->tenant_id)->where(fn (Builder $scope) => $scope->where('scope', 'organisation')->orWhere(fn (Builder $private) => $private->where('scope', 'event')->where('event_id', $event->id))));
         });
@@ -51,6 +51,10 @@ final class BadgeLibraryService
                 if ($design !== null && ($design->tenant_id !== ($input['scope'] === 'platform' ? null : $event->tenant_id) || $design->scope !== $input['scope'])) {
                     throw ValidationException::withMessages(['design_id' => 'Save a new design to change its sharing scope.']);
                 }
+                $paidFamilies = app(BadgeTemplateAccess::class)->eventFamilies($event);
+                if ($input['scope'] === 'platform' && $paidFamilies !== []) {
+                    throw ValidationException::withMessages(['scope' => 'A licensed derivative cannot be republished as a platform design.']);
+                }
                 $snapshot = $this->snapshot($event, $current);
                 if ($input['scope'] === 'platform') {
                     foreach ([$snapshot['layout'], $snapshot['back']['layout'] ?? []] as $layout) {
@@ -70,7 +74,10 @@ final class BadgeLibraryService
                 ]);
                 $number = (int) $design->versions()->max('version') + 1;
 
-                return $design->versions()->create(['version' => $number, 'snapshot' => $snapshot]);
+                $version = $design->versions()->create(['version' => $number, 'snapshot' => $snapshot]);
+                app(BadgeTemplateAccess::class)->attach('version', $version->id, $paidFamilies);
+
+                return $version;
             });
         } catch (Throwable $exception) {
             $this->removeFiles($files);
@@ -83,9 +90,6 @@ final class BadgeLibraryService
     {
         $revision = isset($input['revision_id']) ? BadgeDesignRevision::query()->where('tenant_id', $event->tenant_id)->where('event_id', $event->id)->findOrFail($input['revision_id']) : null;
         $version = $revision === null ? $this->visibleVersion($event, $input['version_id']) : null;
-        if ($version !== null && $version->design->price_pesewas > 0) {
-            throw ValidationException::withMessages(['version_id' => 'This GH₵50 design is preview-only until template purchasing is available.']);
-        }
         $snapshot = $revision !== null ? $revision->snapshotSettings() : $version->snapshotSettings();
         if ($revision === null && isset($input['composition'], $snapshot['compositions'][$input['composition']])) {
             $snapshot = $snapshot['compositions'][$input['composition']];
@@ -97,9 +101,13 @@ final class BadgeLibraryService
         $template = $this->templates->forEvent($event);
         $files = [];
         try {
-            return $template->getConnection()->transaction(function () use ($event, $template, $snapshot, $revision, $input, &$files): EventBadgeTemplate {
+            return $template->getConnection()->transaction(function () use ($event, $template, $snapshot, $revision, $version, $input, &$files): EventBadgeTemplate {
                 $current = $template->newQuery()->whereKey($template->id)->lockForUpdate()->firstOrFail();
                 $this->assertVersion($current, (int) $input['expected_version']);
+                $access = app(BadgeTemplateAccess::class);
+                $targetFamilies = $access->families($revision !== null ? 'revision' : 'version', $revision->id ?? $version->id);
+                $access->assertLicensed($event, $targetFamilies);
+                $previousFamilies = $access->eventFamilies($event);
                 $cleanup = app(\App\Services\Design\ArtifactArtworkCleanup::class);
                 $oldAssets = $cleanup->assets($current);
                 $previous = $this->snapshot($event, $current);
@@ -132,7 +140,10 @@ final class BadgeLibraryService
                     $next['sheet_settings']['category_labels'] = $this->categoryLabels($event, $input['category_labels'] ?? []);
                 }
                 $this->assertPaperFit($next);
-                BadgeDesignRevision::query()->create(['tenant_id' => $event->tenant_id, 'event_id' => $event->id, 'design_version' => $current->design_version, 'snapshot' => $previous]);
+                $savedRevision = BadgeDesignRevision::query()->create(['tenant_id' => $event->tenant_id, 'event_id' => $event->id, 'design_version' => $current->design_version, 'snapshot' => $previous]);
+                $access->attach('revision', $savedRevision->id, $previousFamilies);
+                \App\Models\BadgeDesignProvenance::query()->where('source_type', 'event')->where('source_id', $event->id)->delete();
+                $access->attach('event', $event->id, $targetFamilies);
                 unset($next['categories']);
                 $current->fill(array_intersect_key($next, array_flip(self::FIELDS)));
                 $current->design_version++;
@@ -172,47 +183,40 @@ final class BadgeLibraryService
         return $snapshot;
     }
 
-    /** @param array<string, mixed> $snapshot */
-    public function previewImage(array $snapshot, bool $watermarked = true): string
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed>  $options
+     */
+    public function previewImage(array $snapshot, bool $watermarked = true, array $options = []): string
     {
-        $width = 600;
-        $height = (int) round($width * $snapshot['height_mm'] / $snapshot['width_mm']);
-        $image = imagecreatetruecolor($width, $height);
-        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
-        if (is_string($snapshot['background_path'] ?? null)) {
-            $source = imagecreatefromstring($this->artwork->contents($snapshot['background_disk'], $snapshot['background_path']));
-            if ($source !== false) {
-                $scale = min($width / imagesx($source), $height / imagesy($source));
-                $w = (int) round(imagesx($source) * $scale);
-                $h = (int) round(imagesy($source) * $scale);
-                imagecopyresampled($image, $source, (int) (($width - $w) / 2), (int) (($height - $h) / 2), 0, 0, $w, $h, imagesx($source), imagesy($source));
-                unset($source);
-            }
+        return app(BadgeTemplatePreviewRenderer::class)->render($snapshot, $watermarked, $options);
+    }
+
+    public function watermarkedDataUri(?string $uri): ?string
+    {
+        if ($uri === null) {
+            return null;
         }
-        $ink = imagecolorallocate($image, 20, 39, 75);
-        foreach ($snapshot['layout'] as $key => $item) {
-            if (($item['visible'] ?? true) === false || ($item['removed'] ?? false) === true) {
-                continue;
-            }
-            $text = match ($key) {
-                'attendee_name' => 'Sample Attendee', 'event_name' => 'Your conference', 'ticket_type' => 'Category', default => '',
-            };
-            if ($text !== '') {
-                $font = base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf');
-                $size = min(40, max(12, $item['font_size'] * $width / ($snapshot['width_mm'] * 72 / 25.4)));
-                imagettftext($image, $size, 0, (int) ($item['x'] * $width), (int) ($item['y'] * $height + $size), $ink, $font, $text);
-            }
+        $parts = explode(',', $uri, 2);
+        $bytes = isset($parts[1]) ? base64_decode($parts[1], true) : false;
+        $image = $bytes === false ? false : imagecreatefromstring($bytes);
+        if ($image === false) {
+            throw new RuntimeException('The preview artwork is unavailable.');
         }
-        $watermark = imagecolorallocatealpha($image, 100, 40, 80, 45);
-        for ($y = 80; $watermarked && $y < $height + 150; $y += 150) {
-            imagettftext($image, 36, 25, 15, $y, $watermark, base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf'), 'SAMPLE - GH50');
+        $color = imagecolorallocatealpha($image, 120, 30, 70, 45);
+        $size = max(8, min(48, imagesx($image) / 8));
+        $font = base_path('vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf');
+        for ($y = 0; $y < imagesy($image) + $size * 4; $y += (int) ($size * 3)) {
+            for ($x = -imagesx($image); $x < imagesx($image); $x += max(40, (int) ($size * 6))) {
+                imagettftext($image, $size, 20, $x, $y, $color, $font, 'PREVIEW');
+            }
         }
         ob_start();
         imagepng($image);
-        $bytes = ob_get_clean();
+        $result = ob_get_clean();
         unset($image);
 
-        return 'data:image/png;base64,'.base64_encode($bytes);
+        return 'data:image/png;base64,'.base64_encode($result);
     }
 
     /**

@@ -57,6 +57,13 @@ final class ArtifactArtworkCleanup
                     }
                 }
             }
+            foreach (['render_snapshot', 'render_snapshot->back'] as $root) {
+                foreach (['background', 'logo'] as $type) {
+                    if (\App\Models\BadgeTemplateUse::query()->where($root.'->'.$type.'_disk', $disk)->where($root.'->'.$type.'_path', $path)->exists()) {
+                        $referenced = true;
+                    }
+                }
+            }
             if ($referenced) {
                 continue;
             }

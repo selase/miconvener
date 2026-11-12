@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $version_id
  * @property string $purpose
  * @property string $output_key
+ * @property array<string, mixed> $render_snapshot
  * @property string $snapshot_hash
  */
 final class BadgeTemplateUse extends Model
@@ -28,7 +29,7 @@ final class BadgeTemplateUse extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['licence_id', 'purchase_id', 'actor_id', 'version_id', 'purpose', 'output_key', 'snapshot_hash'];
+    protected $fillable = ['licence_id', 'purchase_id', 'actor_id', 'version_id', 'purpose', 'output_key', 'snapshot_hash', 'render_snapshot'];
 
     /** @return BelongsTo<BadgeTemplateLicence, $this> */
     public function licence(): BelongsTo
@@ -46,5 +47,11 @@ final class BadgeTemplateUse extends Model
     public function version(): BelongsTo
     {
         return $this->belongsTo(BadgeLibraryVersion::class, 'version_id');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return ['actor_id' => 'integer', 'render_snapshot' => 'array'];
     }
 }

@@ -19,6 +19,7 @@ final class GenerateBadgeSheetRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'confirm_paid_use' => ['sometimes', 'boolean'],
             'export_reference' => ['sometimes', 'required', 'uuid'],
             'registration_ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_BADGES],
             'registration_ids.*' => ['required', 'uuid', 'distinct'],
