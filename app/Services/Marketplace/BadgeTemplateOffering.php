@@ -39,7 +39,9 @@ final class BadgeTemplateOffering implements CommerceOffering
 
     public function assertNewAttempt(StoreOrder $order): void
     {
-        app(\App\Services\Badges\BadgeTemplateReserve::class)->assertCapacity($order->tenant, $order->charged_pesewas, $order->id);
+        if (($order->terms_snapshot['refund_policy'] ?? null) !== 'non_refundable') {
+            app(\App\Services\Badges\BadgeTemplateReserve::class)->assertCapacity($order->tenant, $order->charged_pesewas, $order->id);
+        }
         if ($order->charged_pesewas !== 5000 || $order->currency !== 'GHS' || $order->platform_fee_pesewas !== 0) {
             throw ValidationException::withMessages(['checkout' => 'The paid template price is unavailable.']);
         }

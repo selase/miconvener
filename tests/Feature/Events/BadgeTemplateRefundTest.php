@@ -49,6 +49,27 @@ test('the ordinary refund deadline is exclusive at seven calendar days', functio
     expect(fn () => app(BadgeTemplateRefunds::class)->request($this->purchase, $this->actor, (string) Str::uuid(), 'Late request'))->toThrow(ValidationException::class);
 });
 
+test('a new nonrefundable licence refuses an ordinary refund even before use', function (): void {
+    $this->purchase = BadgeTemplatePurchase::factory()->create(['terms_snapshot' => ['refund_policy' => 'non_refundable', 'refund_days' => 0]]);
+    $this->purchase->order->update(['accepted_at' => now()]);
+    $attempt = StorePaymentAttempt::factory()->create(['order_id' => $this->purchase->order_id]);
+    app(StorePaymentConfirmer::class)->confirm(StorePaymentObservation::factory()->create(['attempt_id' => $attempt->id]));
+    expect(fn () => app(BadgeTemplateRefunds::class)->request($this->purchase, $this->actor, (string) Str::uuid(), 'Changed my mind'))->toThrow(ValidationException::class);
+    expect($this->purchase->licence->fresh()->state)->toBe('active')
+        ->and(App\Models\StoreRefund::where('order_id', $this->purchase->order_id)->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+test('a new nonrefundable licence retains audited financial correction handling', function (): void {
+    $this->purchase = BadgeTemplatePurchase::factory()->create(['terms_snapshot' => ['refund_policy' => 'non_refundable', 'refund_days' => 0]]);
+    $this->purchase->order->update(['accepted_at' => now()]);
+    $attempt = StorePaymentAttempt::factory()->create(['order_id' => $this->purchase->order_id]);
+    app(StorePaymentConfirmer::class)->confirm(StorePaymentObservation::factory()->create(['attempt_id' => $attempt->id]));
+    $refund = app(BadgeTemplateRefunds::class)->request($this->purchase, $this->actor, (string) Str::uuid(), 'Confirmed payment correction', true);
+    expect($refund->status)->toBe('needs_funding')->and($this->purchase->licence->fresh()->state)->toBe('suspended');
+    Http::assertNothingSent();
+});
+
 test('a used licence needs an explicit audited platform exception', function (): void {
     $this->purchase->licence->update(['first_used_at' => now()]);
     expect(fn () => app(BadgeTemplateRefunds::class)->request($this->purchase, $this->actor, (string) Str::uuid(), 'Used design'))->toThrow(ValidationException::class);

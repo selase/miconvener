@@ -76,13 +76,12 @@ final class BadgeTemplatePurchases
             if (StoreOrder::query()->where('shop_id', $agreement->shop_id)->where('buyer_email', $email)->where('submission_key', $operationKey)->exists()) {
                 $this->refuse();
             }
-            app(BadgeTemplateReserve::class)->assertCapacity($agreement->tenant, $price->minor);
             $licence = BadgeTemplateLicence::query()->whereKey($licence->id)->lockForUpdate()->firstOrFail();
             $terms = ['requested_by' => $actor->id, 'seller_name' => $agreement->shop->name, 'commercial_policy_reference' => config('services.badge_templates.commercial_approval'), 'buyer_tenant_id' => $buyer->id, 'event_id' => $event->id, 'event_name' => $event->name,
                 'family_id' => $family->id, 'version_id' => $version->id, 'design_name' => $family->name,
-                'total_pesewas' => $price->minor, 'currency' => $price->currency, 'refund_days' => 7, 'licence_timezone' => \App\Models\CommunitySettings::for($buyer)->timezone,
+                'total_pesewas' => $price->minor, 'currency' => $price->currency, 'refund_policy' => 'non_refundable', 'refund_days' => 0, 'licence_timezone' => \App\Models\CommunitySettings::for($buyer)->timezone,
                 'licence' => 'One event, unlimited attendees, edits and reprints. Later family versions may be explicitly applied.',
-                'refund_terms' => 'Full refund within seven calendar days while unused. Requesting clean output records use before download.',
+                'refund_terms' => 'Non-refundable once purchased.',
                 'support_contact' => $agreement->support_contact, 'receipt_terms' => $agreement->receipt_terms,
                 'agreement_id' => $agreement->id, 'agreement_version' => $agreement->version,
                 'refund_gateway_fee_bearer' => 'platform'];

@@ -47,10 +47,11 @@ final class BadgeTemplateReserve
         $used = array_fill_keys(\App\Models\BadgeTemplateUse::query()->whereIn('purchase_id', $purchases->pluck('id'))->pluck('purchase_id')->all(), true);
         foreach ($purchases as $purchase) {
             $order = $purchase->order;
+            $nonRefundable = ($purchase->terms_snapshot['refund_policy'] ?? null) === 'non_refundable';
             if ($order->id === $excludeOrder) {
                 continue;
             }
-            if ($purchase->state === 'paid' && $purchase->licence->state === 'active' && $purchase->licence->current_purchase_id === $purchase->id
+            if (! $nonRefundable && $purchase->state === 'paid' && $purchase->licence->state === 'active' && $purchase->licence->current_purchase_id === $purchase->id
                 && $purchase->licence->first_used_at === null && ! isset($used[$purchase->id])
                 && $order->paid_at !== null && now()->lessThan(app(BadgeTemplateRefunds::class)->deadline($purchase))) {
                 $capture = $observations->get($order->id)?->firstWhere('processing_state', 'posted');
@@ -60,7 +61,7 @@ final class BadgeTemplateReserve
             }
             if (in_array($purchase->state, ['pending', 'review'], true)) {
                 $unresolved = $order->attempts->contains(fn ($attempt): bool => ! in_array($attempt->status, ['failed', 'expired'], true));
-                if ($order->expires_at->isFuture() || $unresolved) {
+                if ((! $nonRefundable && $order->expires_at->isFuture()) || $unresolved) {
                     $known = $observations->get($order->id)?->contains(fn ($capture): bool => $capture->amount_pesewas !== null && $capture->amount_pesewas > 0 && $capture->currency === 'GHS' && $capture->account_matches && $capture->reference_matches) ?? false;
                     if (! $known) {
                         $orderMinimums[$order->id] = $order->charged_pesewas;
