@@ -373,6 +373,7 @@ it('asks before first paid output and sends explicit use acknowledgement', async
     await screen.findByText('Person 0');
     fireEvent.click(screen.getByRole('button', { name: /Download .* PDF/ }));
     expect(await screen.findByText(/records use/)).toBeTruthy();
+    expect(screen.queryByText(/Ordinary unused-licence refunds will no longer be available/)).toBeNull();
     expect(csrfFetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Confirm use and download' }));
     await waitFor(() =>

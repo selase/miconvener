@@ -39,7 +39,10 @@ test('a paid template quote freezes the event licence and charges exactly fifty 
         ->and($purchase->order->platform_fee_pesewas)->toBe(0)
         ->and($purchase->order->tenant_id)->toBe($this->seller->id)
         ->and($purchase->buyer_tenant_id)->toBe($this->buyer->id)
-        ->and($purchase->terms_snapshot['refund_days'])->toBe(7)
+        ->and($purchase->terms_snapshot['refund_days'])->toBe(0)
+        ->and($purchase->terms_snapshot['refund_policy'])->toBe('non_refundable')
+        ->and($purchase->terms_snapshot['refund_terms'])->toBe('Non-refundable once purchased.')
+        ->and($purchase->order->terms_snapshot['refund_policy'])->toBe('non_refundable')
         ->and($purchase->order->lines()->first()->badge_purchase_id)->toBe($purchase->id);
 });
 
@@ -124,14 +127,25 @@ test('a later family version reuses the original pending licence checkout and de
     expect($again->id)->toBe($first->id)->and($again->order->expires_at->equalTo($first->order->expires_at))->toBeTrue();
 });
 
-test('a new purchase cannot spend refund backing promised to an existing event', function (): void {
+test('new nonrefundable quotes do not consume legacy refund backing', function (): void {
     app(App\Services\Finance\LedgerService::class)->postTransaction($this->seller, null, 'badge_template_reserve_adjustment', 'Synthetic reserve adjustment', 'reduce-fixture', [
         ['code' => '1010', 'direction' => 'debit', 'amount' => 45000], ['code' => '1020', 'direction' => 'credit', 'amount' => 45000],
     ], null, 'GHS', App\Enum\LedgerCategoryEnum::Commerce);
     $service = app(BadgeTemplatePurchases::class);
     $service->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
     $other = App\Models\Event::factory()->create(['tenant_id' => $this->buyer->id]);
-    expect(fn () => $service->quote($other, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid()))->toThrow(ValidationException::class);
+    expect($service->quote($other, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid())->state)->toBe('pending')
+        ->and(app(App\Services\Badges\BadgeTemplateReserve::class)->available($this->seller))->toBe(5000);
+});
+
+test('nonrefundable purchases and rollout need no prefunded refund reserve', function (): void {
+    app(App\Services\Finance\LedgerService::class)->postTransaction($this->seller, null, 'badge_template_reserve_adjustment', 'Synthetic reserve removed', 'no-funding', [
+        ['code' => '1010', 'direction' => 'debit', 'amount' => 50000], ['code' => '1020', 'direction' => 'credit', 'amount' => 50000],
+    ], null, 'GHS', App\Enum\LedgerCategoryEnum::Commerce);
+    $this->artisan('badges:paid-templates', ['tenant' => $this->buyer->slug, '--enable' => true])->assertSuccessful();
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $this->actor, 'buyer@example.test', (string) Str::uuid());
+    app(App\Services\Marketplace\BadgeTemplateOffering::class)->assertNewAttempt($purchase->order);
+    expect($purchase->terms_snapshot['refund_policy'])->toBe('non_refundable');
 });
 
 test('current event staff can recover a purchase status without exposing platform finance', function (): void {

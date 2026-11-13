@@ -3,7 +3,7 @@
 @section('content')
 <div class="container-xxl">
     <h1 class="mb-4">Badge template sales</h1>
-    <p class="text-muted">GH₵50 event licences. Refunds use the protected platform reserve. Verify uncertain payments before acting.</p>
+    <p class="text-muted">GH₵50 event licences. New purchases are non-refundable. Financial corrections and historical refunds require protected funding. Verify uncertain payments before acting.</p>
     @if(session('success'))<div class="alert alert-success" role="status">{{ session('success') }}</div>@endif
     @if($errors->any())<div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>@endif
     @forelse($purchases as $purchase)
@@ -16,6 +16,7 @@
         <h2 class="fs-4">{{ $purchase->event->name }}</h2>
         <p>{{ $purchase->terms_snapshot['design_name'] ?? 'Badge template' }} · {{ $purchase->state }} · Licence {{ $licenceState }}</p>
         <p class="text-muted">{{ $used ? 'Clean output requested' : 'No clean output requested' }} · Purchase {{ $purchase->id }}</p>
+        <p>{{ $purchase->terms_snapshot['refund_terms'] ?? 'Refunds follow the terms recorded at purchase.' }}</p>
         @foreach($purchase->order->attempts as $attempt)
         <div class="border-top pt-4 mt-4">
             <p>Payment {{ $attempt->reference }} · {{ $attempt->status }}</p>
@@ -29,7 +30,7 @@
             <form method="POST" action="{{ route('admin.badge-template-sales.update', $purchase->id) }}" class="d-grid gap-3 mb-4">
                 @csrf<input type="hidden" name="action" value="refund"><input type="hidden" name="capture_id" value="{{ $capture->id }}"><input type="hidden" name="operation_key" value="{{ Str::uuid() }}">
                 <label>Reason for full refund<input class="form-control" name="reason" required maxlength="500"></label>
-                <label class="form-check"><input class="form-check-input" type="checkbox" name="exception" value="1"><span class="form-check-label">Approve a support exception for a used or older licence. This is audited.</span></label>
+                <label class="form-check"><input class="form-check-input" type="checkbox" name="exception" value="1"><span class="form-check-label">Approve an audited financial correction or exception to the recorded purchase policy.</span></label>
                 <button class="btn btn-sm btn-light-dark">Approve full refund</button>
             </form>
             @endif

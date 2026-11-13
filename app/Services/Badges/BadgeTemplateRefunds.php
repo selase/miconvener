@@ -46,6 +46,9 @@ final class BadgeTemplateRefunds
         $type = LedgerTransaction::withoutGlobalScopes()->whereKey($refund->observation->ledger_transaction_id)->value('transaction_type');
         $primary = $type === 'badge_template_sale';
         if ($primary) {
+            if (($purchase->terms_snapshot['refund_policy'] ?? null) === 'non_refundable' && ! $exception) {
+                $this->refuse('This purchase is non-refundable. A financial correction requires an explicit audited platform exception.');
+            }
             if ($purchase->licence->current_purchase_id !== $purchase->id || $purchase->state !== 'paid') {
                 $this->refuse('This payment is not the current event licence.');
             }

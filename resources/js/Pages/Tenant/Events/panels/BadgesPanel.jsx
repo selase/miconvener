@@ -294,8 +294,8 @@ export default function BadgesPanel({ event }) {
                         <>
                             <p className="text-sm">
                                 This records use of your paid event licence before generating the
-                                file. Ordinary unused-licence refunds will no longer be available. A
-                                failed render can be reviewed by support.
+                                file under the terms accepted at purchase. Support can review
+                                rendering problems.
                             </p>
                             <Button
                                 disabled={printing}

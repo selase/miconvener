@@ -9,7 +9,6 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Services\Badges\BadgeTemplateReadiness;
-use App\Services\Badges\BadgeTemplateReserve;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
@@ -30,8 +29,7 @@ final class PaidBadgeTemplatesCommand extends Command
         }
         if (! $this->option('off')) {
             try {
-                $agreement = app(BadgeTemplateReadiness::class)->agreement($buyer, false);
-                app(BadgeTemplateReserve::class)->assertCapacity($agreement->tenant, 5000);
+                app(BadgeTemplateReadiness::class)->agreement($buyer, false);
                 if (Permission::query()->where('guard_name', 'web')->whereIn('name', ['purchase badge-templates', 'manage template refunds'])->count() !== 2
                     || Role::query()->whereNull('tenant_id')->where('guard_name', 'web')->whereIn('name', ['Superadmin', 'Org Superadmin'])->count() !== 2) {
                     $this->error('Required permissions or built-in role definitions are missing. Verify role grants before enabling.');

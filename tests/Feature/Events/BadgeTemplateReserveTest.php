@@ -31,6 +31,19 @@ test('unknown attempts keep their capacity after quote expiry', function (): voi
     expect(app(BadgeTemplateReserve::class)->available($this->seller))->toBe(0);
 });
 
+test('nonrefundable quotes and settled licences do not reserve ordinary refund capacity', function (): void {
+    $this->purchase->update(['state' => 'cancelled']);
+    $this->purchase = BadgeTemplatePurchase::factory()->create([
+        'order_id' => App\Models\StoreOrder::factory()->badgeTemplate()->state(['agreement_id' => $this->purchase->order->agreement_id]),
+        'terms_snapshot' => ['refund_policy' => 'non_refundable', 'refund_days' => 0],
+    ]);
+    expect(app(BadgeTemplateReserve::class)->available($this->seller))->toBe(5000);
+    $this->purchase->order->update(['accepted_at' => now()]);
+    $attempt = StorePaymentAttempt::factory()->create(['order_id' => $this->purchase->order_id]);
+    app(StorePaymentConfirmer::class)->confirm(StorePaymentObservation::factory()->create(['attempt_id' => $attempt->id]));
+    expect(app(BadgeTemplateReserve::class)->available($this->seller))->toBe(5000);
+});
+
 test('an unused paid licence reserves its full ordinary refund and use releases that contingent capacity', function (): void {
     $this->purchase->order->update(['accepted_at' => now()]);
     $attempt = StorePaymentAttempt::factory()->create(['order_id' => $this->purchase->order_id]);

@@ -2,7 +2,7 @@
 
 > **For agentic workers** use `superpowers:executing-plans` for the native implementation, task by task. Track each step in its implementation commit. Use test-first development and one focused whole-change review before merge.
 
-**Status** PR #100 merged as `5ef3652c` and deployed on 12 November 2026. Hosted Paystack test payment succeeded. Its full refund is pending provider processing. Acceptance found a tenant-host return-page error, corrected and regression-tested in the follow-up branch. Production seller setup and paid activation remain pending.
+**Status** PR #100 merged as `5ef3652c` and deployed on 12 November 2026. Hosted Paystack test payment and its full refund succeeded. Acceptance found a tenant-host return-page error, corrected and regression-tested in the follow-up branch. Production seller setup and paid activation remain pending.
 
 **Goal** Sell a reusable design-family licence for GH₵50 per event, with unlimited edits and reprints, through the badge library.
 
@@ -271,7 +271,7 @@ The owner completed one GH₵50 hosted Paystack test-mode card purchase for the 
 
 The browser returned to an organisation-hosted private receipt and received 404. `GuardAttendeePortalHost` correctly requires the platform hostname for private `/my/*` pages. Checkout initialization, callback redirection and digital receipt mail now build their URLs from the configured platform URL and named route path. Three regressions failed before the correction. The affected checkout, payments, refunds and store-receipt suites then passed 67 tests with 232 assertions. A replay of the existing callback reached the receipt in the browser.
 
-One full unused-licence refund was submitted through the native refund service against the original test account and capture. Refund `01a1cf79-b215-731e-8c11-7ed4e5a332f3` remains provider-pending. The licence is suspended. Completed provider refund, refund ledger reversal and final licence revocation remain unverified until Paystack reports processing complete.
+One full unused-licence refund was submitted through the native refund service against the original test account and capture. Refund `01a1cf79-b215-731e-8c11-7ed4e5a332f3` subsequently completed with provider status `processed`. The purchase and licence are refunded, one balanced refund journal exists, and the 98-pesewa processing expense remains. The browser receipt shows refunded. Exactly one receipt and one refund exist.
 
 ### Acceptance correction self-review
 
@@ -282,3 +282,16 @@ A few UI/refactoring pieces were implemented alongside their tests rather than s
 ### Final CI fixture correction
 
 CI on `2b91beec` passed code quality and 4,942 PHP tests, with one badge-layout failure. The paper-size test had inherited a randomly generated event title. A deterministic title, `Reprehenderit voluptates consequatur voluptatem.`, reproduced the same text-fit error after the first three print modes passed and the compact landscape mode began. The positive printing fixture now uses `Preterm Newborns`. A separate oversized-title test checks the `layout.event_name` refusal and retained paid use claim. All 22 tests in that file passed with 79 assertions. No application text-fit rule was changed. The final CI result is recorded on PR #100.
+
+## Owner-approved policy amendment, 13 November 2026
+
+New quotes are non-refundable once purchased, including before first output. The GH₵50 total and event licence remain unchanged. Existing frozen terms, accepted quotes, receipts and refund history retain their original policy. Upfront reserve funding is removed from new quotes, new-policy checkout and organisation readiness. Legacy refundable purchases, unresolved captured money and approved financial corrections retain reserve protection. Platform finance can approve an audited correction, including extra captures, with original-account verification and funding at correction time.
+
+- [x] Prove new-policy quotes and payment starts work without reserve funding. Freeze policy and display text in both order and purchase snapshots.
+- [x] Prove ordinary new-policy refunds fail without suspending licences or contacting the provider. Preserve historical refunds and audited corrections.
+- [x] Preserve legacy contingent exposure and unresolved-capture/approved-refund reserves. Update activation command and finance/first-output wording.
+- [ ] Run affected PHP, JavaScript and worker races, browser check, build assets and self-review. Obtain one whole-change review, then push, wait for CI, merge and verify deployment under the owner's authorisation.
+
+VAT details remain deferred at the owner's request. Standard receipts show the supplied seller and support details with the approved total.
+
+Policy amendment verification completed with 71 PHP tests/229 assertions and 33 JavaScript tests. PHPStan, Pint, ESLint and the asset build passed. New refund-enforcement, reserve and UI regressions failed before their fixes. One independent whole-change review found no blockers. Browser review showed the new non-refundable wording before payment and preserved the historical receipt wording. The local PHP run took 13 minutes 36 seconds under severe disk I/O pressure, with about 1.3 GiB free. CI and production deployment remain the release gate.
