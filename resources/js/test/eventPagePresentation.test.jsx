@@ -280,9 +280,21 @@ describe('public event presentation', { timeout: 30000 }, () => {
     });
 
     it('places the organiser social row above the event heading', () => {
-        render(<Show event={event} org={org} />);
+        render(
+            <Show
+                event={event}
+                org={org}
+                community={{ followingEnabled: true, organisation: { name: org.name } }}
+            />
+        );
         const row = screen.getByRole('region', { name: 'Event organiser' });
-        expect(within(row).getByRole('link', { name: 'Instagram' })).toBeTruthy();
+        expect(within(row).getByText('Hosted by')).toBeTruthy();
+        expect(within(row).getByText('+ Follow Our organisation')).toBeTruthy();
+        const socials = within(row).getByLabelText('Our organisation social links');
+        expect(socials.parentElement).toBe(row);
+        expect(socials.classList.contains('w-full')).toBe(false);
+        expect(within(socials).getByRole('link', { name: 'Instagram' })).toBeTruthy();
+        expect(within(row).queryByText('Managed by Our organisation')).toBeNull();
         expect(
             Boolean(
                 row.compareDocumentPosition(screen.getByRole('heading', { level: 1 })) &
