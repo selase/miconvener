@@ -348,16 +348,27 @@ test('someone who has already started paying is not told to pay again', function
         ->assertInertia(fn ($page) => $page->where('registration.awaiting_checkout', false));
 });
 
-test('the approval email takes the organizer straight to the guests section', function () {
+test('the organiser approval email renders with or without a ticket type', function (bool $hasTicketType) {
     [$tenant] = approvalHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id, 'requires_approval' => true]);
+    $ticketType = $hasTicketType
+        ? EventTicketType::factory()->create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'name' => 'PISP invitation',
+        ])
+        : null;
     $registration = EventRegistration::factory()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
+        'ticket_type_id' => $ticketType?->id,
         'status' => EventRegistration::STATUS_PENDING_APPROVAL,
-    ]);
+    ])->fresh();
 
-    // The approve buttons are on Guests; landing on the overview meant hunting for them.
-    expect((new EventRegistrationNeedsApproval($registration))->render())
+    $html = (new EventRegistrationNeedsApproval($registration))->render();
+
+    expect($html)
+        ->toContain($registration->email)
         ->toContain("/events/{$event->id}/guests");
-});
+    expect(str_contains($html, 'PISP invitation'))->toBe($hasTicketType);
+})->with(['with a ticket type' => true, 'without a ticket type' => false]);

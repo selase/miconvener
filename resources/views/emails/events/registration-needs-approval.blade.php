@@ -7,8 +7,8 @@ registrations before confirming a spot.
 
 <x-mail::panel>
 {{ $registration->full_name }}<br>
-{{ $registration->email }}@if ($registration->ticket_type_name)<br>
-{{ $registration->ticket_type_name }}@endif
+{{ $registration->email }}@if ($ticketTypeName)<br>
+{{ $ticketTypeName }}@endif
 </x-mail::panel>
 
 <x-mail::button :url="$reviewUrl">
