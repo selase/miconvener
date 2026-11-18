@@ -55,6 +55,19 @@ final class RouteServiceProvider extends ServiceProvider
      */
     private function configureRateLimiting(): void
     {
+        foreach (['signup', 'password-reset'] as $action) {
+            RateLimiter::for($action, function (Request $request) use ($action): array {
+                $email = $request->input('email');
+                $recipient = is_string($email) ? mb_strtolower(mb_trim($email)) : '';
+
+                return [
+                    Limit::perMinutes(10, 5)->by($action.':ip:'.$request->ip()),
+                    Limit::perHour(3)->by($action.':recipient:'.hash('sha256', $recipient)),
+                    Limit::perHour(100)->by($action.':application'),
+                ];
+            });
+        }
+
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)
             ->by($request->user()?->id ?: $request->ip()));
 
