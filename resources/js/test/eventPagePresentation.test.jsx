@@ -72,6 +72,42 @@ const org = {
 };
 
 describe('public event presentation', { timeout: 30000 }, () => {
+    it('formats event descriptions with headings and indented lists', () => {
+        const description = [
+            'Build software with practising engineers.',
+            'COHORT 01 AT A GLANCE\n• Saturday labs\n• Midweek virtual clinics',
+            'HOW TO APPLY\n1. Send an application.\n2. Pay GHS 600 after approval.',
+            'QUESTIONS\nVisit https://example.test/bootcamp',
+        ].join('\n\n');
+        render(<Show event={{ ...event, description }} org={org} />);
+
+        const about = screen.getByRole('heading', { name: 'About the event' }).parentElement;
+        expect(within(about).getByText('Build software with practising engineers.').tagName).toBe(
+            'P'
+        );
+        expect(
+            within(about)
+                .getAllByRole('heading', { level: 3 })
+                .map((heading) => heading.textContent)
+        ).toEqual(['COHORT 01 AT A GLANCE', 'HOW TO APPLY', 'QUESTIONS']);
+        const [bullets, steps] = within(about).getAllByRole('list');
+        expect(bullets.tagName).toBe('UL');
+        expect(steps.tagName).toBe('OL');
+        expect(
+            within(bullets)
+                .getAllByRole('listitem')
+                .map((item) => item.textContent)
+        ).toEqual(['Saturday labs', 'Midweek virtual clinics']);
+        expect(
+            within(steps)
+                .getAllByRole('listitem')
+                .map((item) => item.textContent)
+        ).toEqual(['Send an application.', 'Pay GHS 600 after approval.']);
+        expect(
+            within(about).getByRole('link', { name: 'https://example.test/bootcamp' }).href
+        ).toBe('https://example.test/bootcamp');
+    });
+
     it('keeps a neutral contact entry point when the managing organisation is hidden', () => {
         render(
             <Show
