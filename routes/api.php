@@ -20,7 +20,7 @@ Route::middleware('auth:sanctum')->get('/user', fn (Request $request) => $reques
 
 // Mobile Auth API (token-based, no session)
 Route::prefix('v1/auth')->name('api.auth.')->middleware('throttle:auth')->group(function () {
-    Route::post('/register', [App\Http\Controllers\Api\V1\AuthController::class, 'register'])->name('register');
+    Route::post('/register', [App\Http\Controllers\Api\V1\AuthController::class, 'register'])->middleware('throttle:signup')->name('register');
     Route::post('/login', [App\Http\Controllers\Api\V1\AuthController::class, 'login'])->name('login');
     Route::post('/logout', [App\Http\Controllers\Api\V1\AuthController::class, 'logout'])->name('logout')->middleware('auth:sanctum');
 });
