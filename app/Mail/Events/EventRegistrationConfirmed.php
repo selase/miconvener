@@ -53,7 +53,7 @@ final class EventRegistrationConfirmed extends Mailable
     public function send($mailer): ?SentMessage
     {
         if ($this->usesAlternateTransport()) {
-            $mailer = app(MailFactory::class)->mailer('event_confirmation_resend');
+            $mailer = app(MailFactory::class)->mailer('transactional_resend');
         }
 
         return parent::send($mailer);
@@ -127,6 +127,6 @@ final class EventRegistrationConfirmed extends Mailable
         return filled($eventId)
             && $this->registration->event_id === $eventId
             && filled(config('mail.event_confirmation_override.from'))
-            && filled(config('mail.mailers.event_confirmation_resend.password'));
+            && filled(config('mail.mailers.transactional_resend.smtp.password'));
     }
 }

@@ -52,9 +52,10 @@ test('the sent ticket email carries the QR as an inline png part', function () {
 
     Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
 
-    $mime = app('mailer')->getSymfonyTransport()->messages()[0]->toString();
+    $sent = app('mailer')->getSymfonyTransport()->messages()[0];
+    $mime = $sent->toString();
 
-    expect($mime)->toContain('cid:');
+    expect($sent->getOriginalMessage()->getHtmlBody())->toContain('cid:');
     expect($mime)->toContain('image/png');
     expect($mime)->toContain('Content-Disposition: inline');
     // The old failure mode: an SVG data URI that Gmail strips and Outlook cannot draw.
@@ -99,14 +100,14 @@ test('the queued ticket email uses Resend only for the configured event', functi
         'mail.default' => 'array',
         'mail.event_confirmation_override.event_id' => $matchesEvent ? $event->id : 'another-event',
         'mail.event_confirmation_override.from' => 'tickets@relay.example.com',
-        'mail.mailers.event_confirmation_resend' => ['transport' => 'array', 'password' => 'test-only'],
+        'mail.mailers.transactional_resend' => ['transport' => 'array', 'smtp' => ['password' => 'test-only']],
     ]);
 
     $manager = app('mail.manager');
     $mailable = (new EventRegistrationConfirmed($registration))->to($registration->email);
     (new SendQueuedMailable($mailable))->handle($manager);
 
-    $resend = $manager->mailer('event_confirmation_resend')->getSymfonyTransport()->messages();
+    $resend = $manager->mailer('transactional_resend')->getSymfonyTransport()->messages();
     $default = $manager->mailer('array')->getSymfonyTransport()->messages();
 
     expect($resend)->toHaveCount($matchesEvent ? 1 : 0)
@@ -154,4 +155,21 @@ test('the QR encodes the same token the scanner matches on', function () {
     // image has to carry -- a mismatch here means every scan fails at the door.
     expect($registration->qr_token)->not->toBeEmpty();
     expect(QrCodeGenerator::svgDataUri($registration->qr_token))->toStartWith('data:image/svg+xml;base64,');
+});
+
+test('the Resend transport preserves organiser replies while using its verified sender', function () {
+    $delivery = new \Illuminate\Mail\Transport\ArrayTransport;
+    $transport = new \App\Services\Mail\VerifiedSenderTransport($delivery, 'tickets@relay.example.com');
+    $message = (new \Symfony\Component\Mime\Email)
+        ->from(new \Symfony\Component\Mime\Address('old@organiser.example.com', 'An organiser'))
+        ->replyTo('help@organiser.example.com')
+        ->to('attendee@example.com')
+        ->subject('Test confirmation')
+        ->text('Test confirmation');
+
+    $sent = $transport->send($message);
+    expect($sent->getEnvelope()->getSender()->getAddress())->toBe('tickets@relay.example.com')
+        ->and($sent->toString())->toContain('From: An organiser <tickets@relay.example.com>')
+        ->and($sent->toString())->toContain('Reply-To: help@organiser.example.com')
+        ->and($sent->getEnvelope()->getRecipients()[0]->getAddress())->toBe('attendee@example.com');
 });

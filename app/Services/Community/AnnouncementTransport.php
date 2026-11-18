@@ -17,7 +17,9 @@ final class AnnouncementTransport
 
     public function email(string $address, Mailable $mail): void
     {
-        Mail::to($address)->send($mail);
+        $mailer = config('mail.campaign_mailer');
+        $recipient = $mailer === null ? Mail::to($address) : Mail::mailer($mailer)->to($address);
+        $recipient->send($mail);
     }
 
     /** @param list<SmsMessage> $messages

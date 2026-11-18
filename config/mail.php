@@ -17,6 +17,8 @@ return [
 
     'default' => env('MAIL_MAILER', 'smtp'),
 
+    'campaign_mailer' => env('MAIL_CAMPAIGN_MAILER') ?: (env('MAIL_MAILER') === 'transactional_resend' ? 'smtp' : null),
+
     'event_confirmation_override' => [
         'event_id' => env('EVENT_CONFIRMATION_RESEND_EVENT_ID'),
         'from' => env('EVENT_CONFIRMATION_RESEND_FROM'),
@@ -42,14 +44,18 @@ return [
 
     'mailers' => [
 
-        'event_confirmation_resend' => [
-            'transport' => 'smtp',
-            'scheme' => 'smtps',
-            'host' => 'smtp.resend.com',
-            'port' => 465,
-            'username' => 'resend',
-            'password' => env('EVENT_CONFIRMATION_RESEND_KEY'),
-            'timeout' => 15,
+        'transactional_resend' => [
+            'transport' => 'resend-verified-smtp',
+            'verified_from' => env('EVENT_CONFIRMATION_RESEND_FROM'),
+            'smtp' => [
+                'transport' => 'smtp',
+                'scheme' => 'smtps',
+                'host' => 'smtp.resend.com',
+                'port' => 465,
+                'username' => 'resend',
+                'password' => env('EVENT_CONFIRMATION_RESEND_KEY'),
+                'timeout' => 15,
+            ],
         ],
         'smtp' => [
             'transport' => 'smtp',
