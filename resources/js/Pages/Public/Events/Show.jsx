@@ -827,6 +827,8 @@ function RegistrationPanel({ event }) {
     }, [event.ticket_types, unlockedTicketTypes]);
 
     const hasTicketTypes = availableTicketTypes.length > 0;
+    const needsAccessCode =
+        !hasTicketTypes && event.ticket_types?.some((ticket) => ticket.is_invite_only);
 
     const { data, setData, post, processing, errors } = useForm({
         title: '',
@@ -1103,6 +1105,7 @@ function RegistrationPanel({ event }) {
 
     const submit = (e) => {
         e.preventDefault();
+        if (needsAccessCode) return;
         setFieldsExpanded(true);
         post(route('public.events.register', { event: event.slug }));
     };
@@ -1166,6 +1169,11 @@ function RegistrationPanel({ event }) {
                 {event.capacity_reservation_note && (
                     <p className="mb-3 text-xs text-ink-secondary">
                         {event.capacity_reservation_note}
+                    </p>
+                )}
+                {needsAccessCode && (
+                    <p className="mb-3 text-sm text-ink-secondary">
+                        An access code is required to register for this event.
                     </p>
                 )}
                 {availableTicketTypes.length > 0 && (
@@ -1279,7 +1287,7 @@ function RegistrationPanel({ event }) {
                         </p>
                     )}
                     <form onSubmit={submit} className="mt-4 space-y-4">
-                        {hasTicketTypes && (
+                        {(hasTicketTypes || needsAccessCode) && (
                             <div className="space-y-2">
                                 <div className="flex flex-col gap-px bg-border">
                                     {availableTicketTypes.map((ticketType) => (
@@ -1331,7 +1339,7 @@ function RegistrationPanel({ event }) {
 
                                 {/* Unlock Invite-only Tickets */}
                                 <div className="pt-1">
-                                    {!showAccessCodeInput ? (
+                                    {!showAccessCodeInput && !needsAccessCode ? (
                                         <button
                                             type="button"
                                             onClick={() => setShowAccessCodeInput(true)}
@@ -1345,13 +1353,17 @@ function RegistrationPanel({ event }) {
                                                 <span className="text-[11.5px] font-medium text-ink">
                                                     Enter Access Code:
                                                 </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowAccessCodeInput(false)}
-                                                    className="text-[11px] text-ink-muted hover:text-ink"
-                                                >
-                                                    Cancel
-                                                </button>
+                                                {!needsAccessCode && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setShowAccessCodeInput(false)
+                                                        }
+                                                        className="text-[11px] text-ink-muted hover:text-ink"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                )}
                                             </div>
                                             <div className="flex gap-2">
                                                 <input
@@ -1362,6 +1374,7 @@ function RegistrationPanel({ event }) {
                                                             e.target.value.toUpperCase()
                                                         )
                                                     }
+                                                    aria-label="Access code"
                                                     placeholder="e.g. VIP2026"
                                                     className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
                                                 />
@@ -1859,6 +1872,7 @@ function RegistrationPanel({ event }) {
                             type="submit"
                             disabled={
                                 processing ||
+                                needsAccessCode ||
                                 (event.member_benefits?.members_only && !hasMemberAccess)
                             }
                             variant="primary"
