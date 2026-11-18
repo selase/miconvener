@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Services\Mail\VerifiedSenderTransport;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -117,6 +119,12 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $mail = $this->app->make(MailManager::class);
+        $mail->extend('resend-verified-smtp', fn (array $config): VerifiedSenderTransport => new VerifiedSenderTransport(
+            $mail->createSymfonyTransport($config['smtp']),
+            (string) $config['verified_from'],
+        ));
+
         $this->loadMigrationsFrom(database_path('migrations/landlord'));
 
         $this->registerBladeDirectives();
