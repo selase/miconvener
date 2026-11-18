@@ -35,11 +35,14 @@ final class EventRegistrationNeedsApproval extends Mailable implements ShouldQue
 
     public function content(): Content
     {
+        $this->registration->loadMissing('ticketType');
+
         return new Content(
             markdown: 'emails.events.registration-needs-approval',
             with: [
                 'event' => $this->registration->event,
                 'registration' => $this->registration,
+                'ticketTypeName' => $this->registration->ticketType?->name,
                 // Straight to Guests, where the approve buttons are.
                 'reviewUrl' => $this->registration->tenant->url(
                     '/events/'.$this->registration->event->id.'/guests'
