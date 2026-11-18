@@ -10,10 +10,13 @@ use App\Models\EventRegistration;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\TicketPdfService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Mail\Factory as MailFactory;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\SentMessage;
 use Illuminate\Queue\SerializesModels;
 use Throwable;
 
@@ -35,7 +38,25 @@ final class EventRegistrationConfirmed extends Mailable
 
     public function envelope(): Envelope
     {
-        return $this->brandedEnvelope("You're confirmed for {$this->registration->event->name}");
+        $envelope = $this->brandedEnvelope("You're confirmed for {$this->registration->event->name}");
+
+        if ($this->usesAlternateTransport()) {
+            $envelope->from = new Address(
+                (string) config('mail.event_confirmation_override.from'),
+                $envelope->from?->name,
+            );
+        }
+
+        return $envelope;
+    }
+
+    public function send($mailer): ?SentMessage
+    {
+        if ($this->usesAlternateTransport()) {
+            $mailer = app(MailFactory::class)->mailer('event_confirmation_resend');
+        }
+
+        return parent::send($mailer);
     }
 
     /**
@@ -97,5 +118,15 @@ final class EventRegistrationConfirmed extends Mailable
     protected function brandingEvent(): ?Event
     {
         return $this->registration->event;
+    }
+
+    private function usesAlternateTransport(): bool
+    {
+        $eventId = config('mail.event_confirmation_override.event_id');
+
+        return filled($eventId)
+            && $this->registration->event_id === $eventId
+            && filled(config('mail.event_confirmation_override.from'))
+            && filled(config('mail.mailers.event_confirmation_resend.password'));
     }
 }

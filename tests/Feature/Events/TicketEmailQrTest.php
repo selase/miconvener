@@ -10,6 +10,7 @@ use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\TicketPdfService;
+use Illuminate\Mail\SendQueuedMailable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 
@@ -82,6 +83,41 @@ test('the ticket email carries a PDF the attendee can use offline', function () 
     expect($mime)->toContain('application/pdf');
     expect($mime)->toContain('ticket-');
 });
+
+test('the queued ticket email uses Resend only for the configured event', function (bool $matchesEvent) {
+    $tenant = Tenant::factory()->create(['slug' => 'ticket-transport', 'isolation_mode' => 'shared']);
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+    $registration->issueTicket();
+    $registration->save();
+
+    config([
+        'mail.default' => 'array',
+        'mail.event_confirmation_override.event_id' => $matchesEvent ? $event->id : 'another-event',
+        'mail.event_confirmation_override.from' => 'tickets@relay.example.com',
+        'mail.mailers.event_confirmation_resend' => ['transport' => 'array', 'password' => 'test-only'],
+    ]);
+
+    $manager = app('mail.manager');
+    $mailable = (new EventRegistrationConfirmed($registration))->to($registration->email);
+    (new SendQueuedMailable($mailable))->handle($manager);
+
+    $resend = $manager->mailer('event_confirmation_resend')->getSymfonyTransport()->messages();
+    $default = $manager->mailer('array')->getSymfonyTransport()->messages();
+
+    expect($resend)->toHaveCount($matchesEvent ? 1 : 0)
+        ->and($default)->toHaveCount($matchesEvent ? 0 : 1);
+
+    if ($matchesEvent) {
+        expect($resend[0]->toString())
+            ->toContain('tickets@relay.example.com')
+            ->toContain('application/pdf');
+    }
+})->with([true, false]);
 
 test('the ticket PDF renders and embeds the QR rather than linking to it', function () {
     $tenant = Tenant::factory()->create(['slug' => 'pdf-render', 'isolation_mode' => 'shared']);

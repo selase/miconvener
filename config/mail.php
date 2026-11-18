@@ -17,6 +17,11 @@ return [
 
     'default' => env('MAIL_MAILER', 'smtp'),
 
+    'event_confirmation_override' => [
+        'event_id' => env('EVENT_CONFIRMATION_RESEND_EVENT_ID'),
+        'from' => env('EVENT_CONFIRMATION_RESEND_FROM'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Mailer Configurations
@@ -36,6 +41,16 @@ return [
     */
 
     'mailers' => [
+
+        'event_confirmation_resend' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtps',
+            'host' => 'smtp.resend.com',
+            'port' => 465,
+            'username' => 'resend',
+            'password' => env('EVENT_CONFIRMATION_RESEND_KEY'),
+            'timeout' => 15,
+        ],
         'smtp' => [
             'transport' => 'smtp',
             'host' => env('MAIL_HOST', 'smtp.mailgun.org'),
