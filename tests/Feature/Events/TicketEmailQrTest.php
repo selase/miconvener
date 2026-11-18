@@ -52,9 +52,10 @@ test('the sent ticket email carries the QR as an inline png part', function () {
 
     Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
 
-    $mime = app('mailer')->getSymfonyTransport()->messages()[0]->toString();
+    $sent = app('mailer')->getSymfonyTransport()->messages()[0];
+    $mime = $sent->toString();
 
-    expect($mime)->toContain('cid:');
+    expect($sent->getOriginalMessage()->getHtmlBody())->toContain('cid:');
     expect($mime)->toContain('image/png');
     expect($mime)->toContain('Content-Disposition: inline');
     // The old failure mode: an SVG data URI that Gmail strips and Outlook cannot draw.

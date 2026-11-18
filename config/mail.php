@@ -17,7 +17,7 @@ return [
 
     'default' => env('MAIL_MAILER', 'smtp'),
 
-    'campaign_mailer' => env('MAIL_CAMPAIGN_MAILER', env('MAIL_MAILER') === 'transactional_resend' ? 'smtp' : null),
+    'campaign_mailer' => env('MAIL_CAMPAIGN_MAILER') ?: (env('MAIL_MAILER') === 'transactional_resend' ? 'smtp' : null),
 
     'event_confirmation_override' => [
         'event_id' => env('EVENT_CONFIRMATION_RESEND_EVENT_ID'),

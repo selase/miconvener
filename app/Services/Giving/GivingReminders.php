@@ -132,7 +132,9 @@ final class GivingReminders
         }
         $row->refresh();
         try {
-            Mail::mailer(config('mail.campaign_mailer'))->to($row->email)->send(new ReminderMail($row, $this->unsubscribeToken($row)));
+            $mailer = config('mail.campaign_mailer');
+            $recipient = $mailer === null ? Mail::to($row->email) : Mail::mailer($mailer)->to($row->email);
+            $recipient->send(new ReminderMail($row, $this->unsubscribeToken($row)));
             GivingReminder::withoutGlobalScopes()->whereKey($id)->where('last_delivery_key', $key)->update(['delivery_state' => 'sent']);
         } catch (Throwable) {
             GivingReminder::withoutGlobalScopes()->whereKey($id)->where('last_delivery_key', $key)->update(['delivery_state' => 'outcome_unknown']);
