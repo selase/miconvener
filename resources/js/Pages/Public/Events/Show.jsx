@@ -56,6 +56,71 @@ function LinkedText({ text }) {
     );
 }
 
+function EventDescription({ text }) {
+    const blocks = [];
+
+    for (const paragraph of text.trim().split(/\n\s*\n/)) {
+        let current;
+        for (const [index, line] of paragraph.split(/\r?\n/).entries()) {
+            const value = line.trim();
+            const bullet = value.match(/^[•*-]\s+(.+)$/);
+            const step = value.match(/^(\d+)\.\s+(.+)$/);
+            const isHeading =
+                index === 0 &&
+                value.length <= 80 &&
+                /\p{Lu}/u.test(value) &&
+                value === value.toUpperCase() &&
+                !/[.!?]$/.test(value);
+            const type = bullet ? 'ul' : step ? 'ol' : isHeading ? 'h3' : 'p';
+
+            if (current?.type !== type) {
+                current = { type, lines: [] };
+                blocks.push(current);
+            }
+
+            current.lines.push({
+                text: bullet?.[1] ?? step?.[2] ?? line,
+                number: step ? Number(step[1]) : undefined,
+            });
+        }
+    }
+
+    return (
+        <div className="space-y-3 wrap-anywhere text-[15px] leading-relaxed text-[#003249] dark:text-ink-secondary">
+            {blocks.map(({ type, lines }, index) => {
+                if (type === 'h3') {
+                    return (
+                        <h3 key={index} className="mt-6 text-base leading-snug font-semibold">
+                            {lines[0].text}
+                        </h3>
+                    );
+                }
+                if (type === 'p') {
+                    return (
+                        <p key={index} className="whitespace-pre-line">
+                            <LinkedText text={lines.map((line) => line.text).join('\n')} />
+                        </p>
+                    );
+                }
+
+                const List = type;
+                return (
+                    <List
+                        key={index}
+                        className={`space-y-2 ps-6 ${type === 'ul' ? 'list-disc' : 'list-decimal'}`}
+                    >
+                        {lines.map((line, itemIndex) => (
+                            <li key={itemIndex} value={line.number}>
+                                <LinkedText text={line.text} />
+                            </li>
+                        ))}
+                    </List>
+                );
+            })}
+        </div>
+    );
+}
+
 function formatDateRange(startsAt, endsAt, timezone) {
     const sameDay =
         new Date(startsAt).toLocaleDateString('en-CA', { timeZone: timezone }) ===
@@ -2276,13 +2341,12 @@ export default function Show({
                             )}
                             <section id="event-about" className="scroll-mt-6 pb-8">
                                 <h2 className={sectionHeading}>About the event</h2>
-                                <p className="whitespace-pre-line text-[15px] leading-7 text-[#003249] dark:text-ink-secondary">
-                                    {event.description ? (
-                                        <LinkedText text={event.description} />
-                                    ) : (
+                                <EventDescription
+                                    text={
+                                        event.description?.trim() ||
                                         'More information about this event will be shared soon.'
-                                    )}
-                                </p>
+                                    }
+                                />
                                 {event.allow_goodwill_messages && !event.allow_contributions && (
                                     <div className="mt-6 border-l-2 border-accent bg-accent/5 p-5">
                                         <h3 className="flex items-center gap-2 text-sm font-medium">
