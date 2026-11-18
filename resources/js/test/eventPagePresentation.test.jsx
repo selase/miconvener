@@ -338,6 +338,42 @@ describe('public event presentation', { timeout: 30000 }, () => {
             )
         ).toBe(true);
     });
+    it('requires an invite code before registering when every ticket is invite-only', async () => {
+        const ticket = { id: 'invite', name: 'PISP invitation', price: 0, is_invite_only: true };
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({ ticket_types: [ticket] }),
+        });
+        submitted.mockClear();
+
+        try {
+            render(<Show event={{ ...event, ticket_types: [ticket] }} org={org} isPrivate />);
+            fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+            const registration = within(
+                screen.getByRole('dialog', { name: 'Complete your registration' })
+            );
+            const register = registration.getByRole('button', { name: 'Register', exact: true });
+            expect(register.disabled).toBe(true);
+            fireEvent.submit(register.closest('form'));
+            expect(submitted).not.toHaveBeenCalled();
+
+            fireEvent.change(registration.getByRole('textbox', { name: 'Access code' }), {
+                target: { value: 'PISP-EXAMPLE' },
+            });
+            fireEvent.click(registration.getByRole('button', { name: 'Unlock', exact: true }));
+            const unlocked = await registration.findByRole('radio', { name: /PISP invitation/ });
+            expect(unlocked.checked).toBe(true);
+            expect(register.disabled).toBe(false);
+            fireEvent.submit(register.closest('form'));
+            expect(submitted).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ ticket_type_id: 'invite', access_code: 'PISP-EXAMPLE' })
+            );
+        } finally {
+            fetchMock.mockRestore();
+        }
+    });
+
     it('preserves paid-ticket totals, invite-code entry and waitlist actions', () => {
         render(
             <Show
