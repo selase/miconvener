@@ -1905,7 +1905,7 @@ function OrganiserLinks({ links = {} }) {
         youtube: 'YouTube',
     };
     const marks = {
-        website: <Globe className="h-4 w-4" />,
+        website: <Globe className="size-3.5" />,
         instagram: 'IG',
         x: 'X',
         facebook: 'f',
@@ -1913,7 +1913,7 @@ function OrganiserLinks({ links = {} }) {
         youtube: '▶',
     };
     return (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
             {Object.entries(labels)
                 .filter(([key]) => links[key])
                 .map(([key, label]) => (
@@ -1924,7 +1924,7 @@ function OrganiserLinks({ links = {} }) {
                         rel="noopener noreferrer"
                         aria-label={label}
                         title={label}
-                        className="flex h-9 w-9 items-center justify-center border border-border text-xs font-semibold text-ink-secondary transition-colors hover:border-accent hover:text-accent"
+                        className="flex size-7 items-center justify-center border border-border text-[11px] font-semibold text-ink-secondary transition-colors hover:border-accent hover:text-accent"
                     >
                         {marks[key]}
                     </a>
@@ -2056,7 +2056,7 @@ export default function Show({
                         Object.keys(socialLinks).length > 0) && (
                         <section
                             aria-label="Event organiser"
-                            className="relative flex flex-wrap items-center gap-3 pb-6 pt-5"
+                            className="relative flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5"
                         >
                             {event.hosts?.length > 0 ? (
                                 <EventHostCredits hosts={event.hosts} byline />
@@ -2066,23 +2066,23 @@ export default function Show({
                                         <img
                                             src={org.logo_url}
                                             alt=""
-                                            className="h-11 w-11 shrink-0 border border-border bg-white object-contain p-1"
+                                            className="size-8 shrink-0 border border-border bg-white object-contain p-1"
                                         />
                                     ) : (
                                         <div
                                             aria-hidden="true"
-                                            className="flex h-11 w-11 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
+                                            className="flex size-8 shrink-0 items-center justify-center border border-border bg-surface text-sm font-medium text-accent"
                                         >
                                             {org.name?.slice(0, 1)}
                                         </div>
                                     )}
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 break-words">
                                         <span className="block text-[10px] text-ink-tertiary">
                                             Hosted by
                                         </span>
                                         <a
                                             href="#event-organiser"
-                                            className="text-[13px] font-medium hover:text-accent"
+                                            className="text-xs font-medium hover:text-accent"
                                         >
                                             {org.name}
                                         </a>
@@ -2090,8 +2090,8 @@ export default function Show({
                                 </>
                             ) : null}
                             {showManagingOrganisation && community?.followingEnabled && (
-                                <details className="group">
-                                    <summary className="cursor-pointer list-none border border-border bg-surface px-4 py-2 text-xs text-ink [&::-webkit-details-marker]:hidden">
+                                <details className="group shrink-0">
+                                    <summary className="cursor-pointer list-none border border-border bg-surface px-2.5 py-1.5 text-[11px] text-ink [&::-webkit-details-marker]:hidden">
                                         + Follow {org.name}
                                     </summary>
                                     <div className="absolute inset-x-0 top-full z-20 border border-border bg-surface p-5 shadow-lg sm:inset-x-auto sm:right-0 sm:w-80">
@@ -2107,20 +2107,22 @@ export default function Show({
                             )}
                             {Object.keys(socialLinks).length > 0 && (
                                 <div
-                                    className="w-full"
+                                    className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
                                     aria-label={
                                         socialLinksMode === 'event'
                                             ? 'Event social links'
                                             : `${org.name} social links`
                                     }
                                 >
-                                    <span className="text-[10px] text-ink-tertiary">
-                                        {socialLinksMode === 'event'
-                                            ? 'Event links'
-                                            : showManagingOrganisation
-                                              ? `Managed by ${org.name}`
-                                              : 'Social links'}
-                                    </span>
+                                    {socialLinksMode === 'event' ? (
+                                        <span className="text-[10px] text-ink-tertiary">
+                                            Event links
+                                        </span>
+                                    ) : showManagingOrganisation && event.hosts?.length > 0 ? (
+                                        <span className="text-[10px] text-ink-tertiary">
+                                            Managed by {org.name}
+                                        </span>
+                                    ) : null}
                                     <OrganiserLinks links={socialLinks} />
                                 </div>
                             )}
@@ -2167,7 +2169,7 @@ export default function Show({
                                 {event.name}
                             </h1>
                             {event.description && (
-                                <p className="mt-4 max-w-xl text-[15px] leading-7 text-ink-secondary">
+                                <p className="mt-4 max-w-xl text-[15px] leading-7 text-[#003249] dark:text-ink-secondary">
                                     {event.description.split(/\n\s*\n/)[0].length > 220
                                         ? `${event.description.split(/\n\s*\n/)[0].slice(0, 217)}…`
                                         : event.description.split(/\n\s*\n/)[0]}
@@ -2274,7 +2276,7 @@ export default function Show({
                             )}
                             <section id="event-about" className="scroll-mt-6 pb-8">
                                 <h2 className={sectionHeading}>About the event</h2>
-                                <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
+                                <p className="whitespace-pre-line text-[15px] leading-7 text-[#003249] dark:text-ink-secondary">
                                     {event.description ? (
                                         <LinkedText text={event.description} />
                                     ) : (
@@ -2387,7 +2389,7 @@ export default function Show({
                                     className="scroll-mt-6 border-t border-border py-8"
                                 >
                                     <h2 className={sectionHeading}>Plan your visit</h2>
-                                    <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
+                                    <p className="whitespace-pre-line text-[15px] leading-7 text-[#003249] dark:text-ink-secondary">
                                         {event.plan_your_visit_content}
                                     </p>
                                 </section>
@@ -2443,7 +2445,7 @@ export default function Show({
                                                 {org.name}
                                             </h2>
                                             {org.description && (
-                                                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
+                                                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#003249] dark:text-ink-secondary">
                                                     {org.description}
                                                 </p>
                                             )}
