@@ -299,3 +299,29 @@ test('the relay delivers when production excludes development-only Telescope', f
     $process->setTimeout(30)->mustRun();
     expect($process->getExitCode())->toBe(0);
 });
+
+test('academic voice editor payments are relayed without changing signed bytes', function (int $status): void {
+    \Illuminate\Support\Facades\Http::preventStrayRequests();
+    \Illuminate\Support\Facades\Http::fake(['https://ai-humanizer-production-w3fk7h.laravel.cloud/api/webhooks/paystack' => \Illuminate\Support\Facades\Http::response([], $status)]);
+    $body = json_encode(['event' => 'charge.success', 'data' => ['reference' => 'AV-paper', 'metadata' => ['application' => 'academic_voice_editor', 'webhook_url' => 'https://evil.example']]], JSON_PRETTY_PRINT);
+    $signature = hash_hmac('sha512', $body, 'sk_billing_key');
+    $this->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)->assertStatus($status === 200 ? 200 : 502);
+    \Illuminate\Support\Facades\Http::assertSent(fn ($request): bool => $request->url() === 'https://ai-humanizer-production-w3fk7h.laravel.cloud/api/webhooks/paystack' && $request->body() === $body && $request->hasHeader('x-paystack-signature', $signature));
+    \Illuminate\Support\Facades\Http::assertSentCount(1);
+})->with([200, 302, 500]);
+
+test('academic voice editor relay rejects invalid signatures and ignores unrelated events', function (): void {
+    \Illuminate\Support\Facades\Http::fake();
+    $payload = ['event' => 'charge.success', 'data' => ['metadata' => ['application' => 'academic_voice_editor']]];
+    signedPost('/webhooks/settlement/paystack', $payload, 'wrong-key')->assertStatus(400);
+    $payload['event'] = 'refund.processed';
+    signedPost('/webhooks/settlement/paystack', $payload, 'sk_billing_key')->assertOk();
+    \Illuminate\Support\Facades\Http::assertNothingSent();
+});
+
+test('a disabled academic voice editor relay asks Paystack to retry', function (): void {
+    config(['services.paystack.academic_voice_editor_relay_enabled' => false]);
+    \Illuminate\Support\Facades\Http::fake();
+    signedPost('/webhooks/settlement/paystack', ['event' => 'charge.success', 'data' => ['metadata' => ['application' => 'academic_voice_editor']]], 'sk_billing_key')->assertStatus(503);
+    \Illuminate\Support\Facades\Http::assertNothingSent();
+});
