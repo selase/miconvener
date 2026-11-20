@@ -44,7 +44,7 @@ export default function PollPanel({ registration, isOnline = true, pollUrl = nul
             setError(null);
             const mine = next?.user_response;
             const score = mine?.score ?? mine?.points_awarded;
-            setQuizResult(mine && score !== null && score !== undefined ? { score, is_correct: mine.is_correct } : null);
+            setQuizResult(next?.type === 'quiz' && mine && score !== null && score !== undefined ? { score, is_correct: mine.is_correct } : null);
         }
         setPoll(next);
     };

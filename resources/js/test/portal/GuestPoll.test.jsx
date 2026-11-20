@@ -50,3 +50,10 @@ it('shows the closed question without offering another answer', async () => {
     expect(await screen.findByText('Voting has closed. Waiting for the next question.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Yes/ })).toBeNull();
 });
+
+it('never labels an ordinary poll answer as an incorrect quiz on reload', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ poll: { id: 'q', question: 'Your preference?', type: 'multiple_choice', options: [{ id: 'a', label: 'Yes', votes_count: 1, percentage: 100 }], total_votes: 1, user_response: { option_id: 'a', score: 0, is_correct: null } } }) }));
+    render(<PollPanel pollUrl="/guest/state" />);
+    await screen.findByText('Your preference?');
+    expect(screen.queryByText(/Incorrect/)).toBeNull();
+});
