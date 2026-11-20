@@ -61,12 +61,12 @@ final class SettlementWebhookController extends Controller
         $data = $request->input('data');
 
         $metadata = BillingWebhookController::metadata($data['metadata'] ?? null);
-        if (($metadata['application'] ?? null) === 'udworkspace') {
+        if (in_array($metadata['application'] ?? null, ['udworkspace', 'academic_voice_editor'], true)) {
             if ($event !== 'charge.success') {
                 return response()->json(['status' => 'ignored']);
             }
 
-            return $this->relayUdworkspacePayment($body, $signature);
+            return $this->relayPayment($body, $signature, $metadata['application']);
         }
 
         if ($settlementMatches && in_array($event, ['charge.success', 'charge.failed'], true)
@@ -151,12 +151,16 @@ final class SettlementWebhookController extends Controller
      * Preserve the original signed bytes. A failure must stay unacknowledged so
      * Paystack retries; the destination performs its own verification and deduplication.
      */
-    private function relayUdworkspacePayment(string $body, string $signature): JsonResponse
+    private function relayPayment(string $body, string $signature, string $application): JsonResponse
     {
+        // Destinations are fixed here, never taken from transaction metadata.
+        [$label, $url, $enabled] = $application === 'academic_voice_editor'
+            ? ['Academic Voice Editor', 'https://ai-humanizer-production-w3fk7h.laravel.cloud/api/webhooks/paystack', config('services.paystack.academic_voice_editor_relay_enabled')]
+            : ['UDWorkspace', 'https://udworkspace.com/webhooks/paystack', config('services.paystack.udworkspace_relay_enabled')];
         $attempt = (string) Str::uuid();
         $context = ['attempt_id' => $attempt, 'payload_sha256' => hash('sha256', $body)];
-        if (! config('services.paystack.udworkspace_relay_enabled')) {
-            Log::warning('UDWorkspace Paystack relay disabled', $context);
+        if (! $enabled) {
+            Log::warning("{$label} Paystack relay disabled", $context);
 
             return response()->json(['error' => 'Payment relay unavailable'], 503);
         }
@@ -167,7 +171,7 @@ final class SettlementWebhookController extends Controller
                 ->withoutRedirecting()
                 ->withHeaders(['x-paystack-signature' => $signature, 'X-Payment-Relay-Attempt' => $attempt])
                 ->withBody($body, 'application/json')
-                ->post('https://udworkspace.com/webhooks/paystack');
+                ->post($url);
             $result = class_exists(Telescope::class) ? Telescope::withoutRecording($send) : $send();
             $context['http_status'] = $result->status();
             $targetAttempt = (string) $result->header('X-Webhook-Attempt');
@@ -175,20 +179,20 @@ final class SettlementWebhookController extends Controller
                 $context['target_attempt_id'] = $targetAttempt;
             }
             if ($result->status() !== 200) {
-                Log::warning('UDWorkspace Paystack relay failed', $context);
+                Log::warning("{$label} Paystack relay failed", $context);
 
                 return response()->json(['error' => 'Payment relay unavailable'], 502)
                     ->header('X-Payment-Relay-Attempt', $attempt);
             }
         } catch (Throwable $exception) {
             $context['exception_class'] = $exception::class;
-            Log::warning('UDWorkspace Paystack relay failed', $context);
+            Log::warning("{$label} Paystack relay failed", $context);
 
             return response()->json(['error' => 'Payment relay unavailable'], 502)
                 ->header('X-Payment-Relay-Attempt', $attempt);
         }
 
-        Log::info('UDWorkspace Paystack relay delivered', $context);
+        Log::info("{$label} Paystack relay delivered", $context);
 
         return response()->json(['status' => 'relayed'])
             ->header('X-Payment-Relay-Attempt', $attempt);
