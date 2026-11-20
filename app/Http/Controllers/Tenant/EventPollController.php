@@ -29,6 +29,24 @@ final class EventPollController extends Controller
         return response()->json($polls->map(fn (EventPoll $p): array => $this->pollPayload($p)));
     }
 
+    public function guestSettings(string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('read event');
+        $model = $this->findEvent($this->getTenant()->id, $event);
+
+        return response()->json($this->guestPayload($subdomain, $model));
+    }
+
+    public function updateGuestSettings(\App\Http\Requests\Tenant\UpdateGuestPollSettingsRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $model = $this->findEvent($tenant->id, $event);
+        abort_if($request->boolean('enabled') && (! $tenant->canUseLivePolling($model) || $model->visibility !== Event::VISIBILITY_PUBLIC || $model->status !== Event::STATUS_PUBLISHED), 422, 'Guest polls require a published public event with Live Polling available.');
+        $model->update(['guest_polls_enabled' => $request->boolean('enabled')]);
+
+        return response()->json($this->guestPayload($subdomain, $model));
+    }
+
     public function store(Request $request, string $subdomain, string $event): JsonResponse
     {
         $this->authorize('update event');
@@ -175,6 +193,15 @@ final class EventPollController extends Controller
         $eventModel->update(['present_token' => Str::random(40)]);
 
         return response()->json(['present_url' => $this->presentUrl($tenant->slug, $eventModel)]);
+    }
+
+    /** @return array<string, mixed> */
+    private function guestPayload(string $subdomain, Event $event): array
+    {
+        $url = route('public.events.guest-polls.show', ['subdomain' => $subdomain, 'event' => $event->slug]);
+
+        return ['enabled' => (bool) $event->guest_polls_enabled, 'url' => $url,
+            'qr' => \App\Services\Events\QrCodeGenerator::svgDataUri($url)];
     }
 
     /**

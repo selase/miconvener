@@ -103,6 +103,11 @@ final class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('attendee-profile-read', fn (Request $request) => Limit::perMinute(120)->by($request->ip().':attendee-profile-read'));
 
+        RateLimiter::for('guest-poll-write', fn (Request $request): array => [
+            Limit::perMinute(60)->by('guest-poll-session:'.$request->session()->getId()),
+            Limit::perMinute(4000)->by('guest-poll-ip:'.$request->ip()),
+        ]);
+
         RateLimiter::for('public-registration', fn (Request $request) => Limit::perMinute(10)
             ->by($request->ip()));
 

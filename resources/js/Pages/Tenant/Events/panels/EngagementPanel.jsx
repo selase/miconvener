@@ -6,6 +6,7 @@ import StatusPill from '@/Components/Console/StatusPill';
 import { Trash2, Plus, X, Check, Trophy } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 import PollChart from '@/Components/Polls/PollChart';
+import GuestPollSettings from './GuestPollSettings';
 
 const STATUS_TONE = { draft: 'neutral', live: 'success', closed: 'failed' };
 
@@ -806,6 +807,8 @@ export default function EngagementPanel({ event }) {
                     Results update as votes arrive.
                 </p>
             )}
+
+            <GuestPollSettings event={event} />
 
             <PresentLink event={event} />
 

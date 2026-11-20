@@ -43,12 +43,15 @@ final class PollPresentationController extends Controller
         // The room needs to reach somewhere it can actually answer without
         // being read a URL. This used to point at /e/{event}/poll, the data
         // endpoint the public page fetches, so anyone who scanned it got a
-        // blob of JSON. Answering happens in the portal now.
+        // blob of JSON. Registered-only events still answer in the portal;
+        // opted-in public events offer the separate guest page.
         //
         // Built against the platform host, not this request's: the wall is
         // served from the tenant's subdomain and the portal is not, so url()
         // would send a scanned phone to a subdomain that redirects it away.
-        $joinPage = request()->getScheme().'://'.app(TenantHostMatcher::class)->baseDomain().'/my';
+        $joinPage = $eventModel->guest_polls_enabled && $eventModel->visibility === Event::VISIBILITY_PUBLIC
+            ? route('public.events.guest-polls.show', ['subdomain' => $this->tenant()->slug, 'event' => $eventModel->slug])
+            : request()->getScheme().'://'.app(TenantHostMatcher::class)->baseDomain().'/my';
 
         return Inertia::render('Public/Events/PollPresentation', [
             'event' => [
@@ -60,6 +63,7 @@ final class PollPresentationController extends Controller
             // Zero bars and a room that cannot answer yet look identical from
             // the back of a hall, and only one of them is something an
             // organiser can act on.
+            'guestParticipation' => (bool) $eventModel->guest_polls_enabled && $eventModel->visibility === Event::VISIBILITY_PUBLIC,
             'eligibleVoters' => $eventModel->registrations()
                 ->confirmed()
                 ->whereNotNull('checked_in_at')
@@ -88,7 +92,13 @@ final class PollPresentationController extends Controller
             abort(403, 'Live Polling presentation is locked on this event.');
         }
 
-        return response()->json(['poll' => $this->livePayload($eventModel)]);
+        $guest = (bool) $eventModel->guest_polls_enabled && $eventModel->visibility === Event::VISIBILITY_PUBLIC;
+        $url = $guest
+            ? route('public.events.guest-polls.show', ['subdomain' => $this->tenant()->slug, 'event' => $eventModel->slug])
+            : request()->getScheme().'://'.app(TenantHostMatcher::class)->baseDomain().'/my';
+
+        return response()->json(['poll' => $this->livePayload($eventModel), 'guestParticipation' => $guest,
+            'join' => ['url' => $url, 'qr' => QrCodeGenerator::svgDataUri($url)]]);
     }
 
     /**
