@@ -24,7 +24,7 @@ const LABELS = {
  * The live question on an attendee's phone: the input its type needs, and once
  * answered, how the room is answering.
  */
-export default function PollPanel({ registration, isOnline = true }) {
+export default function PollPanel({ registration, isOnline = true, pollUrl = null }) {
     const [loading, setLoading] = useState(true);
     const [poll, setPoll] = useState(null);
     const [answer, setAnswer] = useState(emptyAnswer(null));
@@ -33,7 +33,7 @@ export default function PollPanel({ registration, isOnline = true }) {
     const [quizResult, setQuizResult] = useState(null);
     const pollId = useRef(null);
 
-    const url = `/my/events/${registration.id}/poll`;
+    const url = pollUrl ?? `/my/events/${registration.id}/poll`;
 
     // A new question gets a fresh answer, and a quiz score from an earlier one
     // must not hang over it.
@@ -44,7 +44,7 @@ export default function PollPanel({ registration, isOnline = true }) {
             setError(null);
             const mine = next?.user_response;
             const score = mine?.score ?? mine?.points_awarded;
-            setQuizResult(mine && score !== null && score !== undefined ? { score, is_correct: mine.is_correct } : null);
+            setQuizResult(next?.type === 'quiz' && mine && score !== null && score !== undefined ? { score, is_correct: mine.is_correct } : null);
         }
         setPoll(next);
     };
@@ -70,14 +70,13 @@ export default function PollPanel({ registration, isOnline = true }) {
         if (isOnline) {
             fetchPoll();
         }
-    }, [registration.id, isOnline]);
+    }, [url, isOnline]);
 
     // The presenter holds the pace, so the phone follows rather than decides.
     // Five seconds: this is the fallback for a room with no socket, and a
     // question is open for a minute or two at most. While someone is still
-    // answering, the same question is left alone so a half-typed answer is not
-    // wiped out from under them; once they have answered, it refreshes so they
-    // can watch the room.
+    // answering, adopt preserves the draft for the same question while updating
+    // its status and results, so closing a question removes answer controls.
     useEffect(() => {
         if (!isOnline) return undefined;
 
@@ -87,15 +86,13 @@ export default function PollPanel({ registration, isOnline = true }) {
                 .then((data) => {
                     if (!data) return;
                     const next = data.poll;
-                    if (next?.id !== pollId.current || next?.user_response) {
-                        adopt(next);
-                    }
+                    adopt(next);
                 })
                 .catch(() => {});
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [registration.id, isOnline]);
+    }, [url, isOnline]);
 
     // A ref, not state: a tap that sends at once can fire twice before state
     // catches up, and the second would be refused as a repeat vote.
@@ -108,7 +105,7 @@ export default function PollPanel({ registration, isOnline = true }) {
      */
     const submit = async (e, override = null) => {
         e?.preventDefault?.();
-        if (!poll || sending.current) return;
+        if (!poll || poll.status === 'closed' || poll.is_time_up || sending.current) return;
 
         sending.current = true;
         setSubmitting(true);
@@ -204,6 +201,11 @@ export default function PollPanel({ registration, isOnline = true }) {
 
             {mine ? (
                 <Answered poll={poll} mine={mine} />
+            ) : poll.status === 'closed' || poll.is_time_up ? (
+                <div className="mt-6 space-y-3">
+                    <p role="status" className="text-sm text-ink-secondary">Voting has closed. Waiting for the next question.</p>
+                    {poll.results && <PollChart poll={poll.results} />}
+                </div>
             ) : (
                 <form onSubmit={submit} className="mt-6 space-y-4">
                     <AnswerInput poll={poll} answer={answer} setAnswer={setAnswer} onPickAndSend={submit} />

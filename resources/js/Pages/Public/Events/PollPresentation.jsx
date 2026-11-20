@@ -18,11 +18,14 @@ export default function PollPresentation({
     event,
     organiser,
     poll: initialPoll,
-    join,
+    join: initialJoin,
     resultsUrl,
     eligibleVoters = 0,
+    guestParticipation: initialGuestParticipation = false,
 }) {
     const [poll, setPoll] = useState(initialPoll);
+    const [join, setJoin] = useState(initialJoin);
+    const [guestParticipation, setGuestParticipation] = useState(initialGuestParticipation);
     const [connected, setConnected] = useState(false);
 
     // Polling first, so the screen is correct even where a socket never opens.
@@ -30,7 +33,11 @@ export default function PollPresentation({
         const load = () => {
             fetch(resultsUrl, { headers: { Accept: 'application/json' } })
                 .then((r) => r.json())
-                .then((data) => setPoll(data.poll))
+                .then((data) => {
+                    setPoll(data.poll);
+                    if (data.join) setJoin(data.join);
+                    if (typeof data.guestParticipation === 'boolean') setGuestParticipation(data.guestParticipation);
+                })
                 .catch(() => {});
         };
 
@@ -117,7 +124,7 @@ export default function PollPresentation({
                         )}
 
                         <div className="mt-[3vh] min-h-0 flex-1">
-                            {poll.total_responses === 0 && eligibleVoters === 0 ? (
+                            {poll.total_responses === 0 && eligibleVoters === 0 && !guestParticipation ? (
                                 /* A chart of zeroes and a room that cannot answer
                                    yet look identical from the back of a hall, and
                                    only one of them is something an organiser can

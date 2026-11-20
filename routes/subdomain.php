@@ -284,6 +284,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::patch('events/{event}/service-requests/{serviceRequest}', [EventServiceRequestController::class, 'updateStatus'])->name('tenant.events.service-requests.status');
 
     Route::get('events/{event}/polls', [EventPollController::class, 'index'])->name('tenant.events.polls.index');
+    Route::get('events/{event}/polls/guests', [EventPollController::class, 'guestSettings'])->name('tenant.events.polls.guests.show');
+    Route::patch('events/{event}/polls/guests', [EventPollController::class, 'updateGuestSettings'])->name('tenant.events.polls.guests.update');
     Route::post('events/{event}/polls', [EventPollController::class, 'store'])->name('tenant.events.polls.store');
     Route::patch('events/{event}/polls/{poll}', [EventPollController::class, 'updateStatus'])->name('tenant.events.polls.status');
     Route::get('events/{event}/polls/present-link', [EventPollController::class, 'presentLink'])->name('tenant.events.polls.present-link');
@@ -781,6 +783,11 @@ Route::post('/e/{event}/decks/{deck}/present/{token}/{action}', [App\Http\Contro
     ->whereIn('action', ['start', 'advance', 'previous', 'close', 'end'])
     ->middleware('throttle:120,1')
     ->name('public.events.decks.presenter.act');
+
+Route::get('/e/{event}/live-polls', [App\Http\Controllers\Public\GuestPollController::class, 'show'])->name('public.events.guest-polls.show');
+Route::post('/e/{event}/live-polls/join', [App\Http\Controllers\Public\GuestPollController::class, 'join'])->middleware('throttle:guest-poll-write')->name('public.events.guest-polls.join');
+Route::get('/e/{event}/live-polls/state', [App\Http\Controllers\Public\GuestPollController::class, 'state'])->name('public.events.guest-polls.state');
+Route::post('/e/{event}/live-polls/state/{poll}/respond', [App\Http\Controllers\Public\GuestPollController::class, 'respond'])->whereUuid('poll')->middleware('throttle:guest-poll-write')->name('public.events.guest-polls.respond');
 
 Route::get('/e/{event}/poll', [PublicPollController::class, 'show'])->name('public.events.poll.show');
 Route::post('/e/{event}/poll/{poll}/respond', [PublicPollController::class, 'respond'])->name('public.events.poll.respond');
