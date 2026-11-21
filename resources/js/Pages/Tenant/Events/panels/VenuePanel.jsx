@@ -162,7 +162,10 @@ export default function VenuePanel({ event, venueRooms }) {
 
         const loadWaiting = () => {
             csrfFetch(route('tenant.events.service-requests.index', { event: event.id }))
-                .then((r) => r.json())
+                .then((r) => {
+                    if (!r.ok) throw new Error('Service request access unavailable');
+                    return r.json();
+                })
                 .then((rows) => {
                     if (cancelled) {
                         return;
@@ -174,6 +177,9 @@ export default function VenuePanel({ event, venueRooms }) {
                         }
                     });
                     setWaitingSeats(map);
+                })
+                .catch(() => {
+                    if (!cancelled) setWaitingSeats({});
                 });
         };
 
@@ -183,11 +189,7 @@ export default function VenuePanel({ event, venueRooms }) {
         let channel = null;
         if (typeof window !== 'undefined' && window.Echo) {
             channel = window.Echo.private(`event.${event.id}.service-requests`);
-            channel.listen('.ServiceRequestRaised', (incoming) => {
-                if (incoming.seat_label) {
-                    setWaitingSeats((current) => ({ ...current, [incoming.seat_label]: incoming }));
-                }
-            });
+            channel.listen('.ServiceRequestRaised', () => loadWaiting());
         }
 
         return () => {

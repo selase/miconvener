@@ -19,7 +19,16 @@ final class TenantResolver
      */
     public function resolve(Request $request): ?Tenant
     {
+        $route = $request->route();
+        if ($route instanceof \Illuminate\Routing\Route && $route->named('impersonation.stop')) {
+            return null;
+        }
+
         $tenant = $this->findTenant($request);
+        $boundTenantId = Session::get('impersonation_tenant_id');
+        if (Session::has('original_user') && $boundTenantId !== null && (string) $tenant?->id !== (string) $boundTenantId) {
+            throw new \App\Exceptions\TenantMembershipException;
+        }
         if (! $tenant instanceof Tenant) {
             return null;
         }
@@ -27,6 +36,8 @@ final class TenantResolver
         // Set the current team ID for Spatie Permissions BEFORE membership checks
         // This prevents role relationship caching issues with empty roles.
         setPermissionsTeamId($tenant->id);
+
+        $request->user()?->unsetRelation('roles')->unsetRelation('permissions');
 
         $this->validateStatus($tenant);
         $this->validateMembership($tenant, $request);
@@ -79,6 +90,11 @@ final class TenantResolver
             throw new HttpException(404, 'Tenant not found');
         }
 
+        $route = $request->route();
+        if ($route instanceof \Illuminate\Routing\Route && $route->named('workspaces.*', 'account-identity.*', 'organisation-invitations.*', 'tenant.my-tenants', 'tenant.switch', 'store.*', 'marketplace.*')) {
+            return null;
+        }
+
         // 2. Session
         if ($tenantId = Session::get('active_tenant_id')) {
             /** @var Tenant|null $tenant */
@@ -108,11 +124,11 @@ final class TenantResolver
         return null;
     }
 
-    /** Public Giving retains its source/proof guards; visiting it must not sign out foreign console staff. */
+    /** Public attendee, Giving and store routes retain their independent source/proof guards. */
     private function validateMembership(Tenant $tenant, Request $request): void
     {
         $route = $request->route();
-        if ($route instanceof \Illuminate\Routing\Route && $route->named('public.giving.*')) {
+        if ($route instanceof \Illuminate\Routing\Route && $route->named('public.*', 'store.*', 'marketplace.*')) {
             return;
         }
         $user = $request->user();
@@ -123,13 +139,17 @@ final class TenantResolver
             return;
         }
 
+        if (! \App\Models\User::query()->whereKey($user->id)->where(fn ($query) => $query->where('status', \App\Models\User::STATUS_ACTIVE)->orWhereNull('status'))->exists()) {
+            throw new \App\Exceptions\TenantMembershipException;
+        }
+
         // Superadmins bypass membership checks to allow global management
         if (\Illuminate\Support\Facades\Gate::allows('access-superadmin-dashboard')) {
             return;
         }
 
         // Robust membership check using relationship query
-        if (! $user->tenants()->where('tenants.id', $tenant->id)->exists()) {
+        if (! app(OrganisationMemberships::class)->isActive($user, $tenant)) {
             throw new \App\Exceptions\TenantMembershipException();
         }
     }

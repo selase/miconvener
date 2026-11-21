@@ -497,33 +497,12 @@ final class TenantController extends Controller
     public function changeTenant($tenantId)
     {
         $user = auth()->user();
+        $tenant = Tenant::query()->findOrFail($tenantId);
+        abort_unless($user->isGlobalSuperAdmin() || app(\App\Services\Tenancy\OrganisationMemberships::class)->isActive($user, $tenant), 403);
+        session()->put('active_tenant_id', $tenant->id);
+        session()->forget('tenant_id');
 
-        if ($user->hasRole('Superadmin')) {
-            $tenant = Tenant::find($tenantId);
-        } else {
-            // Check if tenant exist
-            $tenant = $user->tenants()->find($tenantId);
-        }
-
-        if (! $tenant) {
-            abort(404);
-        }
-
-        // Change tenant
-        $user->update(['tenant_id' => $tenantId]);
-
-        if ($tenant && $tenant->slug !== null) {
-            $tenantDomain = str_replace('://', '://'.$tenant->slug.'.', config('app.url'));
-
-            session()->put('tenant_id', $tenant->id);
-
-            return redirect()->intended($tenantDomain.RouteServiceProvider::HOME);
-        }
-
-        return back()->with([
-            'status' => 'error',
-            'message' => 'This action is not authorized',
-        ]);
+        return redirect()->to($tenant->url(RouteServiceProvider::HOME));
     }
 
     public function resetTenant()

@@ -19,7 +19,10 @@ final class TenantSwitchController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        return response()->json($request->user()->tenants);
+        $user = $request->user();
+        $tenants = $user->tenants()->get()->filter(fn (Tenant $tenant): bool => app(\App\Services\Tenancy\OrganisationMemberships::class)->isActive($user, $tenant));
+
+        return response()->json($tenants->map(fn (Tenant $tenant): array => $this->workspace($tenant))->values());
     }
 
     /**
@@ -27,6 +30,8 @@ final class TenantSwitchController extends Controller
      */
     public function switch(Request $request): JsonResponse
     {
+        abort_if(Session::has('original_user'), 403, 'Stop impersonation before switching organisations.');
+
         $request->validate([
             'tenant_id' => 'required|uuid|exists:tenants,id',
         ]);
@@ -34,7 +39,7 @@ final class TenantSwitchController extends Controller
         $tenant = Tenant::findOrFail($request->tenant_id);
         $user = $request->user();
 
-        if (! $user->tenants->contains($tenant->id)) {
+        if (! app(\App\Services\Tenancy\OrganisationMemberships::class)->isActive($user, $tenant) || $tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE) {
             throw new HttpException(403, 'User does not belong to this tenant');
         }
 
@@ -45,9 +50,15 @@ final class TenantSwitchController extends Controller
 
         return response()->json([
             'message' => 'Tenant switched successfully',
-            'tenant' => $tenant,
+            'tenant' => $this->workspace($tenant),
             'redirect_url' => $tenant->url(\App\Providers\RouteServiceProvider::HOME),
         ]);
+    }
+
+    /** @return array{id: string, name: string, slug: string} */
+    private function workspace(Tenant $tenant): array
+    {
+        return ['id' => $tenant->id, 'name' => $tenant->name, 'slug' => $tenant->slug];
     }
 
     /**

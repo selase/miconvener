@@ -1,16 +1,12 @@
-@component('mail::message')
+<x-mail::message>
 # Hello {{ $user }},
 
-Congratulations! your account has been created for {{ $tenantName ? $tenantName.' on '.config('app.name') : config('app.name') }}.
-Below are the details:
+Your account is ready. Choose your own password using account recovery. For your security, we do not send passwords by email.
 
-**Email:** {{ $email }} <br> **Password:** {{ $password }}
-
-
-@component('mail::button', ['url' => $loginUrl ?? route('login')])
-Login
-@endcomponent
+<x-mail::button :url="rtrim(config('app.url'), '/').'/forgot-password'">
+Set up your password
+</x-mail::button>
 
 Thanks,<br>
 {{ config('app.name') }}
-@endcomponent
+</x-mail::message>

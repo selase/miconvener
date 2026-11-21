@@ -25,6 +25,7 @@ final class ApiLoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
+            'two_factor_code' => ['nullable', 'string', 'max:32'],
             'device_name' => ['required', 'string', 'max:255'],
         ];
     }
@@ -58,5 +59,14 @@ final class ApiLoginRequest extends FormRequest
     public function throttleKey(): string
     {
         return Str::lower($this->input('email')).'|'.$this->ip();
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $email = $this->input('email');
+
+        if (is_string($email)) {
+            $this->merge(['email' => mb_strtolower(mb_trim($email))]);
+        }
     }
 }

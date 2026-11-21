@@ -26,4 +26,13 @@ final class ApiRegisterRequest extends FormRequest
             'device_name' => ['required', 'string', 'max:255'],
         ];
     }
+
+    protected function prepareForValidation(): void
+    {
+        $email = $this->input('email');
+
+        if (is_string($email)) {
+            $this->merge(['email' => mb_strtolower(mb_trim($email))]);
+        }
+    }
 }

@@ -13,7 +13,22 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
 require_once __DIR__.'/../../Support/PublicAttendeeProfileScenario.php';
-uses(DatabaseTruncation::class);
+trait GuardsAttendeeProfileRaceDatabase
+{
+    use DatabaseTruncation;
+
+    protected function beforeTruncatingDatabase(): void
+    {
+        $connection = Illuminate\Support\Facades\DB::connection('landlord');
+        if (! app()->environment('testing') || $connection->getDriverName() !== 'pgsql'
+            || ! Tests\Support\IsolatedPostgresDatabase::permits($connection->getDatabaseName())
+            || $connection->selectOne('select current_database() as name')->name !== $connection->getDatabaseName()) {
+            throw new RuntimeException('Attendee profile races require an isolated PostgreSQL testing database.');
+        }
+    }
+}
+
+uses(GuardsAttendeeProfileRaceDatabase::class);
 afterEach(function (): void {
     $this->truncateDatabaseTables();
 });
@@ -22,11 +37,7 @@ afterEach(function (): void {
 function attendeeProfileRace(array $context, array $actions): array
 {
     $database = config('database.connections.landlord.database');
-    if (getenv('GITHUB_ACTIONS') === 'true') {
-        expect($database)->toMatch('/^testing(?:_test_\d+)?$/');
-    } else {
-        expect($database)->toBe('miconvener_s2b_codex_testing');
-    }
+    expect(Tests\Support\IsolatedPostgresDatabase::permits($database))->toBeTrue();
     $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => config('database.connections.landlord.database'), 'DB_HOST' => config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $start = microtime(true) + 2;
     $workers = array_map(fn (string $action): Process => (new Process([PHP_BINARY, base_path('tests/Fixtures/events/attendee-profile-worker.php')], base_path(), $environment))->setTimeout(60)->setInput(json_encode($context + ['action' => $action, 'start_at' => $start], JSON_THROW_ON_ERROR)), $actions);

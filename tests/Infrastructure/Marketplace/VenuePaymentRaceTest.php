@@ -66,6 +66,7 @@ function venuePaymentScenario(array $quoteTerms = []): array
     }
     Permission::query()->firstOrCreate(['name' => 'manage venue', 'guard_name' => 'web'], ['category' => 'venue']);
     $host = User::factory()->create(['tenant_id' => $tenant->id]);
+    $tenant->users()->attach($host->id);
     setPermissionsTeamId($tenant->id);
     $host->givePermissionTo('manage venue');
     app(App\Services\Tenancy\TenantContext::class)->setTenant($tenant);
@@ -272,6 +273,7 @@ it('imports and refunds a legacy conflict payment once when two finance users re
         Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web'], ['category' => 'venue']);
     }
     $finance = User::factory()->create(['tenant_id' => $s['tenant']->id]);
+    $s['tenant']->users()->attach($finance->id);
     setPermissionsTeamId($s['tenant']->id);
     $finance->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
     $legacy = VenueBooking::factory()->create(['tenant_id' => $s['tenant']->id, 'shop_id' => $s['booking']->shop_id, 'store_listing_id' => $s['booking']->store_listing_id, 'status' => VenueBooking::STATUS_PENDING_PAYMENT,

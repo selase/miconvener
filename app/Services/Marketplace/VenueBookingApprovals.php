@@ -12,6 +12,7 @@ use App\Models\VenueBooking;
 use App\Models\VenueBookingAction;
 use App\Models\VenueBookingCharge;
 use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Tenancy\OrganisationMemberships;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Venue\VenueCalendarLocks;
 use Carbon\CarbonImmutable;
@@ -427,7 +428,7 @@ final class VenueBookingApprovals
     {
         $tenant = app(TenantContext::class)->getTenant();
         $member = $tenant !== null
-            && (User::query()->whereKey($actor->id)->where('tenant_id', $tenant->id)->exists() || $actor->tenants()->whereKey($tenant->id)->exists());
+            && app(OrganisationMemberships::class)->isActive($actor, $tenant);
         if (! $member || $tenant->id !== $booking->tenant_id || $booking->shop?->tenant_id !== $tenant->id) {
             throw new AuthorizationException('You cannot decide this request.');
         }

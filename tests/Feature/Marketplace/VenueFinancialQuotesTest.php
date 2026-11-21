@@ -52,6 +52,7 @@ beforeEach(function (): void {
 
     Permission::query()->firstOrCreate(['name' => 'manage venue', 'guard_name' => 'web'], ['category' => 'venue']);
     $this->host = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($this->host->id);
     setPermissionsTeamId($this->tenant->id);
     $this->host->givePermissionTo('manage venue');
     app(TenantContext::class)->setTenant($this->tenant);
@@ -184,8 +185,10 @@ describe('what a quote refuses', function (): void {
 
     test('a host without venue authority, another organisation host, or an outsider', function (): void {
         $plain = User::factory()->create(['tenant_id' => $this->tenant->id]);
+        $this->tenant->users()->attach($plain->id);
         $otherTenant = Tenant::factory()->create();
         $foreignHost = User::factory()->create(['tenant_id' => $otherTenant->id]);
+        $otherTenant->users()->attach($foreignHost->id);
         setPermissionsTeamId($otherTenant->id);
         $foreignHost->givePermissionTo('manage venue');
         setPermissionsTeamId($this->tenant->id);
@@ -218,6 +221,7 @@ describe('what a quote refuses', function (): void {
         $bareShop = Shop::factory()->create(['tenant_id' => $bare->id, 'is_active' => true]);
         $bareListing = StoreListing::factory()->create(['shop_id' => $bareShop->id, 'listing_kind' => StoreListing::KIND_VENUE, 'status' => StoreListing::STATUS_PUBLISHED]);
         $bareHost = User::factory()->create(['tenant_id' => $bare->id]);
+        $bare->users()->attach($bareHost->id);
         foreach ([VenueRequestRollout::FEATURE, VenuePaymentRollout::FEATURE] as $slug) {
             $bare->features()->updateOrCreate(['feature_key' => $slug], ['enabled' => true, 'meta' => ['source' => 'admin_override']]);
         }
@@ -270,6 +274,7 @@ describe('replacing and withdrawing', function (): void {
     test('only an owning host may withdraw', function (): void {
         $quote = ($this->issue)();
         $plain = User::factory()->create(['tenant_id' => $this->tenant->id]);
+        $this->tenant->users()->attach($plain->id);
 
         expect(fn () => $this->quotes->withdraw($quote, $plain, 'Nope.', (string) Str::uuid()))->toThrow(AuthorizationException::class);
     });

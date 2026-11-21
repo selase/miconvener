@@ -183,6 +183,26 @@ export default function ConsoleLayout({ children, compact = false }) {
                     </button>
                 </div>
 
+                <div className={`border-b border-border px-4.5 py-3 ${compact ? 'md:px-2' : ''}`}>
+                    <a
+                        href={route('workspaces.index')}
+                        className="flex items-center gap-2 rounded-md py-2 text-sm text-ink-secondary hover:text-ink"
+                        aria-label="Switch workspace or create organisation"
+                        title="Your workspaces"
+                    >
+                        <Building2
+                            className="h-4 w-4 shrink-0"
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                        />
+                        <span className={compact ? 'md:hidden' : undefined}>Your workspaces</span>
+                        <ChevronDown
+                            className={`ml-auto h-3.5 w-3.5 ${compact ? 'md:hidden' : ''}`}
+                            aria-hidden="true"
+                        />
+                    </a>
+                </div>
+
                 <nav className="flex flex-col py-2">
                     {groups.map((group, index) => {
                         const containsActive = group.items.some((item) => item.href === activeHref);

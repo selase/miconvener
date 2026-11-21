@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
     Users,
     DoorOpen,
@@ -16,11 +16,9 @@ import {
     Activity,
 } from 'lucide-react';
 import Button from '@/Components/Console/Button';
-import { useToast } from '@/Components/Console/Toast';
 import csrfFetch from '@/lib/csrfFetch';
 
 export default function SessionOccupancyPanel({ event, onOpenScannerForSession }) {
-    const toast = useToast();
     const [sessions, setSessions] = useState([]);
     const [summary, setSummary] = useState({
         total_sessions: 0,
@@ -29,6 +27,7 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
         total_in_sessions: 0,
     });
     const [loading, setLoading] = useState(true);
+    const [accessUnavailable, setAccessUnavailable] = useState(false);
     const [activeRosterSession, setActiveRosterSession] = useState(null);
     const [roster, setRoster] = useState([]);
     const [rosterFilter, setRosterFilter] = useState('active');
@@ -42,12 +41,26 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                 const res = await csrfFetch(
                     route('tenant.events.sessions.occupancy', { event: event.id })
                 );
+                if (!res.ok) {
+                    setSessions([]);
+                    setSummary({});
+                    setRoster([]);
+                    setActiveRosterSession(null);
+                    setAccessUnavailable(true);
+                    return;
+                }
                 const data = await res.json();
+                setAccessUnavailable(false);
                 if (data.sessions) {
                     setSessions(data.sessions);
                     setSummary(data.summary || {});
                 }
             } catch (err) {
+                setSessions([]);
+                setSummary({});
+                setRoster([]);
+                setActiveRosterSession(null);
+                setAccessUnavailable(true);
                 console.error('Failed to fetch session occupancy:', err);
             } finally {
                 if (!quiet) setLoading(false);
@@ -67,36 +80,7 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
         // Real-time Reverb WebSocket listener
         if (typeof window !== 'undefined' && window.Echo) {
             const channel = window.Echo.private(`event.${event.id}.sessions`);
-            channel.listen('.SessionAttendanceUpdated', (data) => {
-                setSessions((prev) =>
-                    prev.map((s) => {
-                        if (s.id === data.session_id) {
-                            const newPct = data.occupancy_percentage;
-                            const isFull = data.is_room_full;
-                            const newStatus = isFull
-                                ? 'at_capacity'
-                                : newPct >= 85
-                                  ? 'near_capacity'
-                                  : 'available';
-
-                            return {
-                                ...s,
-                                live_headcount: data.live_headcount,
-                                occupancy_percentage: newPct,
-                                is_at_capacity: isFull,
-                                status: newStatus,
-                            };
-                        }
-                        return s;
-                    })
-                );
-
-                // Flash subtle notification
-                if (data.attendee_name) {
-                    const actionLabel = data.action === 'check_in' ? 'entered' : 'exited';
-                    toast(`${data.attendee_name} ${actionLabel} ${data.title}`);
-                }
-            });
+            channel.listen('.SessionAttendanceUpdated', () => fetchOccupancy(true));
 
             return () => {
                 clearInterval(interval);
@@ -105,7 +89,7 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
         }
 
         return () => clearInterval(interval);
-    }, [event.id, fetchOccupancy, toast]);
+    }, [event.id, fetchOccupancy]);
 
     const loadRoster = async (session, filter = rosterFilter, search = rosterSearch) => {
         setRosterLoading(true);
@@ -140,6 +124,21 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
             return '';
         }
     };
+
+    if (accessUnavailable) {
+        return (
+            <div
+                role="alert"
+                className="space-y-3 border border-border p-4 text-sm text-ink-secondary"
+            >
+                <p>
+                    Session data is unavailable. Check your connection or reopen the event to check
+                    your access.
+                </p>
+                <Button onClick={() => fetchOccupancy()}>Try again</Button>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

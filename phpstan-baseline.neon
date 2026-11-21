@@ -223,12 +223,6 @@ parameters:
 			path: app/Http/Controllers/Admin/ImpersonateUserController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Admin\ImpersonateUserController::impersonate() has parameter $id with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: app/Http/Controllers/Admin/ImpersonateUserController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Admin\ImpersonateUserController::stopImpersonation() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -355,12 +349,6 @@ parameters:
 			path: app/Http/Controllers/Admin/RateCardController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Admin\ResendAccountPasswordController::__invoke() should return Illuminate\Http\Response but returns Illuminate\Http\JsonResponse.'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Admin/ResendAccountPasswordController.php
-
-		-
 			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
 			identifier: property.notFound
 			count: 1
@@ -385,12 +373,6 @@ parameters:
 			path: app/Http/Controllers/Admin/RoleController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/TeamController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Admin\TeamController::store() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -399,12 +381,6 @@ parameters:
 		-
 			rawMessage: Access to an undefined property App\Models\Tenant::$gravatar.
 			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/TenantController.php
-
-		-
-			rawMessage: Left side of && is always true.
-			identifier: booleanAnd.leftAlwaysTrue
 			count: 1
 			path: app/Http/Controllers/Admin/TenantController.php
 
@@ -445,28 +421,10 @@ parameters:
 			path: app/Http/Controllers/Admin/TenantController.php
 
 		-
-			rawMessage: 'Strict comparison using !== between string and null will always evaluate to true.'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: app/Http/Controllers/Admin/TenantController.php
-
-		-
-			rawMessage: Unreachable statement - code above always terminates.
-			identifier: deadCode.unreachable
-			count: 1
-			path: app/Http/Controllers/Admin/TenantController.php
-
-		-
 			rawMessage: Using nullsafe method call on non-nullable type App\Enum\TenantStatusEnum. Use -> instead.
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Admin/TenantController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/UsersController.php
 
 		-
 			rawMessage: 'Method App\Http\Controllers\Admin\UsersController::destroy() should return Illuminate\Http\Response but returns Illuminate\Http\JsonResponse.'
@@ -962,12 +920,6 @@ parameters:
 			path: app/Http/Controllers/Settings/ApiTokenController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Settings\ApiTokenController::store() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Settings/ApiTokenController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$body.
 			identifier: property.notFound
 			count: 1
@@ -1044,24 +996,6 @@ parameters:
 			identifier: method.unresolvableReturnType
 			count: 1
 			path: app/Http/Controllers/Tenant/AbstractReviewController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::displayName().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/ApiKeyController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,App\Models\TenantApiKey>::map() contains unresolvable type.'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Tenant/ApiKeyController.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,App\Models\TenantApiKey>::map() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
-			count: 1
-			path: app/Http/Controllers/Tenant/ApiKeyController.php
 
 		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\Commerce\WebhookController::handlePaystack() has no return type specified.'
@@ -1916,24 +1850,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/TenantPayoutAccountController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/UserController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Pagination\AbstractPaginator<int,App\Models\User>::through() contains unresolvable type.'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Tenant/UserController.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Pagination\AbstractPaginator<int,App\Models\User>::through() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
-			count: 1
-			path: app/Http/Controllers/Tenant/UserController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
 			identifier: property.notFound
 			count: 1
@@ -1974,48 +1890,6 @@ parameters:
 			identifier: method.unresolvableReturnType
 			count: 1
 			path: app/Http/Controllers/Tenant/Venue/VenueOperationsController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$allowed_ips.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::requiresDedicatedDb().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
-
-		-
-			rawMessage: 'Parameter #1 $tenant of method App\Services\Tenancy\TenantContext::setTenant() expects App\Models\Tenant, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
-
-		-
-			rawMessage: 'Parameter #1 $tenant of method App\Services\Tenancy\TenantDatabaseManager::configure() expects App\Models\Tenant, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
-
-		-
-			rawMessage: 'Parameter #1 $tenant of method App\Services\Tenancy\TenantStorageManager::configure() expects App\Models\Tenant, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Middleware/AuthenticateWithApiKey.php
 
 		-
 			rawMessage: 'Call to an undefined method Symfony\Component\HttpFoundation\Response::withHeaders().'
@@ -2208,24 +2082,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Resources/UserProfileResource.php
-
-		-
-			rawMessage: 'Call to an undefined method App\Http\Resources\UserProfileResource::getAllPermissions().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Resources/UserProfileResource.php
-
-		-
-			rawMessage: 'Call to an undefined method App\Http\Resources\UserProfileResource::getRoleNames().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Resources/UserProfileResource.php
-
-		-
-			rawMessage: Instanceof between App\Models\Tenant and App\Models\Tenant will always evaluate to true.
-			identifier: instanceof.alwaysTrue
-			count: 1
-			path: app/Jobs/Middleware/TenantAwareJob.php
 
 		-
 			rawMessage: Access to property $content_type on an unknown class App\Models\RetentionPolicy.
@@ -4160,18 +4016,6 @@ parameters:
 			path: app/Models/TenantApiKey.php
 
 		-
-			rawMessage: 'Method App\Models\TenantApiKey::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantApiKey.php
-
-		-
-			rawMessage: 'Method App\Models\TenantApiKey::user() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantApiKey.php
-
-		-
 			rawMessage: 'Method App\Models\TenantFeature::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -4341,12 +4185,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\User::name() return type with generic class Illuminate\Database\Eloquent\Casts\Attribute does not specify its types: TGet, TSet'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/User.php
-
-		-
-			rawMessage: 'Method App\Models\User::tenants() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsToMany does not specify its types: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor (2-4 required)'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/User.php
@@ -4906,12 +4744,6 @@ parameters:
 		-
 			rawMessage: Expression on left side of ?? is not nullable.
 			identifier: nullCoalesce.expr
-			count: 2
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter #2 $recipient of method App\Services\Notifications\AutomatedNotificationDispatcher::interpolateTemplate() expects array{name: string, email: string|null, phone: string|null, ticket_code: string|null, action_url: string|null}, array{name: string, email: string|null, phone: string|null, ticket_code: string|null, action_url: string|null, action_label: string|null} given.'
-			identifier: argument.type
 			count: 2
 			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
 

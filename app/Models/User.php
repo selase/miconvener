@@ -23,6 +23,8 @@ use Spatie\Permission\Traits\HasRoles;
  *
  * @property-read string $name
  * @property-read string $gravatar
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Role> $roles
+ * @property-read TenantMembership $pivot
  */
 final class User extends Authenticatable
 {
@@ -56,6 +58,8 @@ final class User extends Authenticatable
      */
     protected $keyType = 'string';
 
+    protected $attributes = ['security_version' => 0];
+
     protected $fillable = [
         'uuid',
         'first_name',
@@ -81,6 +85,7 @@ final class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'security_version',
         'two_factor_secret',
         'two_factor_recovery_codes',
     ];
@@ -92,6 +97,7 @@ final class User extends Authenticatable
      */
     protected $casts = [
         'id' => 'string',
+        'security_version' => 'integer',
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
         'phone_no' => E164PhoneNumberCast::class.':GH',
@@ -101,6 +107,9 @@ final class User extends Authenticatable
         // the column would lock every one of them out.
         'two_factor_recovery_codes' => 'encrypted:array',
     ];
+
+    /** @var \Laravel\Sanctum\Contracts\HasAbilities|null */
+    protected $accessToken = null;
 
     /**
      * The disk profile photos live on, matching Event::uploadDisk().
@@ -191,9 +200,21 @@ final class User extends Authenticatable
         return true;
     }
 
+    /** @return BelongsToMany<Tenant, $this, TenantMembership> */
     public function tenants(): BelongsToMany
     {
-        return $this->belongsToMany(Tenant::class);
+        return $this->allTenants()->wherePivot('status', 'active');
+    }
+
+    /** @return BelongsToMany<Tenant, $this, TenantMembership> */
+    public function allTenants(): BelongsToMany
+    {
+        return $this->belongsToMany(Tenant::class)->using(TenantMembership::class)->withPivot(['status', 'accepted_at', 'suspended_at', 'revoked_at', 'changed_by'])->withTimestamps();
+    }
+
+    public function currentAccessToken(): ?\Laravel\Sanctum\Contracts\HasAbilities
+    {
+        return $this->accessToken;
     }
 
     public function displayName(): string
@@ -234,6 +255,21 @@ final class User extends Authenticatable
         $key = parent::getKey();
 
         return is_null($key) ? $key : (string) $key;
+    }
+
+    public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
+    {
+        return \Spatie\Activitylog\LogOptions::defaults()
+            ->useLogName('system')
+            ->logOnly(['first_name', 'last_name', 'email', 'phone_no', 'status', 'photo'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
+
+    /** @return Attribute<string|null, string|null> */
+    protected function email(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => $value === null ? null : mb_strtolower(mb_trim($value)));
     }
 
     /**

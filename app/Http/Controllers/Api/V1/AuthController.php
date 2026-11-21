@@ -44,25 +44,38 @@ final class AuthController extends Controller
     {
         $request->ensureIsNotRateLimited();
 
-        /** @var User|null $user */
-        $user = User::where('email', $request->input('email'))->first();
+        return (new User)->getConnection()->transaction(function () use ($request): JsonResponse {
+            /** @var User|null $user */
+            $user = User::query()->where('email', $request->input('email'))->lockForUpdate()->first();
 
-        if (! $user || ! Hash::check($request->input('password'), $user->password)) {
-            RateLimiter::hit($request->throttleKey());
+            if (! $user || ! in_array($user->status, [null, User::STATUS_ACTIVE], true) || ! Hash::check($request->input('password'), $user->password)) {
+                RateLimiter::hit($request->throttleKey());
 
-            throw ValidationException::withMessages([
-                'email' => [trans('auth.failed')],
-            ]);
-        }
+                throw ValidationException::withMessages([
+                    'email' => [trans('auth.failed')],
+                ]);
+            }
 
-        RateLimiter::clear($request->throttleKey());
+            if ($user->two_factor_secret && $user->two_factor_confirmed_at) {
+                $code = (string) $request->input('two_factor_code', '');
+                if ($code === '' || ! app('pragmarx.google2fa')->verifyKey($user->two_factor_secret, $code)) {
+                    RateLimiter::hit($request->throttleKey());
 
-        $token = $user->createToken($request->input('device_name'));
+                    throw ValidationException::withMessages([
+                        'two_factor_code' => ['Enter a valid authenticator code.'],
+                    ]);
+                }
+            }
 
-        return response()->json([
-            'token' => $token->plainTextToken,
-            'user' => new UserProfileResource($user),
-        ], 200);
+            RateLimiter::clear($request->throttleKey());
+
+            $token = $user->createToken($request->input('device_name'));
+
+            return response()->json([
+                'token' => $token->plainTextToken,
+                'user' => new UserProfileResource($user),
+            ], 200);
+        });
     }
 
     /**
@@ -70,7 +83,9 @@ final class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        abort_unless($token instanceof \Laravel\Sanctum\PersonalAccessToken, 400, 'Use the account menu to end this browser session.');
+        $token->delete();
 
         return response()->json(null, 204);
     }

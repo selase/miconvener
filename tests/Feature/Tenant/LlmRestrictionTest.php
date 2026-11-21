@@ -20,6 +20,7 @@ beforeEach(function () {
         'status' => \App\Enum\TenantStatusEnum::ACTIVE,
     ]);
     $this->user = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->user->tenants()->attach($this->tenant->id);
 
     // Create a key for testing
     $service = app(ApiKeyService::class);

@@ -66,3 +66,14 @@ Route::middleware('auth')->group(function (): void {
         ->middleware('throttle:two-factor')
         ->name('two-factor.challenge.store');
 });
+
+Route::prefix('organisation-invitations')->name('organisation-invitations.')->group(function (): void {
+    Route::get('resume', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'resume'])->middleware('auth')->name('resume');
+    Route::get('complete', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'complete'])->middleware('auth')->name('complete');
+    Route::post('{invitation}/mfa/setup', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'setupMfa'])->middleware(['auth', 'throttle:6,1'])->name('mfa.setup');
+    Route::post('{invitation}/mfa/confirm', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'confirmMfa'])->middleware(['auth', 'throttle:6,1'])->name('mfa.confirm');
+    Route::get('{invitation}', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'show'])->middleware('throttle:60,60')->name('show');
+    Route::post('{invitation}', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'accept'])->middleware('throttle:60,60')->name('accept');
+    Route::post('{invitation}/resend', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'resend'])->middleware('auth')->name('resend');
+    Route::delete('{invitation}', [App\Http\Controllers\Auth\OrganisationInvitationController::class, 'revoke'])->middleware('auth')->name('revoke');
+});

@@ -90,3 +90,14 @@ test('public checkout accepts exact money and keeps the result private to its re
     $this->flushSession();
     $this->getJson('http://'.$host.'/giving/payments/'.$attempt->reference)->assertNotFound();
 });
+
+test('Giving callback settles accepted money despite a revoked unrelated staff cookie', function (): void {
+    [$tenant, , , $attempt] = GivingScenario::online();
+    $staff = App\Models\User::factory()->create();
+    App\Models\User::query()->whereKey($staff->id)->increment('security_version');
+    Http::fake(['*transaction/verify/*' => Http::response(['status' => true, 'data' => ['id' => 991] + GivingScenario::verified($attempt)])]);
+    $this->actingAs($staff)->withSession([App\Http\Middleware\StaffAccountSecurity::SESSION_KEY => ['user_id' => (string) $staff->id, 'version' => 0]])
+        ->get(route('public.giving.callback', ['subdomain' => $tenant->slug, 'reference' => $attempt->reference]))->assertRedirect(route('public.giving.result', ['subdomain' => $tenant->slug, 'reference' => $attempt->reference]));
+    expect($attempt->fresh()->state)->toBe('confirmed');
+    $this->assertGuest();
+});

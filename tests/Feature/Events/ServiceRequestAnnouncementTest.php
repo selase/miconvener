@@ -93,14 +93,11 @@ test('every request is announced to the console the moment it is raised', functi
 
     EventFacade::assertDispatched(
         ServiceRequestRaised::class,
-        function (ServiceRequestRaised $broadcast) use ($event, $registration): bool {
+        function (ServiceRequestRaised $broadcast) use ($event): bool {
             $payload = $broadcast->broadcastWith();
 
             return $broadcast->serviceRequest->event_id === $event->id
-                // The seat travels with it, so a steward knows where to go.
-                && $payload['seat_label'] === 'C-14'
-                && $payload['room_name'] === 'Main Auditorium'
-                && $payload['registrant_name'] === $registration->full_name
+                && $payload === ['refresh' => true]
                 && $broadcast->broadcastOn()[0]->name === "private-event.{$event->id}.service-requests";
         }
     );

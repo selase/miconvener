@@ -1,12 +1,57 @@
-import { useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { ShieldCheck } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
+import AccountEmailChangeForm from '@/Components/Console/AccountEmailChangeForm';
+import ThemeToggle from '@/Components/Console/ThemeToggle';
 
-export default function Account({ account, setup }) {
+function WorkspaceAccountLayout({ children }) {
     const { flash } = usePage().props;
+    return (
+        <div className="min-h-screen bg-canvas font-console text-ink">
+            <Head title="My account" />
+            <header className="border-b border-border bg-surface">
+                <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+                    <Link
+                        href={route('workspaces.index')}
+                        className="text-sm text-accent hover:underline"
+                    >
+                        Your workspaces
+                    </Link>
+                    <div className="flex items-center gap-4">
+                        <ThemeToggle />
+                        <Link
+                            href={route('logout')}
+                            method="post"
+                            as="button"
+                            className="text-sm text-ink-secondary hover:text-ink"
+                        >
+                            Sign out
+                        </Link>
+                    </div>
+                </div>
+            </header>
+            <main className="mx-auto max-w-5xl">
+                {(flash?.success || flash?.error) && (
+                    <p
+                        role={flash.error ? 'alert' : 'status'}
+                        className="mx-8 mt-6 rounded-lg border border-border bg-surface p-4 text-sm"
+                    >
+                        {flash.error || flash.success}
+                    </p>
+                )}
+                {children}
+            </main>
+        </div>
+    );
+}
+
+export default function Account({ account, setup, accountRoutePrefix = 'tenant.account' }) {
+    const { flash } = usePage().props;
+    const Layout =
+        accountRoutePrefix === 'workspaces.account' ? WorkspaceAccountLayout : ConsoleLayout;
     const setupForm = useForm({});
     const confirmForm = useForm({ code: '' });
     const disableForm = useForm({ password: '' });
@@ -18,25 +63,25 @@ export default function Account({ account, setup }) {
 
     const regenerate = (event) => {
         event.preventDefault();
-        recoveryForm.post(route('tenant.account.two-factor.recovery-codes'), {
+        recoveryForm.post(route(`${accountRoutePrefix}.two-factor.recovery-codes`), {
             onSuccess: () => recoveryForm.reset(),
         });
     };
 
     const confirm = (event) => {
         event.preventDefault();
-        confirmForm.post(route('tenant.account.two-factor.confirm'));
+        confirmForm.post(route(`${accountRoutePrefix}.two-factor.confirm`));
     };
 
     const disable = (event) => {
         event.preventDefault();
-        disableForm.post(route('tenant.account.two-factor.disable'), {
+        disableForm.post(route(`${accountRoutePrefix}.two-factor.disable`), {
             onSuccess: () => disableForm.reset(),
         });
     };
 
     return (
-        <ConsoleLayout>
+        <Layout>
             <PageHeader title="My account" />
 
             <div className="max-w-2xl space-y-6 px-8 py-6">
@@ -53,6 +98,8 @@ export default function Account({ account, setup }) {
                         </div>
                     </dl>
                 </section>
+
+                <AccountEmailChangeForm account={account} />
 
                 <section className="rounded-lg border border-border bg-surface p-6">
                     <div className="flex items-start gap-3">
@@ -72,7 +119,7 @@ export default function Account({ account, setup }) {
 
                     {account.two_factor_required && (
                         <p className="mt-5 rounded-lg border border-warning-fg/30 bg-warning-bg px-4 py-3 text-sm text-warning-fg">
-                            Your organization requires two-factor authentication.
+                            An organisation you belong to requires two-factor authentication.
                         </p>
                     )}
 
@@ -196,7 +243,7 @@ export default function Account({ account, setup }) {
                                 type="button"
                                 disabled={setupForm.processing}
                                 onClick={() =>
-                                    setupForm.post(route('tenant.account.two-factor.setup'))
+                                    setupForm.post(route(`${accountRoutePrefix}.two-factor.setup`))
                                 }
                             >
                                 Set up two-factor authentication
@@ -214,6 +261,6 @@ export default function Account({ account, setup }) {
                     </p>
                 </section>
             </div>
-        </ConsoleLayout>
+        </Layout>
     );
 }

@@ -14,6 +14,7 @@ use App\Models\EventRegistration;
 use App\Models\EventSpeaker;
 use App\Models\Speaker;
 use App\Models\User;
+use App\Services\Events\EventStaffScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -86,7 +87,7 @@ final class AutomatedNotificationDispatcher
     /**
      * Resolve recipient list according to target role and audience criteria.
      *
-     * @return array<int, array{name: string, email: ?string, phone: ?string, ticket_code: ?string, action_url: ?string, action_label: ?string}>
+     * @return array<int, array{name: string, email: ?string, phone: ?string, ticket_code: ?string, action_url: ?string, action_label: ?string, staff_user_id?: int|string, recorded_email?: ?string}>
      */
     public function resolveRecipients(EventNotificationRule $rule, Event $event): array
     {
@@ -114,14 +115,21 @@ final class AutomatedNotificationDispatcher
 
         // 2. ORGANIZER ROLE
         if ($role === EventNotificationRule::ROLE_ORGANIZER) {
-            return User::where('tenant_id', $event->tenant_id)->get()->map(fn (User $u): array => [
-                'name' => mb_trim("{$u->first_name} {$u->last_name}"),
-                'email' => $u->email,
-                'phone' => null,
-                'ticket_code' => null,
-                'action_url' => url("/events/{$event->id}"),
-                'action_label' => 'Open Host Console',
-            ])->all();
+            return User::withoutGlobalScopes()
+                ->whereHas('tenants', fn ($query) => $query->whereKey($event->tenant_id))
+                ->where(fn ($query) => $query->where('status', User::STATUS_ACTIVE)->orWhereNull('status'))
+                ->get()
+                ->filter(fn (User $user): bool => EventStaffScope::canListenToEvent($user, $event))
+                ->map(fn (User $u): array => [
+                    'staff_user_id' => $u->id,
+                    'recorded_email' => $u->email,
+                    'name' => mb_trim("{$u->first_name} {$u->last_name}"),
+                    'email' => $u->email,
+                    'phone' => null,
+                    'ticket_code' => null,
+                    'action_url' => url("/events/{$event->id}"),
+                    'action_label' => 'Open Host Console',
+                ])->values()->all();
         }
 
         // 3. ATTENDEE ROLE & AUDIENCE STRATIFICATION
@@ -158,7 +166,7 @@ final class AutomatedNotificationDispatcher
     /**
      * Replace template placeholders with real recipient & event context.
      *
-     * @param  array{name: string, email: ?string, phone: ?string, ticket_code: ?string, action_url: ?string}  $recipient
+     * @param  array{name: string, email: ?string, phone: ?string, ticket_code: ?string, action_url: ?string, action_label?: ?string, staff_user_id?: int|string, recorded_email?: ?string}  $recipient
      */
     public function interpolateTemplate(string $template, array $recipient, Event $event): string
     {
@@ -202,7 +210,7 @@ final class AutomatedNotificationDispatcher
     }
 
     /**
-     * @param  array<int, array{name: string, email: ?string, phone: ?string, ticket_code: ?string, action_url: ?string, action_label: ?string}>  $recipients
+     * @param  array<int, array{name: string, email: ?string, phone: ?string, ticket_code: ?string, action_url: ?string, action_label: ?string, staff_user_id?: int|string, recorded_email?: ?string}>  $recipients
      * @return array{total_recipients: int, claimed_count: int, sent_count: int, staged_count: int, suppressed_count: int, rate_limited_count: int}
      */
     private function dispatchRecipients(EventNotificationRule $rule, array $recipients, string $occurrenceKey, \Illuminate\Database\Eloquent\Model $source): array

@@ -15,6 +15,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->tenant = Tenant::factory()->create(['slug' => 'test-tenant', 'status' => \App\Enum\TenantStatusEnum::ACTIVE]);
     $this->user = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->user->tenants()->attach($this->tenant->id);
 
     // Explicitly register a temporary test route for this test session
     Route::get('/api/test-auth', function () {

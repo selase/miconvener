@@ -10,6 +10,7 @@ use App\Models\GivingGift;
 use App\Models\GivingPaymentAttempt;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -77,7 +78,7 @@ final class GivingFunds
     private function authorize(Tenant $tenant, User $actor): void
     {
         abort_unless(app(GivingRollout::class)->enabled($tenant), 404);
-        abort_unless($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists(), 403);
+        abort_unless(app(OrganisationMemberships::class)->isActive($actor, $tenant), 403);
         Gate::forUser($actor)->authorize('create', [GivingFund::class, $tenant]);
     }
 

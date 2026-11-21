@@ -37,14 +37,6 @@ final readonly class ResolveTenant
         $tenant = $this->resolver->resolve($request);
 
         if (! $tenant instanceof \App\Models\Tenant) {
-            // Fallback: try to retrieve tenant from session directly (covers tests where resolver may miss)
-            $tenantId = \Illuminate\Support\Facades\Session::get('active_tenant_id');
-            if ($tenantId) {
-                $tenant = \App\Models\Tenant::find($tenantId);
-            }
-        }
-
-        if (! $tenant instanceof \App\Models\Tenant) {
             $this->dbManager->configureShared();
 
             return $next($request);

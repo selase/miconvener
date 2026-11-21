@@ -105,3 +105,18 @@ test('central superadmin login preserves the requested management page', functio
         ->assertRedirect('http://miconvener.test/tenants')
         ->assertSessionMissing('active_tenant_id');
 });
+
+test('existing tenant login and dashboard remain available while multi organisation writers are disabled', function (): void {
+    config(['organisation_access.enabled' => false]);
+    $this->seed(Database\Seeders\RoleSeeder::class);
+    $this->seed(Database\Seeders\PermissionsSeeder::class);
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $user->assignRole('Org Superadmin');
+    $this->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
+        ->post('http://'.$tenant->slug.'.miconvener.test/login', ['email' => $user->email, 'password' => 'password'])
+        ->assertRedirect('http://'.$tenant->slug.'.miconvener.test/dashboard');
+    $this->get('http://'.$tenant->slug.'.miconvener.test/dashboard')->assertOk();
+    $this->get('http://'.$tenant->slug.'.miconvener.test/users')->assertOk();
+    expect($user->fresh()->tenants()->whereKey($tenant->id)->exists())->toBeTrue();
+});

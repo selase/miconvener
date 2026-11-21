@@ -1,7 +1,8 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Auth\AuthenticationException;
+use App\Services\Auth\TwoFactorSettings;
 use Livewire\Component;
 
 new class extends Component
@@ -39,7 +40,7 @@ new class extends Component
         $this->showQrCode = true;
     }
 
-    public function confirmTwoFactor()
+    public function confirmTwoFactor(): void
     {
         abort_unless(auth()->id() === $this->user->id, 403);
         $this->validate([
@@ -49,10 +50,23 @@ new class extends Component
         $google2fa = app('pragmarx.google2fa');
 
         if ($google2fa->verifyKey($this->secret, $this->code)) {
-            $this->user->update([
-                'two_factor_secret' => $this->secret,
-                'two_factor_confirmed_at' => now(),
-            ]);
+            $authenticated = auth()->user();
+            $authenticated->getConnection()->transaction(function () use ($authenticated): void {
+                $locked = User::query()->whereKey($authenticated->id)->lockForUpdate()->firstOrFail();
+                if (! in_array($locked->status, [null, User::STATUS_ACTIVE], true)
+                    || (int) $locked->security_version !== (int) $authenticated->security_version) {
+                    throw new AuthenticationException;
+                }
+                abort_if($locked->two_factor_confirmed_at !== null, 409);
+
+                $locked->update([
+                    'two_factor_secret' => $this->secret,
+                    'two_factor_confirmed_at' => now(),
+                ]);
+                $locked->tokens()->delete();
+                $this->user->setRawAttributes($locked->getAttributes(), true);
+            });
+            session()->put('google2fa', ['auth_passed' => true, 'auth_time' => now()]);
 
             $this->showQrCode = false;
             $this->reset(['secret', 'code', 'qrCodeUrl']);
@@ -63,25 +77,14 @@ new class extends Component
         }
     }
 
-    public function disableTwoFactor()
+    public function disableTwoFactor(): void
     {
         abort_unless(auth()->id() === $this->user->id, 403);
-        $this->validate([
-            'password' => 'required',
-        ]);
+        $this->validate(['password' => 'required']);
+        app(TwoFactorSettings::class)->disable(auth()->user(), $this->password);
+        $this->user->setRawAttributes(auth()->user()->getAttributes(), true);
 
-        if (! Hash::check($this->password, auth()->user()->password)) {
-            $this->addError('password', 'The provided password does not match our records.');
-
-            return;
-        }
-
-        $this->user->update([
-            'two_factor_secret' => null,
-            'two_factor_confirmed_at' => null,
-            'two_factor_recovery_codes' => null,
-        ]);
-
+        session()->forget('google2fa');
         $this->reset('password');
         session()->flash('success', 'Two-factor authentication has been disabled.');
     }

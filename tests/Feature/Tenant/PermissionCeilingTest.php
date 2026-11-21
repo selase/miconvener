@@ -128,7 +128,7 @@ test('nobody can change their own role, even downward', function () {
     expect(freshRoleNames($admin, $tenant))->toBe(['Org Admin']);
 });
 
-test('editing your own details while keeping your role still works', function () {
+test('editing your own membership preserves the global identity and role', function () {
     [$tenant] = ceilingActor(['read user'], 'self-details');
     $admin = ceilingMember($tenant, 'Org Admin');
     $host = 'self-details.'.mb_ltrim((string) config('session.domain'), '.');
@@ -140,7 +140,7 @@ test('editing your own details while keeping your role still works', function ()
         ->put("http://{$host}/users/{$admin->uuid}", $payload, ['HTTP_HOST' => $host])
         ->assertSessionHasNoErrors();
 
-    expect($admin->fresh()->first_name)->toBe('Renamed');
+    expect($admin->fresh()->first_name)->toBe($admin->first_name);
     expect(freshRoleNames($admin, $tenant))->toBe(['Org Admin']);
 });
 

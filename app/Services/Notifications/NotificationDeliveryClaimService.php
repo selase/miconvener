@@ -53,6 +53,7 @@ final class NotificationDeliveryClaimService
             'metadata' => json_encode([
                 'action_url' => $payload['action_url'] ?? null,
                 'action_label' => $payload['action_label'] ?? null,
+                ...array_intersect_key($recipient, array_flip(['staff_user_id', 'recorded_email'])),
             ], JSON_THROW_ON_ERROR),
             'created_at' => $now,
             'updated_at' => $now,
@@ -74,17 +75,27 @@ final class NotificationDeliveryClaimService
 
     /**
      * @param  array<string, mixed>  $recipient
-     * @return array{name: string, email: ?string, phone: ?string}
+     * @return array{name: string, email: ?string, phone: ?string, staff_user_id?: int|string|null, recorded_email?: ?string}
      */
     private function normalizeRecipient(array $recipient): array
     {
         $email = mb_strtolower(mb_trim((string) ($recipient['email'] ?? '')));
         $phone = preg_replace('/[^0-9+]/', '', mb_trim((string) ($recipient['phone'] ?? '')));
 
-        return [
+        $normalized = [
             'name' => mb_trim((string) ($recipient['name'] ?? '')) ?: 'Conference Participant',
-            'email' => $email !== '' ? $email : null,
+            'email' => array_key_exists('staff_user_id', $recipient) ? (isset($recipient['email']) ? (string) $recipient['email'] : null) : ($email !== '' ? $email : null),
             'phone' => $phone !== '' ? $phone : null,
         ];
+
+        if (array_key_exists('staff_user_id', $recipient)) {
+            $staffId = $recipient['staff_user_id'];
+            $normalized['staff_user_id'] = is_int($staffId) || is_string($staffId) ? $staffId : null;
+        }
+        if (array_key_exists('recorded_email', $recipient)) {
+            $normalized['recorded_email'] = is_string($recipient['recorded_email']) ? $recipient['recorded_email'] : null;
+        }
+
+        return $normalized;
     }
 }

@@ -246,15 +246,22 @@ test('paid checkout readiness refuses missing built in role definitions without 
     expect(App\Models\Role::query()->whereNull('tenant_id')->where('name', 'Superadmin')->exists())->toBeFalse();
 });
 
-test('removing a staff account with paid design history leaves its membership intact with a clear explanation', function (): void {
+test('removing organisation access preserves the identity and paid design audit history', function (): void {
     $target = User::factory()->create(['tenant_id' => $this->buyer->id]);
     $this->buyer->users()->attach($target->id);
     setPermissionsTeamId($this->buyer->id);
     $target->assignRole('Org Superadmin');
-    app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $target, 'buyer@example.test', (string) Str::uuid());
+    $purchase = app(BadgeTemplatePurchases::class)->quote($this->event, $this->version, $target, 'buyer@example.test', (string) Str::uuid());
+    $identity = $target->only(['email', 'password', 'tenant_id', 'status']);
+    $history = $purchase->getRawOriginal();
+    $licence = $purchase->licence->getRawOriginal();
     $host = eventSubdomainHost($this->buyer->slug);
-    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host])->delete("http://{$host}/users/{$target->uuid}")->assertRedirect()->assertSessionHas('error', 'This account has paid badge template audit history. Deactivate its access instead of deleting the retained account.');
-    expect($target->fresh())->not->toBeNull()->and($target->tenants()->whereKey($this->buyer->id)->exists())->toBeTrue();
+    $this->actingAs($this->actor)->withHeaders(['HTTP_HOST' => $host])->delete("http://{$host}/users/{$target->uuid}")->assertRedirect()->assertSessionHas('success', 'Access removed from this organisation.');
+    expect($target->fresh()->only(['email', 'password', 'tenant_id', 'status']))->toBe($identity)
+        ->and($target->fresh()->tenants()->whereKey($this->buyer->id)->exists())->toBeFalse()
+        ->and($target->fresh()->allTenants()->whereKey($this->buyer->id)->first()->pivot->status)->toBe('revoked')
+        ->and($purchase->fresh()->getRawOriginal())->toEqual($history)
+        ->and($purchase->licence->fresh()->getRawOriginal())->toEqual($licence);
 });
 
 test('platform sales history does not borrow a newer purchases licence status or clean use', function (): void {

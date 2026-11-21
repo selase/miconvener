@@ -7,27 +7,20 @@ namespace App\Listeners;
 final class SetTenantIdInSession
 {
     /**
-     * Create the event listener.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        //
-    }
-
-    /**
      * Handle the event.
-     *
-     * @param  object  $event
      */
-    public function handle($event): void
+    public function handle(object $event): void
     {
-        if (session()->has('active_tenant_id')) {
-            return;
+        $memberships = app(\App\Services\Tenancy\OrganisationMemberships::class);
+        if ($id = session('active_tenant_id')) {
+            $selected = \App\Models\Tenant::query()->find($id);
+            if ($selected !== null && $memberships->isActive($event->user, $selected)) {
+                return;
+            }
+            session()->forget('active_tenant_id');
         }
 
-        $tenant = $event->user->tenants()->first();
+        $tenant = $event->user->tenants()->get()->first(fn (\App\Models\Tenant $tenant): bool => $memberships->isActive($event->user, $tenant));
 
         if ($tenant === null) {
             return;

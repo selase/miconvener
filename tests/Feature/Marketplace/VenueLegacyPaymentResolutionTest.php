@@ -43,9 +43,11 @@ beforeEach(function (): void {
         Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web'], ['category' => 'venue']);
     }
     $this->finance = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($this->finance->id);
     setPermissionsTeamId($this->tenant->id);
     $this->finance->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
     $this->bystander = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($this->bystander->id);
     app(TenantContext::class)->setTenant($this->tenant);
 
     $this->start = CarbonImmutable::now()->addDays(30)->setTime(9, 0);
@@ -351,6 +353,7 @@ it('a venue reconciliation does not borrow purchase-only refund terms', function
     StoreCommercialAgreement::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id,
         'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
     $this->finance = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($this->finance->id);
     setPermissionsTeamId($this->tenant->id);
     $this->finance->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
     app(TenantContext::class)->setTenant($this->tenant);

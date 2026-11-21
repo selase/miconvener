@@ -13,9 +13,6 @@ use Illuminate\Validation\ValidationException;
 
 final class LoginRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
@@ -83,5 +80,16 @@ final class LoginRequest extends FormRequest
     public function throttleKey(): string
     {
         return Str::lower($this->input('email')).'|'.$this->ip();
+    }
+
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    protected function prepareForValidation(): void
+    {
+        $email = $this->input('email');
+        if (is_string($email)) {
+            $this->merge(['email' => mb_strtolower(mb_trim($email))]);
+        }
     }
 }

@@ -74,7 +74,9 @@ function RequestCard({ event, request, onChange }) {
                         <MapPin className="h-3 w-3 text-ink-secondary" strokeWidth={1.75} />
                         Seat {request.seat_label}
                         {request.room_name && (
-                            <span className="font-normal text-ink-secondary">· {request.room_name}</span>
+                            <span className="font-normal text-ink-secondary">
+                                · {request.room_name}
+                            </span>
                         )}
                     </div>
                 )}
@@ -133,10 +135,20 @@ export default function RequestsPanel({ event }) {
     const [requests, setRequests] = useState([]);
     const [arrived, setArrived] = useState(null);
 
-    const load = () => {
-        csrfFetch(route('tenant.events.service-requests.index', { event: event.id }))
-            .then((r) => r.json())
-            .then(setRequests);
+    const load = (announce = false) => {
+        return csrfFetch(route('tenant.events.service-requests.index', { event: event.id }))
+            .then((r) => {
+                if (!r.ok) throw new Error('Access unavailable');
+                return r.json();
+            })
+            .then((rows) => {
+                setRequests(rows);
+                if (announce) setArrived(rows[0] ?? null);
+            })
+            .catch(() => {
+                setRequests([]);
+                setArrived(null);
+            });
     };
 
     useEffect(() => {
@@ -157,12 +169,7 @@ export default function RequestsPanel({ event }) {
 
         const channel = window.Echo.private(`event.${event.id}.service-requests`);
 
-        channel.listen('.ServiceRequestRaised', (incoming) => {
-            setRequests((current) =>
-                current.some((r) => r.id === incoming.id) ? current : [incoming, ...current]
-            );
-            setArrived(incoming);
-        });
+        channel.listen('.ServiceRequestRaised', () => load(true));
 
         return () => {
             channel.stopListening('.ServiceRequestRaised');

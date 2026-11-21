@@ -13,6 +13,7 @@ use App\Scopes\TenantScope;
 use App\Services\Community\MemberAccess;
 use App\Services\Community\MemberIdentity;
 use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Gate;
 
@@ -54,7 +55,7 @@ final class MerchandiseAccess
             ->where('listing_kind', StoreListing::KIND_MERCHANDISE)->find($listing->id);
 
         if ($current === null || ! app(CommerceCatalogRollout::class)->enabled($current->shop->tenant)
-            || (! User::query()->whereKey($actor->id)->where('tenant_id', $current->shop->tenant_id)->exists() && ! $actor->tenants()->whereKey($current->shop->tenant_id)->exists())) {
+            || ! app(OrganisationMemberships::class)->isActive($actor, $current->shop->tenant)) {
             return false;
         }
         $team = getPermissionsTeamId();

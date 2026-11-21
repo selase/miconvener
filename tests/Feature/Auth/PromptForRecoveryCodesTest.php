@@ -28,6 +28,7 @@ test('it emails only the users who have two factor enabled but no recovery codes
         'two_factor_confirmed_at' => now(),
     ]);
     $alreadyHasCodes->generateTwoFactorRecoveryCodes();
+    $tenant->users()->attach([$needsCodes->id, $alreadyHasCodes->id]);
 
     // No two-factor at all: nothing to recover, so nothing to ask for.
     User::factory()->create(['tenant_id' => $tenant->id, 'email' => 'no2fa@example.com']);
@@ -67,11 +68,12 @@ test('the email carries a link and never the codes themselves', function () {
 test('a dry run sends nothing', function () {
     Mail::fake();
     $tenant = Tenant::factory()->create(['slug' => 'dry-run-codes']);
-    User::factory()->create([
+    $user = User::factory()->create([
         'tenant_id' => $tenant->id,
         'two_factor_secret' => 'B7S6S7S6S7S6S7S6',
         'two_factor_confirmed_at' => now(),
     ]);
+    $tenant->users()->attach($user->id);
 
     $this->artisan('auth:prompt-recovery-codes', ['--dry-run' => true])->assertSuccessful();
 
