@@ -24,45 +24,26 @@ export default function TeamMemberForm({
     roles,
     statuses,
     roleLocked = false,
+    editing = false,
 }) {
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-                <Field label="First name" error={errors.first_name}>
-                    <input
-                        type="text"
-                        value={data.first_name}
-                        onChange={(event) => setData('first_name', event.target.value)}
-                        className={inputClasses}
-                    />
-                </Field>
-
-                <Field label="Last name" error={errors.last_name}>
-                    <input
-                        type="text"
-                        value={data.last_name}
-                        onChange={(event) => setData('last_name', event.target.value)}
-                        className={inputClasses}
-                    />
-                </Field>
-            </div>
-
-            <Field label="Email" error={errors.email}>
+            <Field
+                label="Email"
+                error={errors.email}
+                hint={
+                    editing
+                        ? 'Account details belong to this person. Only their access here can be changed.'
+                        : 'They can accept with an existing account or create their own.'
+                }
+            >
                 <input
                     type="email"
                     value={data.email}
+                    disabled={editing}
                     onChange={(event) => setData('email', event.target.value)}
                     className={inputClasses}
-                />
-            </Field>
-
-            <Field label="Phone number" error={errors.phone_no}>
-                <input
-                    type="text"
-                    placeholder="+233 20 000 0000"
-                    value={data.phone_no}
-                    onChange={(event) => setData('phone_no', event.target.value)}
-                    className={inputClasses}
+                    required
                 />
             </Field>
 
@@ -91,19 +72,21 @@ export default function TeamMemberForm({
                     </select>
                 </Field>
 
-                <Field label="Status" error={errors.status}>
-                    <select
-                        value={data.status}
-                        onChange={(event) => setData('status', event.target.value)}
-                        className={inputClasses}
-                    >
-                        {statuses.map((status) => (
-                            <option key={status} value={status}>
-                                {status.charAt(0).toUpperCase() + status.slice(1)}
-                            </option>
-                        ))}
-                    </select>
-                </Field>
+                {editing && (
+                    <Field label="Organisation access" error={errors.status}>
+                        <select
+                            value={data.status}
+                            onChange={(event) => setData('status', event.target.value)}
+                            className={inputClasses}
+                        >
+                            {statuses.map((status) => (
+                                <option key={status} value={status}>
+                                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+                )}
             </div>
         </div>
     );

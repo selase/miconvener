@@ -88,6 +88,18 @@ beforeEach(function (): void {
 test('every mailable renders', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'render-check']);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    $renderToken = str_repeat('a', 64);
+    $invitationRole = App\Models\Role::query()->firstOrCreate(['name' => 'Render invite role', 'guard_name' => 'web', 'tenant_id' => null]);
+    $organisationInvitation = App\Models\OrganisationInvitation::query()->create([
+        'tenant_id' => $tenant->id, 'email' => 'invitee@example.org', 'pending_email' => 'invitee@example.org',
+        'role_id' => $invitationRole->id, 'event_ids' => [], 'invited_by' => $user->id,
+        'status' => 'pending', 'expires_at' => now()->addDays(7), 'token_hash' => hash('sha256', $renderToken),
+        'delivery_payload' => Illuminate\Support\Facades\Crypt::encryptString($renderToken), 'revision' => 1,
+    ]);
+    $emailChange = App\Models\AccountEmailChange::query()->create([
+        'user_id' => $user->id, 'current_email' => $user->email, 'new_email' => 'changed@example.org',
+        'security_version' => 0, 'token_hash' => hash('sha256', $renderToken), 'expires_at' => now()->addHour(),
+    ]);
 
     $event = Event::factory()->published()->create([
         'tenant_id' => $tenant->id,
@@ -307,6 +319,9 @@ test('every mailable renders', function (): void {
         'RoomRequestDecided' => fn () => new RoomRequestDecided(VenueBooking::factory()->internal()->create(['purpose' => 'Budget review']), 'declined', 'Closed for maintenance'),
         'EnterpriseEnquiryReceived' => fn () => new EnterpriseEnquiryReceived($lead, ['sales@example.com']),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
+        'OrganisationInvitationMail' => fn () => new App\Mail\Users\OrganisationInvitationMail($organisationInvitation->id, 1),
+        'VerifyAccountEmailChange' => fn () => new App\Mail\Users\VerifyAccountEmailChange($emailChange->id, Illuminate\Support\Facades\Crypt::encryptString($renderToken)),
+        'AccountEmailChanged' => fn () => new App\Mail\Users\AccountEmailChanged($emailChange->id),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),
         'CommunityContactNotice' => fn () => new App\Mail\CommunityContactNotice('Acme Events'),

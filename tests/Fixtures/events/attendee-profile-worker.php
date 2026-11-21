@@ -11,8 +11,15 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 require dirname(__DIR__, 3).'/vendor/autoload.php';
+if (getenv('APP_ENV') !== 'testing' || ! Tests\Support\IsolatedPostgresDatabase::permits((string) getenv('DB_DATABASE'))) {
+    throw new RuntimeException('Attendee profile workers require an isolated testing database.');
+}
 $app = require dirname(__DIR__, 3).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+$connection = Illuminate\Support\Facades\DB::connection('landlord');
+if ($connection->getDriverName() !== 'pgsql' || $connection->selectOne('select current_database() as name')->name !== getenv('DB_DATABASE')) {
+    throw new RuntimeException('Attendee profile worker database does not match the isolated test configuration.');
+}
 $input = json_decode(stream_get_contents(STDIN), true, 16, JSON_THROW_ON_ERROR);
 config(['cache.default' => 'array', 'queue.default' => 'sync', 'filesystems.disks.attendee-profiles-local.root' => $input['root']]);
 $session = app('session.store');

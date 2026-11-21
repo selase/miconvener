@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -37,6 +38,11 @@ final class NewPasswordController extends Controller
      */
     public function store(Request $request)
     {
+        $email = $request->input('email');
+        if (is_string($email)) {
+            $request->merge(['email' => mb_strtolower(mb_trim($email))]);
+        }
+
         $request->validate([
             'token' => ['required'],
             'email' => ['required', 'email'],
@@ -48,11 +54,26 @@ final class NewPasswordController extends Controller
         // database. Otherwise we will parse the error and return the response.
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user) use ($request): void {
-                $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+            function (User $user) use ($request): void {
+                $securityVersion = (int) $user->security_version;
+                $user->getConnection()->transaction(function () use ($user, $request, $securityVersion): void {
+                    $locked = User::query()->whereKey($user->id)->lockForUpdate()->first();
+                    if (! $locked
+                        || $locked->email !== $request->string('email')->toString()
+                        || (int) $locked->security_version !== $securityVersion
+                        || ! Password::tokenExists($locked, $request->string('token')->toString())) {
+                        throw ValidationException::withMessages(['email' => __(Password::INVALID_TOKEN)]);
+                    }
+
+                    Password::deleteToken($locked);
+                    $locked->forceFill([
+                        'password' => Hash::make($request->string('password')->toString()),
+                        'remember_token' => Str::random(60),
+                        'security_version' => (int) $locked->security_version + 1,
+                    ])->save();
+                    $locked->tokens()->delete();
+                    $user->setRawAttributes($locked->getAttributes(), true);
+                });
 
                 event(new PasswordReset($user));
             }

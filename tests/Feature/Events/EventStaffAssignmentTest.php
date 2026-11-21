@@ -89,11 +89,11 @@ test('the organiser picks the events when editing an Event Staff member, and onl
     $other = Event::factory()->create(['tenant_id' => Tenant::factory()->create(['isolation_mode' => 'shared'])->id]);
     $role = Role::where('name', 'Event Staff')->whereNull('tenant_id')->firstOrFail();
     $payload = [
-        'first_name' => $staff->first_name,
-        'last_name' => $staff->last_name,
-        'email' => $staff->email,
+        'first_name' => 'Unauthorised identity edit',
+        'last_name' => 'Unauthorised surname',
+        'email' => 'replacement@example.test',
         'phone_no' => '0241234567',
-        'status' => $staff->status ?? 'active',
+        'status' => 'active',
         'role' => $role->id,
     ];
 
@@ -109,6 +109,17 @@ test('the organiser picks the events when editing an Event Staff member, and onl
     $this->actingAs($owner)->put("http://{$this->host}/users/{$staff->uuid}", ['role' => $admin->id] + $payload)
         ->assertSessionHasNoErrors();
     expect(EventStaffAssignment::where('user_id', $staff->id)->count())->toBe(0);
+
+    $this->actingAs($owner)->put("http://{$this->host}/users/{$staff->uuid}", ['role' => $admin->id, 'status' => 'suspended'] + $payload)
+        ->assertSessionHasNoErrors();
+    $unchanged = $staff->fresh();
+    expect($unchanged->first_name)->toBe($staff->first_name)
+        ->and($unchanged->last_name)->toBe($staff->last_name)
+        ->and($unchanged->email)->toBe($staff->email)
+        ->and((string) $unchanged->phone_no)->toBe((string) $staff->phone_no)
+        ->and($unchanged->status)->toBe($staff->status)
+        ->and($this->tenant->users()->whereKey($staff->id)->exists())->toBeFalse()
+        ->and($this->tenant->allUsers()->whereKey($staff->id)->firstOrFail()->pivot->status)->toBe('suspended');
 });
 
 test('a new Event Staff member can be limited to events as they are added', function (): void {
@@ -126,6 +137,12 @@ test('a new Event Staff member can be limited to events as they are added', func
         'event_ids' => [$this->gala->id],
     ])->assertSessionHasNoErrors();
 
-    $kojo = User::where('email', 'kojo@crewco.test')->firstOrFail();
+    $invitation = \App\Models\OrganisationInvitation::query()->where('email', 'kojo@crewco.test')->sole();
+    expect($invitation->status)->toBe('pending')
+        ->and(User::query()->where('email', $invitation->email)->exists())->toBeFalse();
+    $kojo = User::factory()->create(['email' => $invitation->email, 'email_verified_at' => now()]);
+    expect(EventStaffAssignment::query()->where('user_id', $kojo->id)->exists())->toBeFalse();
+    app(\App\Services\Tenancy\OrganisationInvitations::class)->accept(\Illuminate\Support\Facades\Crypt::decryptString($invitation->delivery_payload), $kojo);
+    expect($invitation->fresh()->status)->toBe('accepted');
     expect(EventStaffAssignment::where('user_id', $kojo->id)->pluck('event_id')->all())->toBe([$this->gala->id]);
 });

@@ -38,20 +38,27 @@ dataset('account requests', [
     'edit user' => [UpdateUserRequest::class],
 ]);
 
-it('accepts a local, international or foreign number in every account form', function (string $request, string $number): void {
+it('validates accepted identity phone numbers and excludes them from membership data', function (string $request, string $number): void {
     $request = $request::create('/team', 'POST', ['phone_no' => $number, 'user' => App\Models\User::factory()->make(['id' => 1])]);
     $request->setContainer(app());
     (new ReflectionMethod($request, 'prepareForValidation'))->invoke($request);
-    $rule = collect($request->rules()['phone_no']);
-
-    expect(Validator::make(['phone_no' => $request->input('phone_no')], ['phone_no' => $rule->all()])->passes())->toBeTrue();
+    $validator = Validator::make(['phone_no' => $request->input('phone_no')], array_intersect_key($request->rules(), ['phone_no' => true]));
+    expect($validator->passes())->toBeTrue();
+    if ($request instanceof StoreTeamMemberRequest || $request instanceof UpdateTeamMemberRequest) {
+        expect($validator->validated())->toBe([]);
+    } else {
+        expect($validator->validated())->toHaveKey('phone_no');
+    }
 })->with('account requests')->with('accepted phone numbers');
 
-it('still refuses what is not a phone number in every account form', function (string $request, string $number): void {
+it('rejects invalid identity phone numbers and excludes them from membership data', function (string $request, string $number): void {
     $request = $request::create('/team', 'POST', ['phone_no' => $number, 'user' => App\Models\User::factory()->make(['id' => 1])]);
     $request->setContainer(app());
     (new ReflectionMethod($request, 'prepareForValidation'))->invoke($request);
-    $rule = collect($request->rules()['phone_no']);
-
-    expect(Validator::make(['phone_no' => $request->input('phone_no')], ['phone_no' => $rule->all()])->passes())->toBeFalse();
+    $validator = Validator::make(['phone_no' => $request->input('phone_no')], array_intersect_key($request->rules(), ['phone_no' => true]));
+    if ($request instanceof StoreTeamMemberRequest || $request instanceof UpdateTeamMemberRequest) {
+        expect($validator->passes())->toBeTrue()->and($validator->validated())->toBe([]);
+    } else {
+        expect($validator->passes())->toBeFalse();
+    }
 })->with('account requests')->with('rejected phone numbers');

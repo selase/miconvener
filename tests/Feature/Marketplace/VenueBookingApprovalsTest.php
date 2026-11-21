@@ -38,6 +38,7 @@ beforeEach(function (): void {
 
     Permission::query()->firstOrCreate(['name' => 'manage venue', 'guard_name' => 'web'], ['category' => 'venue']);
     $this->host = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->host->tenants()->attach($this->tenant->id);
     setPermissionsTeamId($this->tenant->id);
     $this->host->givePermissionTo('manage venue');
     app(TenantContext::class)->setTenant($this->tenant);
@@ -340,6 +341,7 @@ describe('who may decide', function (): void {
         $booking = ($this->request)();
         $outsider = User::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
         $plain = User::factory()->create(['tenant_id' => $this->tenant->id]);
+        $plain->tenants()->attach($this->tenant->id);
 
         expect(fn () => $this->approvals->approve($booking, $outsider, 24, (string) Str::uuid()))->toThrow(AuthorizationException::class)
             ->and(fn () => $this->approvals->approve($booking, $plain, 24, (string) Str::uuid()))->toThrow(AuthorizationException::class)

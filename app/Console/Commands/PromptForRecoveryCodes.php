@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Mail\Auth\SetUpRecoveryCodesMail;
-use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
@@ -42,7 +41,7 @@ final class PromptForRecoveryCodes extends Command
         $sent = 0;
 
         foreach ($users as $user) {
-            $tenant = $user->tenant_id === null ? null : Tenant::query()->find($user->tenant_id);
+            $tenant = $user->tenants()->orderBy('tenants.id')->first();
 
             if ($tenant === null) {
                 $this->warn("Skipped {$user->email}: no organization to link them back to.");

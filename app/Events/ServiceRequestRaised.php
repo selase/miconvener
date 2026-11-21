@@ -48,6 +48,6 @@ final class ServiceRequestRaised implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return $this->serviceRequest->consolePayload();
+        return ['refresh' => true];
     }
 }

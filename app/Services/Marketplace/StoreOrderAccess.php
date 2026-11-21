@@ -8,6 +8,7 @@ use App\Models\StoreOrder;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Gate;
 
@@ -27,7 +28,7 @@ final class StoreOrderAccess
     {
         $current = StoreOrder::query()->with('shop')->find($order->id);
         if ($current === null || $current->tenant_id !== $tenant->id || $current->shop?->tenant_id !== $tenant->id
-            || (! User::query()->whereKey($actor->id)->where('tenant_id', $tenant->id)->exists() && ! $actor->tenants()->whereKey($tenant->id)->exists())) {
+            || ! app(OrganisationMemberships::class)->isActive($actor, $tenant)) {
             return false;
         }
         $team = getPermissionsTeamId();

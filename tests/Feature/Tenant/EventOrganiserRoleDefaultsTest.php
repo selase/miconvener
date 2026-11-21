@@ -60,7 +60,13 @@ it('synchronises team assignments only for the system organiser role', function 
         'phone_no' => '0241234567', 'role' => $role->id, 'status' => 'active',
     ];
     $this->actingAs($owner)->post($host.'/users', $payload + ['event_ids' => [$event->id]])->assertSessionHasNoErrors();
-    $organiser = App\Models\User::query()->where('email', 'organiser@example.test')->firstOrFail();
+    $invitation = App\Models\OrganisationInvitation::query()->where('email', 'organiser@example.test')->sole();
+    expect($invitation->status)->toBe('pending')
+        ->and(App\Models\User::query()->where('email', $invitation->email)->exists())->toBeFalse();
+    $organiser = App\Models\User::factory()->create(['email' => $invitation->email, 'email_verified_at' => now()]);
+    expect(App\Models\EventStaffAssignment::query()->where('user_id', $organiser->id)->exists())->toBeFalse();
+    app(App\Services\Tenancy\OrganisationInvitations::class)->accept(Illuminate\Support\Facades\Crypt::decryptString($invitation->delivery_payload), $organiser);
+    expect($invitation->fresh()->status)->toBe('accepted');
     expect(App\Models\EventStaffAssignment::query()->where('user_id', $organiser->id)->pluck('event_id')->all())->toBe($custom ? [] : [$event->id]);
     $this->actingAs($owner)->put($host.'/users/'.$organiser->uuid, $payload + ['event_ids' => [$event->id]])->assertSessionHasNoErrors();
     expect(App\Models\EventStaffAssignment::query()->where('user_id', $organiser->id)->pluck('event_id')->all())->toBe($custom ? [] : [$event->id]);

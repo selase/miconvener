@@ -178,11 +178,17 @@ final class Tenant extends Model
     }
 
     /**
-     * @return BelongsToMany<User, $this>
+     * @return BelongsToMany<User, $this, TenantMembership>
      */
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class);
+        return $this->allUsers()->wherePivot('status', 'active');
+    }
+
+    /** @return BelongsToMany<User, $this, TenantMembership> */
+    public function allUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)->using(TenantMembership::class)->withPivot(['status', 'accepted_at', 'suspended_at', 'revoked_at', 'changed_by'])->withTimestamps();
     }
 
     /**

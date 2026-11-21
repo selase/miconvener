@@ -41,6 +41,10 @@ final class RegisteredUserController extends Controller
      */
     public function store(Request $request): Redirector|RedirectResponse
     {
+        $email = $request->input('email');
+        if (is_string($email)) {
+            $request->merge(['email' => mb_strtolower(mb_trim($email))]);
+        }
         $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -73,14 +77,12 @@ final class RegisteredUserController extends Controller
             'status' => User::STATUS_ACTIVE,
         ]);
 
-        event(new Registered($user));
-
         // Create tenant (organization)
         $tenant = Tenant::query()->create([
             'name' => $request->string('organization_name')->toString(),
             'slug' => $request->string('slug')->toString(),
             'email' => $request->string('email')->toString(),
-            'status' => TenantStatusEnum::ACTIVE,
+            'status' => TenantStatusEnum::DEACTIVATED,
             'isolation_mode' => 'shared',
             'db_driver' => 'pgsql',
             // The free plan is granted here because nothing downstream will grant
@@ -95,18 +97,19 @@ final class RegisteredUserController extends Controller
         // Provision tenant database and run migrations
         $this->provisioner->provision($tenant);
 
+        \Illuminate\Support\Facades\DB::connection('landlord')->transaction(function () use ($tenant, &$user): void {
+            $lockedTenant = Tenant::query()->whereKey($tenant->id)->lockForUpdate()->firstOrFail();
+            $user = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            abort_unless(in_array($user->status, [null, User::STATUS_ACTIVE], true), 403);
+            $role = \App\Models\Role::query()->where('name', 'Org Superadmin')->whereNull('tenant_id')->firstOrFail();
+            $user->forceFill(['tenant_id' => $tenant->id])->save();
+            $user->allTenants()->attach($tenant->id, ['accepted_at' => now()]);
+            app(\App\Services\Tenancy\OrganisationMemberships::class)->inTenant($lockedTenant, [$user], fn () => $user->assignRole($role));
+            $lockedTenant->forceFill(['status' => TenantStatusEnum::ACTIVE])->save();
+            $tenant->setRawAttributes($lockedTenant->getAttributes(), true);
+        });
+        event(new Registered($user));
         app(\App\Services\Platform\SignupAlerts::class)->signedUp($tenant);
-
-        // Attach user to tenant and set primary tenant
-        $user->tenant_id = $tenant->id;
-        $user->save();
-        $user->tenants()->attach($tenant->id);
-
-        $orgSuperadminRole = \App\Models\Role::where('name', 'Org Superadmin')->whereNull('tenant_id')->first();
-        if ($orgSuperadminRole) {
-            setPermissionsTeamId($tenant->id);
-            $user->assignRole($orgSuperadminRole);
-        }
 
         // Login and set active tenant in session
         Auth::login($user);

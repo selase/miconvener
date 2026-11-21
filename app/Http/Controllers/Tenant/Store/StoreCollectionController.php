@@ -120,7 +120,7 @@ final class StoreCollectionController extends Controller
     {
         $tenant = app(TenantContext::class)->getTenant() ?? abort(403);
         $actor = $request->user() ?? abort(403);
-        abort_unless((string) $actor->tenant_id === (string) $tenant->id || $actor->tenants()->whereKey($tenant->id)->exists(), 403);
+        abort_unless(app(\App\Services\Tenancy\OrganisationMemberships::class)->isActive($actor, $tenant), 403);
         $team = getPermissionsTeamId();
         try {
             setPermissionsTeamId($tenant->id);

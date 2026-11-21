@@ -14,8 +14,15 @@ import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import TeamFormModal from './TeamFormModal';
 
-export default function Index({ users, roles, statuses, events = [] }) {
-    const { flash } = usePage().props;
+export default function Index({
+    users,
+    roles,
+    statuses,
+    events = [],
+    invitations = [],
+    canInvite = false,
+}) {
+    const { flash, auth } = usePage().props;
     const showToast = useToast();
     const [selectedUuid, setSelectedUuid] = useState(null);
     const [modal, setModal] = useState(null);
@@ -43,11 +50,73 @@ export default function Index({ users, roles, statuses, events = [] }) {
             <PageHeader
                 title="Team"
                 actions={
-                    <Button icon={Plus} onClick={() => setModal({ mode: 'create' })}>
-                        Add team member
-                    </Button>
+                    canInvite && (
+                        <Button icon={Plus} onClick={() => setModal({ mode: 'create' })}>
+                            Invite team member
+                        </Button>
+                    )
                 }
             />
+
+            {invitations.length > 0 && (
+                <section
+                    className="mx-8 mt-6 border border-border p-4"
+                    aria-label="Pending invitations"
+                >
+                    <h2 className="text-sm font-medium text-ink">Pending invitations</h2>
+                    <ul className="mt-3 divide-y divide-border">
+                        {invitations.map((invitation) => (
+                            <li
+                                key={invitation.id}
+                                className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"
+                            >
+                                <div>
+                                    <p className="font-medium text-ink">{invitation.email}</p>
+                                    <p className="text-xs text-ink-secondary">
+                                        Expires {invitation.expires_at} ·{' '}
+                                        {{
+                                            pending: 'Queued',
+                                            sending: 'Sending',
+                                            sent: 'Sent',
+                                            uncertain: 'Delivery needs review',
+                                            expired: 'Expired',
+                                        }[invitation.delivery_status] ?? 'Pending'}
+                                    </p>
+                                </div>
+                                {auth?.can?.create_user && (
+                                    <div className="flex gap-2">
+                                        <Button
+                                            disabled={['uncertain', 'sending', 'expired'].includes(
+                                                invitation.delivery_status
+                                            )}
+                                            onClick={() =>
+                                                router.post(
+                                                    route('organisation-invitations.resend', {
+                                                        invitation: invitation.id,
+                                                    })
+                                                )
+                                            }
+                                        >
+                                            Resend
+                                        </Button>
+                                        <Button
+                                            onClick={() =>
+                                                router.delete(
+                                                    route('organisation-invitations.revoke', {
+                                                        invitation: invitation.id,
+                                                    })
+                                                )
+                                            }
+                                        >
+                                            Cancel invitation
+                                        </Button>
+                                    </div>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
 
             <div className="flex">
                 <div className="min-w-0 flex-1 px-8 py-6">
@@ -90,7 +159,7 @@ export default function Index({ users, roles, statuses, events = [] }) {
                                                 user.status === 'active' ? 'success' : 'neutral'
                                             }
                                         >
-                                            {user.status === 'active' ? 'Active' : 'Inactive'}
+                                            {user.status === 'active' ? 'Active' : 'Suspended'}
                                         </StatusPill>
                                     </Td>
                                     <Td muted numeric>
@@ -151,7 +220,7 @@ export default function Index({ users, roles, statuses, events = [] }) {
                                                         : 'neutral'
                                                 }
                                             />
-                                            {selected.status === 'active' ? 'Active' : 'Inactive'}
+                                            {selected.status === 'active' ? 'Active' : 'Suspended'}
                                         </div>
                                     </div>
                                 </div>

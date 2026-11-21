@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Mail\VerifiedSenderTransport;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Gate;
@@ -12,6 +13,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Opcodes\LogViewer\Facades\LogViewer;
 use RuntimeException;
+use WeakMap;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -174,45 +176,37 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configureQueue(): void
     {
+        $this->app->singleton(\App\Jobs\Middleware\TenantAwareJob::class);
+        $scope = $this->app->make(\App\Jobs\Middleware\TenantAwareJob::class);
+        $attempts = new WeakMap;
+
         \Illuminate\Support\Facades\Queue::createPayloadUsing(function ($connection, $queue, $payload): array {
             $tenantId = app(\App\Services\Tenancy\TenantContext::class)->activeTenantId();
 
             return $tenantId ? ['tenant_id' => $tenantId] : [];
         });
 
-        \Illuminate\Support\Facades\Queue::before(function (\Illuminate\Queue\Events\JobProcessing $event): void {
-            /** @var array<string, mixed> $payload */
+        \Illuminate\Support\Facades\Queue::before(function (\Illuminate\Queue\Events\JobProcessing $event) use ($scope, $attempts): void {
             $payload = $event->job->payload();
+            $restoreParent = $scope->hasActiveScope()
+                || config("queue.connections.{$event->connectionName}.driver") === 'sync';
 
-            if (isset($payload['tenant_id'])) {
-                /** @var \App\Models\Tenant|null $tenant */
-                $tenant = \App\Models\Tenant::find($payload['tenant_id']);
+            $scope->enter($payload['tenant_id'] ?? null, $restoreParent, function (Closure $cleanup) use ($attempts, $event): void {
+                $attempts[$event->job] = $cleanup;
+            });
+        });
 
-                if ($tenant instanceof \App\Models\Tenant) {
-                    app(\App\Services\Tenancy\TenantContext::class)->setTenant($tenant);
-
-                    setPermissionsTeamId($tenant->id);
-
-                    \Illuminate\Support\Facades\Log::withContext([
-                        'tenant_id' => (string) $tenant->id,
-                    ]);
-
-                    if ($tenant->requiresDedicatedDb()) {
-                        app(\App\Services\Tenancy\TenantDatabaseManager::class)->configure($tenant);
-                    } else {
-                        app(\App\Services\Tenancy\TenantDatabaseManager::class)->configureShared();
-                    }
-
-                    app(\App\Services\Tenancy\TenantStorageManager::class)->configure($tenant);
-
-                    /*
-                     * ResolveTenant sets this for a request; without it here,
-                     * anything a worker renders that links back to a tenant
-                     * page -- mail, above all -- dies on route() with a
-                     * missing subdomain instead of going out.
-                     */
-                    \Illuminate\Support\Facades\URL::defaults(['subdomain' => $tenant->slug]);
-                }
+        /*
+         * Both Worker and SyncQueue emit JobAttempted in finally, after failed
+         * callbacks as well as successful handlers. Earlier exception events
+         * would restore a parent while the child is still running its failure
+         * callbacks. The job key keeps nested attempts independent.
+         */
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Queue\Events\JobAttempted::class, function (\Illuminate\Queue\Events\JobAttempted $event) use ($attempts): void {
+            if (isset($attempts[$event->job])) {
+                $cleanup = $attempts[$event->job];
+                unset($attempts[$event->job]);
+                $cleanup();
             }
         });
     }

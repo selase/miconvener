@@ -51,6 +51,7 @@ function venueRaceScenario(bool $requests = true): array
     }
     App\Models\Permission::query()->firstOrCreate(['name' => 'manage venue', 'guard_name' => 'web'], ['category' => 'venue']);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    $tenant->users()->attach($user->id);
     setPermissionsTeamId($tenant->id);
     $user->givePermissionTo('manage venue');
 

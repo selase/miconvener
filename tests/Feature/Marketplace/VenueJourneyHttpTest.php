@@ -115,7 +115,11 @@ describe('the host issuing and withdrawing a final quote', function (): void {
     test('rejects a host without the venue permission and another organisation entirely', function (): void {
         $stranger = User::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
 
-        ($this->issue)([], $stranger)->assertRedirect();
+        ($this->issue)([], $stranger)->assertForbidden();
+        $this->assertAuthenticatedAs($stranger);
+        $plain = User::factory()->create(['tenant_id' => $this->tenant->id]);
+        $this->tenant->users()->attach($plain->id);
+        ($this->issue)([], $plain)->assertForbidden();
         expect(VenueFinancialQuote::query()->count())->toBe(0);
     });
 

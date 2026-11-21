@@ -7,21 +7,16 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\StoreTeamMemberRequest;
 use App\Http\Requests\Tenant\UpdateTeamMemberRequest;
-use App\Libraries\Helper;
-use App\Mail\Users\SendAccountDetails;
-use App\Models\BadgeTemplateLicenceEvent;
-use App\Models\BadgeTemplatePurchase;
-use App\Models\BadgeTemplateUse;
 use App\Models\Event;
 use App\Models\EventStaffAssignment;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\PermissionCeiling;
+use App\Services\Tenancy\OrganisationInvitations;
+use App\Services\Tenancy\OrganisationMemberships;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -34,9 +29,9 @@ final class UserController extends Controller
         $tenant = $this->getTenant();
         $actorCanManageOwners = $this->canManageOrgSuperadmins();
 
-        $users = User::where('tenant_id', $tenant->id)
+        $users = $tenant->allUsers()->wherePivotIn('status', ['active', 'suspended'])
             ->with(['roles:id,name', 'roles.permissions:id,name'])
-            ->orderByDesc('created_at')
+            ->orderByDesc('users.created_at')
             ->paginate(20);
 
         $assignments = EventStaffAssignment::query()
@@ -55,12 +50,12 @@ final class UserController extends Controller
             'avatar' => $user->photo ? Storage::url($user->photo) : $user->gravatar,
             'role' => $user->roles->pluck('name')->first(),
             'role_id' => $user->roles->first()?->id,
-            'status' => $user->status,
+            'status' => $user->pivot->status,
             'last_login_at' => $user->last_login_at?->diffForHumans(),
             'created_at' => $user->created_at->format('Y-m-d'),
-            'can_edit' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+            'can_edit' => config('organisation_access.enabled') && ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
                 && $this->withinReach($user),
-            'can_remove' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+            'can_remove' => config('organisation_access.enabled') && ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
                 && $this->withinReach($user)
                 && $user->id !== auth()->id(),
             // Your own role is never yours to change.
@@ -72,7 +67,9 @@ final class UserController extends Controller
         return Inertia::render('Tenant/Team/Index', [
             'users' => $users,
             'roles' => $this->availableRoles(),
-            'statuses' => User::STATUSES,
+            'statuses' => ['active', 'suspended'],
+            'canInvite' => config('organisation_access.enabled') && (bool) auth()->user()?->can('create user'),
+            'invitations' => \App\Models\OrganisationInvitation::query()->where('tenant_id', $tenant->id)->where('status', 'pending')->orderByDesc('created_at')->limit(100)->get(['id', 'email', 'expires_at', 'delivery_status'])->map(fn ($invite): array => ['id' => $invite->id, 'email' => $invite->email, 'expires_at' => $invite->expires_at->format('j M Y'), 'delivery_status' => $invite->expires_at->isPast() ? 'expired' : $invite->delivery_status]),
             'events' => Event::where('tenant_id', $tenant->id)
                 ->orderByDesc('starts_at')
                 ->limit(200)
@@ -88,151 +85,34 @@ final class UserController extends Controller
 
     public function store(StoreTeamMemberRequest $request, string $subdomain): RedirectResponse
     {
-        $tenant = $this->getTenant();
-
-        $limit = $tenant->featureLimitValue('team_seats');
-        if ($limit !== null && $tenant->users()->count() >= $limit) {
-            $message = "Your workspace allows {$limit} team member(s) (including active seat add-ons). Purchase additional team seats, remove an existing member, or upgrade your plan to invite another.";
-
-            return redirect()->back()->withErrors(['email' => $message]);
-        }
-
-        $validated = $request->validated();
-
-        $role = Role::query()->whereKey($validated['role'])->firstOrFail();
-
-        DB::transaction(function () use ($validated, $tenant, $role): void {
-            $password = Helper::generateRandomPassword();
-            $user = User::create([
-                'first_name' => $validated['first_name'],
-                'last_name' => $validated['last_name'],
-                'email' => $validated['email'],
-                'phone_no' => $validated['phone_no'],
-                'password' => bcrypt($password),
-                'status' => $validated['status'],
-                'tenant_id' => $tenant->id,
-            ]);
-
-            setPermissionsTeamId($tenant->id);
-            $user->assignRole($role);
-            $user->tenants()->attach($tenant->id);
-
-            if ($role->isEventScoped()) {
-                $this->syncEventAssignments($user, (string) $tenant->id, $validated['event_ids'] ?? []);
-            }
-
-            $loginUrl = $tenant->url('/login');
-
-            Mail::to($user->email)->queue(new SendAccountDetails(
-                $user->first_name,
-                $user->email,
-                $password,
-                $loginUrl,
-                $tenant->name
-            ));
-        });
+        $data = $request->validated();
+        app(OrganisationInvitations::class)->invite(
+            $this->getTenant(), $request->user(), $data['email'],
+            Role::query()->findOrFail($data['role']), $data['event_ids'] ?? []
+        );
 
         return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
-            ->with('success', __('locale.messages.created', ['name' => 'Team member']));
+            ->with('success', 'Invitation sent. Access starts after they accept.');
     }
 
     public function update(UpdateTeamMemberRequest $request, string $subdomain, User $user): RedirectResponse
     {
-        $tenant = $this->getTenant();
-
-        if ($user->tenant_id !== $tenant->id) {
-            abort(403);
-        }
-
-        $validated = $request->validated();
-
-        if ($this->wouldRemoveFinalActiveOrgSuperadmin($user, $validated['role'], $validated['status'], $tenant->id)) {
-            return back()->withErrors(['role' => 'Assign another active Org Superadmin before changing the final owner.']);
-        }
-
-        $user->update([
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'email' => $validated['email'],
-            'phone_no' => $validated['phone_no'],
-            'status' => $validated['status'],
-        ]);
-
-        $role = Role::query()->whereKey($validated['role'])->firstOrFail();
-
-        setPermissionsTeamId($tenant->id);
-        $user->syncRoles([$role]);
-
-        $this->syncEventAssignments($user, (string) $tenant->id, $role->isEventScoped()
-            ? ($validated['event_ids'] ?? [])
-            : []);
+        $data = $request->validated();
+        app(OrganisationMemberships::class)->updateAccess(
+            $this->getTenant(), $request->user(), $user,
+            Role::query()->findOrFail($data['role']), $data['event_ids'] ?? [], $data['status']
+        );
 
         return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
-            ->with('success', __('locale.messages.updated', ['name' => 'Team member']));
+            ->with('success', 'Organisation access updated.');
     }
 
     public function destroy(string $subdomain, User $user): RedirectResponse
     {
-        $this->authorize('delete user');
-        $tenant = $this->getTenant();
-
-        if ($user->tenant_id !== $tenant->id) {
-            abort(403);
-        }
-
-        if ($this->userHasTenantRole($user, 'Org Superadmin', $tenant->id) && ! $this->canManageOrgSuperadmins()) {
-            abort(403);
-        }
-
-        if (! $this->withinReach($user)) {
-            abort(403);
-        }
-
-        if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot remove your own account.');
-        }
-
-        if ($this->isFinalActiveOrgSuperadmin($user, $tenant->id)) {
-            return back()->with('error', 'Assign another active Org Superadmin before removing the final owner.');
-        }
-
-        if (BadgeTemplateLicenceEvent::query()->where('actor_id', $user->id)->exists()
-            || BadgeTemplateUse::query()->where('actor_id', $user->id)->exists()
-            || BadgeTemplatePurchase::query()->where('terms_snapshot->requested_by', (string) $user->id)->exists()) {
-            return back()->with('error', 'This account has paid badge template audit history. Deactivate its access instead of deleting the retained account.');
-        }
-
-        $user->tenants()->detach($tenant->id);
-        $user->delete();
+        app(OrganisationMemberships::class)->revoke($this->getTenant(), auth()->user(), $user);
 
         return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
-            ->with('success', __('locale.messages.deleted', ['name' => 'Team member']));
-    }
-
-    /**
-     * Replace the events a member is assigned to. Called with an empty list
-     * for anyone without a system event-scoped role, so a limit never lingers unseen after
-     * a role change.
-     *
-     * @param  list<string>  $eventIds
-     */
-    private function syncEventAssignments(User $user, string $tenantId, array $eventIds): void
-    {
-        DB::connection('landlord')->transaction(function () use ($user, $tenantId, $eventIds): void {
-            EventStaffAssignment::query()
-                ->where('tenant_id', $tenantId)
-                ->where('user_id', $user->id)
-                ->whereNotIn('event_id', $eventIds)
-                ->delete();
-
-            foreach (array_unique($eventIds) as $eventId) {
-                EventStaffAssignment::query()->firstOrCreate([
-                    'tenant_id' => $tenantId,
-                    'event_id' => $eventId,
-                    'user_id' => $user->id,
-                ]);
-            }
-        });
+            ->with('success', 'Access removed from this organisation.');
     }
 
     /**
@@ -247,7 +127,7 @@ final class UserController extends Controller
                 ->orWhere('tenant_id', $tenant->id);
         })->get();
 
-        $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Superadmin');
+        $roles = $roles->filter(fn (Role $role): bool => $role->tenant_id !== null || in_array($role->name, OrganisationMemberships::TENANT_ROLES, true));
 
         if (! $this->canManageOrgSuperadmins()) {
             $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Org Superadmin');
@@ -282,59 +162,6 @@ final class UserController extends Controller
             && ($user->isGlobalSuperAdmin() || $user->hasRole('Org Superadmin'));
     }
 
-    private function wouldRemoveFinalActiveOrgSuperadmin(User $user, int|string $roleId, string $status, string $tenantId): bool
-    {
-        if (! $this->isFinalActiveOrgSuperadmin($user, $tenantId)) {
-            return false;
-        }
-
-        $selectedRole = Role::query()->find($roleId);
-
-        return $selectedRole?->name !== 'Org Superadmin' || $status !== User::STATUS_ACTIVE;
-    }
-
-    private function isFinalActiveOrgSuperadmin(User $user, string $tenantId): bool
-    {
-        if (! $this->userHasTenantRole($user, 'Org Superadmin', $tenantId) || $user->status !== User::STATUS_ACTIVE) {
-            return false;
-        }
-
-        $roleId = Role::whereNull('tenant_id')->where('name', 'Org Superadmin')->value('id');
-
-        // model_has_roles.model_id is varchar while users.id is bigint, so
-        // Postgres refuses to join the two columns directly. Collect the ids
-        // and cast them instead.
-        $ownerIds = DB::connection('landlord')
-            ->table(config('permission.table_names.model_has_roles'))
-            ->where('role_id', $roleId)
-            ->where('model_type', User::class)
-            ->where('tenant_id', $tenantId)
-            ->pluck('model_id')
-            ->map(fn (string $id): int => (int) $id)
-            ->all();
-
-        if ($ownerIds === []) {
-            return false;
-        }
-
-        return User::query()
-            ->whereIn('id', $ownerIds)
-            ->where('status', User::STATUS_ACTIVE)
-            ->count() <= 1;
-    }
-
-    private function userHasTenantRole(User $user, string $roleName, string $tenantId): bool
-    {
-        return DB::connection('landlord')
-            ->table(config('permission.table_names.model_has_roles'))
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', (string) $user->id)
-            ->where('model_has_roles.model_type', User::class)
-            ->where('model_has_roles.tenant_id', $tenantId)
-            ->where('roles.name', $roleName)
-            ->exists();
-    }
-
     /**
      * Whether every role this person holds is one the signed-in user could
      * grant. Anyone stronger than you is not yours to edit or remove.
@@ -348,6 +175,6 @@ final class UserController extends Controller
 
         $ceiling = app(PermissionCeiling::class);
 
-        return $user->roles->every(fn (mixed $role): bool => $role instanceof Role && $ceiling->canGrantRole($actor, $role));
+        return $user->roles->every(fn (Role $role): bool => $ceiling->canGrantRole($actor, $role));
     }
 }

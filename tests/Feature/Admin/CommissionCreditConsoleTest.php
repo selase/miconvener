@@ -50,8 +50,10 @@ test('an organisation admin and a user with no role or organisation cannot open 
 
     $this->actingAs($member)->get(route('admin.billing.commission-credits.index'))->assertForbidden();
 
-    // With no role and no organisation, the app turns them away before the page.
-    $this->actingAs(User::factory()->create(['tenant_id' => null]))->get(route('admin.billing.commission-credits.index'))->assertRedirect();
+    $unaffiliated = User::factory()->create(['tenant_id' => null]);
+    $this->actingAs($unaffiliated)->get(route('admin.billing.commission-credits.index'))->assertForbidden();
+    $this->assertAuthenticatedAs($unaffiliated);
+    $this->get(route('workspaces.index'))->assertOk();
 });
 
 test('platform finance staff get the permission and organisation roles never see the role', function (): void {

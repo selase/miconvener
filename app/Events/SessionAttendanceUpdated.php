@@ -42,17 +42,6 @@ final class SessionAttendanceUpdated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return [
-            'session_id' => $this->session->id,
-            'title' => $this->session->title,
-            'location' => $this->session->location,
-            'capacity' => $this->session->capacity,
-            'live_headcount' => $this->session->liveHeadcount(),
-            'occupancy_percentage' => $this->session->occupancyPercentage(),
-            'is_room_full' => $this->session->isRoomFull(),
-            'action' => $this->action,
-            'attendee_name' => $this->attendeeName,
-            'updated_at' => now()->toIso8601String(),
-        ];
+        return ['refresh' => true];
     }
 }

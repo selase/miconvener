@@ -15,6 +15,7 @@ final class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        $schedule->job(new \App\Jobs\Tenancy\DispatchOrganisationInvitationMaintenance)->daily()->name('organisations:maintain-invitations')->withoutOverlapping()->onOneServer();
         $schedule->call(fn () => app(\App\Services\Events\AttendeeImport::class)->purge())->daily()->name('events:purge-import-previews')->withoutOverlapping()->onOneServer();
         $schedule->call(function (): void {
             app(\App\Services\Events\AttendeeImport::class)->recover();

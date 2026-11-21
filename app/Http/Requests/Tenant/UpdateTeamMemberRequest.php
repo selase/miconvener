@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant;
 
-use App\Http\Requests\Concerns\NormalisesPhoneNumber;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Authorization\PermissionCeiling;
@@ -12,12 +11,9 @@ use App\Services\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Propaganistas\LaravelPhone\Rules\Phone;
 
 final class UpdateTeamMemberRequest extends FormRequest
 {
-    use NormalisesPhoneNumber;
-
     public function authorize(): bool
     {
         if (! $this->user()->can('update user')) {
@@ -38,7 +34,7 @@ final class UpdateTeamMemberRequest extends FormRequest
         // reaches beyond the editor's own is out of the editor's hands.
         $ceiling = app(PermissionCeiling::class);
 
-        return $target->roles->every(fn (mixed $role): bool => $role instanceof Role && $ceiling->canGrantRole($this->user(), $role));
+        return $target->roles->every(fn (Role $role): bool => $ceiling->canGrantRole($this->user(), $role));
     }
 
     /**
@@ -47,10 +43,6 @@ final class UpdateTeamMemberRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
-            'phone_no' => ['required', (new Phone)->international()->country('GH')],
             'role' => [
                 'required',
                 'exists:roles,id',
@@ -69,7 +61,7 @@ final class UpdateTeamMemberRequest extends FormRequest
                         $fail('You do not have permission to assign this role.');
                     }
 
-                    if ($role->isSystemRole() && $role->name === 'Superadmin') {
+                    if ($role->tenant_id === null && ! in_array($role->name, \App\Services\Tenancy\OrganisationMemberships::TENANT_ROLES, true)) {
                         $fail('The Superadmin role cannot be assigned within an organization.');
                     }
 
@@ -90,7 +82,7 @@ final class UpdateTeamMemberRequest extends FormRequest
                     }
                 },
             ],
-            'status' => ['required', 'string'],
+            'status' => ['required', Rule::in(['active', 'suspended'])],
             // Empty grants all events to Event Staff and none to Event Organisers.
             'event_ids' => ['sometimes', 'array'],
             'event_ids.*' => [

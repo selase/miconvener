@@ -89,9 +89,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         Route::resource('roles', App\Http\Controllers\Admin\RoleController::class);
         Route::resource('features', App\Http\Controllers\Admin\FeatureController::class);
         Route::resource('packages', App\Http\Controllers\Admin\PackageController::class)->except(['show']);
-        Route::post('users/all', [UsersController::class, 'getAllUsers'])->name('users.all');
-        Route::put('users/{user}/resend-password', ResendAccountPasswordController::class);
-        Route::resource('users', UsersController::class);
+        Route::group(['middleware' => 'can:access-superadmin-dashboard'], function (): void {
+            Route::post('users/all', [UsersController::class, 'getAllUsers'])->name('users.all');
+            Route::put('users/{user}/resend-password', ResendAccountPasswordController::class)->middleware('throttle:6,1');
+            Route::resource('users', UsersController::class);
+        });
     });
 
     // audit trail routes
@@ -155,9 +157,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('reset');
         Route::post('all', [TenantController::class, 'getAllTenants'])
             ->name('all');
-        Route::post('{tenants}/team/all', [TeamController::class, 'getAllTeams'])
-            ->name('team.all');
-        Route::resource('{tenants}/team', TeamController::class);
+        Route::group(['middleware' => 'can:access-superadmin-dashboard'], function (): void {
+            Route::post('{tenants}/team/all', [TeamController::class, 'getAllTeams'])
+                ->name('team.all');
+            Route::resource('{tenants}/team', TeamController::class);
+        });
         Route::get('change/{tenant}', [TenantController::class, 'changeTenant'])
             ->name('change');
         Route::get('{tenant:uuid}/sending-domain', [App\Http\Controllers\Admin\SendingDomainController::class, 'show'])
@@ -399,3 +403,7 @@ Route::get('mcp/marketplace', [App\Http\Controllers\Marketplace\MarketplaceMcpCo
     ->name('mcp.marketplace.show');
 
 require __DIR__.'/auth.php';
+
+require __DIR__.'/workspaces.php';
+
+require __DIR__.'/account-identity.php';

@@ -49,13 +49,7 @@ final class Handler extends ExceptionHandler
                 return response()->json(['message' => $e->getMessage()], 403);
             }
 
-            if (auth()->check()) {
-                auth()->logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-            }
-
-            return redirect()->route('login')->withErrors(['email' => $e->getMessage()]);
+            return response($e->getMessage(), 403);
         });
 
         $this->reportable(function (Throwable $e): void {

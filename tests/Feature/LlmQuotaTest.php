@@ -35,8 +35,12 @@ final class LlmQuotaTest extends TestCase
             'db_driver' => 'pgsql',
         ]);
 
+        $user = \App\Models\User::factory()->create();
+        $user->tenants()->attach($this->tenant->id);
+
         // Create an API key for the tenant
         $this->apiKey = TenantApiKey::create([
+            'user_id' => $user->id,
             'tenant_id' => $this->tenant->id,
             'name' => 'Test Key',
             'key_hash' => hash('sha256', 'test-secret-123'),

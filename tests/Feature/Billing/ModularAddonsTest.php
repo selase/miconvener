@@ -7,6 +7,7 @@ namespace Tests\Feature\Billing;
 use App\Contracts\PaymentGateway;
 use App\Models\Event;
 use App\Models\EventPoll;
+use App\Models\OrganisationInvitation;
 use App\Models\Package;
 use App\Models\Role;
 use App\Models\Tenant;
@@ -16,6 +17,7 @@ use App\Models\User;
 use App\Services\Billing\TenantAddonService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 use Mockery;
 use Tests\TestCase;
@@ -131,6 +133,7 @@ final class ModularAddonsTest extends TestCase
 
     public function test_team_seats_limit_is_strictly_enforced_and_expanded_by_purchased_seats(): void
     {
+        Mail::fake();
         [$tenant, $admin, $host] = $this->createTenantOnPackage('starter', 'starter-seats-test');
 
         expect($tenant->featureLimitValue('team_seats'))->toBe(2);
@@ -138,7 +141,7 @@ final class ModularAddonsTest extends TestCase
 
         $role = Role::findByName('Org Admin', 'web');
 
-        // Add 2nd user -> Success
+        // Reserve the second seat without creating an identity.
         $res1 = $this->actingAs($admin)
             ->post("http://{$host}/users", [
                 'first_name' => 'John',
@@ -149,9 +152,11 @@ final class ModularAddonsTest extends TestCase
                 'role' => $role->id,
             ], ['HTTP_HOST' => $host]);
         $res1->assertSessionHasNoErrors();
-        expect($tenant->users()->count())->toBe(2);
+        expect($tenant->users()->count())->toBe(1);
+        expect(OrganisationInvitation::query()->where('tenant_id', $tenant->id)->where('status', 'pending')->count())->toBe(1);
+        expect(User::query()->where('email', 'john@test.com')->exists())->toBeFalse();
 
-        // Attempt 3rd user -> Blocked by seat limit!
+        // The pending invitation consumes the remaining seat.
         $res3 = $this->actingAs($admin)
             ->post("http://{$host}/users", [
                 'first_name' => 'Max',
@@ -162,7 +167,10 @@ final class ModularAddonsTest extends TestCase
                 'role' => $role->id,
             ], ['HTTP_HOST' => $host]);
         $res3->assertSessionHasErrors('email');
-        expect($tenant->users()->count())->toBe(2);
+        expect(OrganisationInvitation::query()->where('email', 'max@test.com')->exists())->toBeFalse();
+        expect($tenant->users()->count())->toBe(1);
+        expect(OrganisationInvitation::query()->where('tenant_id', $tenant->id)->where('status', 'pending')->count())->toBe(1);
+        expect(User::query()->where('email', 'john@test.com')->exists())->toBeFalse();
 
         // Purchase 2 additional team seats
         TenantAddon::factory()->teamSeat(2)->create([
@@ -173,7 +181,7 @@ final class ModularAddonsTest extends TestCase
         expect($tenant->purchasedTeamSeatsCount())->toBe(2);
         expect($tenant->totalTeamSeatLimit())->toBe(4);
 
-        // Now adding the 3rd user succeeds!
+        // Purchased seats permit another invitation reservation.
         $res4 = $this->actingAs($admin)
             ->post("http://{$host}/users", [
                 'first_name' => 'Max',
@@ -184,7 +192,9 @@ final class ModularAddonsTest extends TestCase
                 'role' => $role->id,
             ], ['HTTP_HOST' => $host]);
         $res4->assertSessionHasNoErrors();
-        expect($tenant->users()->count())->toBe(3);
+        expect($tenant->users()->count())->toBe(1);
+        expect(OrganisationInvitation::query()->where('tenant_id', $tenant->id)->where('status', 'pending')->count())->toBe(2);
+        expect(User::query()->whereIn('email', ['john@test.com', 'max@test.com'])->exists())->toBeFalse();
     }
 
     public function test_addon_service_initializes_checkout_and_fulfills_idempotently(): void

@@ -12,6 +12,7 @@ use App\Models\StoreVariant;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\MerchandiseVisibilityScope;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
@@ -24,7 +25,7 @@ final readonly class MerchandiseCatalog
 
     public function authorize(Tenant $tenant, User $actor): void
     {
-        if (! $this->rollout->baseEnabled($tenant) || (! User::query()->whereKey($actor->id)->where('tenant_id', $tenant->id)->exists() && ! $actor->tenants()->whereKey($tenant->id)->exists())) {
+        if (! $this->rollout->baseEnabled($tenant) || ! app(OrganisationMemberships::class)->isActive($actor, $tenant)) {
             throw new AuthorizationException;
         }
         $team = getPermissionsTeamId();

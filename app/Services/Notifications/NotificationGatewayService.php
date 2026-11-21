@@ -12,6 +12,8 @@ use App\Models\EventNotificationLog;
 use App\Models\EventNotificationRule;
 use App\Models\Tenant;
 use App\Models\TenantNotificationSetting;
+use App\Models\User;
+use App\Services\Events\EventStaffScope;
 use App\Services\Sms\SmsAllowance;
 use App\Services\Sms\SmsMessage;
 use App\Services\Sms\SmsResult;
@@ -92,6 +94,10 @@ final class NotificationGatewayService
             return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'Unsupported notification channel.');
         }
 
+        if (! $this->staffDeliveryAllowed($delivery)) {
+            return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'Staff recipient is no longer authorized.');
+        }
+
         $settings = TenantNotificationSetting::forTenant($delivery->tenant_id);
 
         if (! $settings->canSend($delivery->channel)) {
@@ -160,7 +166,7 @@ final class NotificationGatewayService
     /**
      * Dispatch notification to a recipient across requested channels with quota and anti-abuse checks.
      *
-     * @param  array{name?: ?string, email?: ?string, phone?: ?string}  $recipient
+     * @param  array{name?: ?string, email?: ?string, phone?: ?string, staff_user_id?: int|string|null, recorded_email?: ?string}  $recipient
      * @param  array<string>  $channels
      * @param  array{subject: string, body: string, action_url?: ?string, action_label?: ?string}  $payload
      * @return array<string, array{status: string, message: string, cost: int, retry_after?: int}>
@@ -172,6 +178,38 @@ final class NotificationGatewayService
         array $channels,
         array $payload
     ): array {
+        $ruleId = $rule === null ? null : $rule->id;
+        $organizerRule = $rule !== null && $rule->target_role === EventNotificationRule::ROLE_ORGANIZER;
+        if (array_key_exists('staff_user_id', $recipient) || array_key_exists('recorded_email', $recipient) || $organizerRule) {
+            $results = [];
+            foreach ($channels as $channel) {
+                $delivery = EventNotificationLog::create([
+                    'tenant_id' => $event->tenant_id,
+                    'event_id' => $event->id,
+                    'rule_id' => $ruleId,
+                    'recipient_name' => $recipient['name'] ?? 'Conference Participant',
+                    'recipient_email' => $recipient['email'] ?? null,
+                    'recipient_phone' => $recipient['phone'] ?? null,
+                    'channel' => $channel,
+                    'status' => EventNotificationLog::STATUS_PENDING,
+                    'subject' => $payload['subject'],
+                    'message' => $payload['body'],
+                    'cost_billed' => 0,
+                    'metadata' => array_intersect_key($recipient, array_flip(['staff_user_id', 'recorded_email'])) + [
+                        'action_url' => $payload['action_url'] ?? null,
+                        'action_label' => $payload['action_label'] ?? null,
+                    ],
+                ]);
+                $results[$channel] = $this->deliver($delivery);
+                if (isset($results[$channel]['retry_after'])) {
+                    SendEventNotificationDeliveryJob::dispatch($delivery->id, $delivery->tenant_id)
+                        ->delay(now()->addSeconds($results[$channel]['retry_after']));
+                }
+            }
+
+            return $results;
+        }
+
         $settings = TenantNotificationSetting::forTenant($event->tenant_id);
         $results = [];
 
@@ -408,6 +446,12 @@ final class NotificationGatewayService
 
             $delivery->forceFill(['attempts' => $delivery->attempts + 1, 'last_attempted_at' => now()])->save();
 
+            if (! $this->staffDeliveryAllowed($delivery)) {
+                $results[$id] = $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'Staff recipient is no longer authorized.');
+
+                continue;
+            }
+
             if (empty($delivery->recipient_phone)) {
                 $results[$id] = $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'No phone number available for recipient.');
 
@@ -514,6 +558,35 @@ final class NotificationGatewayService
         }
 
         return ['results' => $results, 'retry_after' => $retryAfter];
+    }
+
+    private function staffDeliveryAllowed(EventNotificationLog $delivery): bool
+    {
+        $metadata = $delivery->metadata ?? [];
+        $rule = $delivery->rule_id === null ? null : EventNotificationRule::withoutGlobalScopes()->find($delivery->rule_id);
+        if (! array_key_exists('staff_user_id', $metadata) && ! array_key_exists('recorded_email', $metadata)
+            && $rule?->target_role !== EventNotificationRule::ROLE_ORGANIZER) {
+            return true;
+        }
+
+        $staffId = $metadata['staff_user_id'] ?? null;
+        $email = $metadata['recorded_email'] ?? null;
+        if ((! is_int($staffId) && ! is_string($staffId))
+            || filter_var($staffId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false
+            || ! is_string($email) || $email === ''
+            || $email !== $delivery->recipient_email) {
+            return false;
+        }
+
+        $user = User::withoutGlobalScopes()->find($staffId);
+        $event = Event::withoutGlobalScopes()->find($delivery->event_id);
+
+        return $user instanceof User && $event instanceof Event
+            && (string) $event->tenant_id === (string) $delivery->tenant_id
+            && $user->email === $email
+            && ($user->status === null || $user->status === User::STATUS_ACTIVE)
+            && $user->tenants()->whereKey($event->tenant_id)->exists()
+            && EventStaffScope::canListenToEvent($user, $event);
     }
 
     /**

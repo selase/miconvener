@@ -10,6 +10,7 @@ use App\Models\GivingFund;
 use App\Models\GivingGift;
 use App\Models\Member;
 use App\Models\User;
+use App\Services\Tenancy\OrganisationMemberships;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -125,7 +126,7 @@ final class GivingCash
 
     private function authorize(GivingFund $fund, User $actor): void
     {
-        abort_unless($actor->tenant_id === $fund->tenant_id || $fund->tenant->users()->where('users.id', $actor->id)->exists(), 403);
+        abort_unless(app(OrganisationMemberships::class)->isActive($actor, $fund->tenant), 403);
         Gate::forUser($actor)->authorize('manage giving');
         Gate::forUser($actor)->authorize('read finance');
     }

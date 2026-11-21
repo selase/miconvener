@@ -33,7 +33,7 @@ it('gates seller orders and finance separately and denies another organisation',
     setPermissionsTeamId($tenant->id);
     App\Models\Permission::query()->firstOrCreate(['name' => 'manage store orders', 'guard_name' => 'web'], ['category' => 'store']);
     $actor->givePermissionTo('manage store orders');
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $this->actingAs($actor)->getJson('http://'.$host.'/store/orders', ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('orders.data.0.id', $order->id);
     $this->getJson('http://'.$host.'/store/finance', ['HTTP_HOST' => $host])->assertForbidden();
@@ -55,7 +55,7 @@ it('lets authorised finance staff reconcile an original payment without creating
     setPermissionsTeamId($tenant->id);
     App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
     $actor->givePermissionTo('manage store finance');
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $data = ['id' => 987, ...StoreCheckoutScenario::evidence($attempt)];
     Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/verify/*' => Illuminate\Support\Facades\Http::response(['data' => $data])]);
@@ -66,7 +66,7 @@ it('lets authorised finance staff reconcile an original payment without creating
 
 it('shares Store discovery only for enabled catalog or retained history', function (): void {
     [$tenant, $variant, $actor, $session] = StoreCheckoutScenario::make();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $request = Illuminate\Http\Request::create('http://'.$host.'/store/orders');
     $request->setLaravelSession(app('session.store'));

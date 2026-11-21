@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Scopes\TenantScope;
 use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Gate;
@@ -142,7 +143,7 @@ final class MemberAccess
 
     public function authorizeStaff(Tenant $tenant, User $actor): void
     {
-        if ($actor->tenant_id !== $tenant->id && ! $tenant->users()->where('users.id', $actor->id)->exists()) {
+        if (! app(OrganisationMemberships::class)->isActive($actor, $tenant)) {
             throw new AuthorizationException;
         }
         $previousTeam = getPermissionsTeamId();

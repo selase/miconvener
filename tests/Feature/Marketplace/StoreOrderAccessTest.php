@@ -49,6 +49,7 @@ it('bounds staff permissions to both the current seller and its actual membershi
     $order = StoreOrder::factory()->create();
     $tenant = $order->tenant;
     $actor = User::factory()->create(['tenant_id' => $tenant->id]);
+    $actor->tenants()->attach($tenant->id);
     setPermissionsTeamId($tenant->id);
     Permission::query()->firstOrCreate(['name' => 'manage store catalog', 'guard_name' => 'web'], ['category' => 'store']);
     $actor->givePermissionTo('manage store catalog');
