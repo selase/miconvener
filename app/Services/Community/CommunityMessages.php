@@ -22,6 +22,7 @@ use App\Services\Notifications\NotificationGatewayService;
 use App\Services\Sms\SmsAllowance;
 use App\Services\Sms\SmsMessage;
 use App\Services\Sms\SmsResult;
+use App\Services\Tenancy\OrganisationMemberships;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -151,7 +152,7 @@ final class CommunityMessages
     public function withdraw(Tenant $tenant, User $actor, CommunityMessage $message, string $reason = 'Withdrawn by organisation'): void
     {
         abort_unless($tenant->communityEnabled() && $tenant->status === TenantStatusEnum::ACTIVE && $message->tenant_id === $tenant->id, 404);
-        abort_unless($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists(), 403);
+        abort_unless(app(OrganisationMemberships::class)->isActive($actor, $tenant), 403);
         $team = getPermissionsTeamId();
         try {
             setPermissionsTeamId($tenant->id);
@@ -325,7 +326,7 @@ final class CommunityMessages
     public function authorize(Tenant $tenant, User $actor, bool $followingEvent = false, bool $readOnly = false): void
     {
         abort_unless($followingEvent ? $tenant->followingEnabled() : ($tenant->communityEnabled() && ($tenant->featureEnabled('community_messages') || ($readOnly && app(InboxRollout::class)->enabled($tenant)))), 404);
-        abort_unless($tenant->status === TenantStatusEnum::ACTIVE && ($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists()), 403);
+        abort_unless($tenant->status === TenantStatusEnum::ACTIVE && app(OrganisationMemberships::class)->isActive($actor, $tenant), 403);
         $team = getPermissionsTeamId();
         try {
             setPermissionsTeamId($tenant->id);

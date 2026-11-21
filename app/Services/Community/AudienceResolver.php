@@ -9,6 +9,7 @@ use App\Models\CommunityAudienceAddress;
 use App\Models\CommunityGroup;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -96,7 +97,7 @@ final class AudienceResolver
             }
         }
         if ($kind === 'arrears') {
-            abort_unless($actor !== null && ($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists()), 403);
+            abort_unless($actor !== null && app(OrganisationMemberships::class)->isActive($actor, $tenant), 403);
             $team = getPermissionsTeamId();
             try {
                 setPermissionsTeamId($tenant->id);

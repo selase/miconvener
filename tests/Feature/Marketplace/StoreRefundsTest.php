@@ -124,7 +124,7 @@ it('cancels an uncollected free order with one stock reversal and no gateway or 
 it('refuses partial amounts at the tenant refund boundary and denies foreign orders', function (): void {
     [$tenant, , $actor, , $order] = StoreCheckoutScenario::paid();
     grantStoreFinance($actor, $tenant->id);
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $this->actingAs($actor)->postJson('http://'.$host.'/store/orders/'.$order->id.'/refunds', ['operation_key' => (string) Str::uuid(), 'reason' => 'Return', 'amount' => 1], ['HTTP_HOST' => $host])
         ->assertUnprocessable()->assertJsonValidationErrors('amount');
@@ -194,7 +194,7 @@ it('refunds an extra capture without returning already consumed merchandise to s
 it('exposes full refund recovery and free cancellation through protected tenant endpoints', function (): void {
     [$tenant, $variant, $actor, $session, $order] = StoreCheckoutScenario::paid();
     grantStoreFinance($actor, $tenant->id);
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $base = 'http://'.$host.'/store';
     Http::fake();

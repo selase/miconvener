@@ -2,88 +2,48 @@
 
 declare(strict_types=1);
 
-use App\Enum\TenantStatusEnum;
-use App\Models\Permission;
+use App\Models\OrganisationInvitation;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
-use Illuminate\Support\Facades\Gate;
+use App\Services\Tenancy\OrganisationInvitations;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 
-test('tenant administrator cannot assign superadmin role', function () {
-    // Setup roles
-    $superadminRole = Role::firstOrCreate(['name' => 'Superadmin', 'guard_name' => 'web']);
-    $orgAdminRole = Role::firstOrCreate(['name' => 'Org Admin', 'guard_name' => 'web']);
-    $orgMemberRole = Role::firstOrCreate(['name' => 'Org Member', 'guard_name' => 'web']);
-
-    // Setup tenant and its admin
-    $tenant = Tenant::create([
-        'name' => 'Test Tenant',
-        'email' => 'admin@test.com',
-        'phone_number' => '1234567890',
-        'slug' => 'test-tenant',
-        'status' => TenantStatusEnum::ACTIVE,
-    ]);
-
-    $tenantAdmin = User::factory()->create(['email' => 't-admin@test.com']);
-    $tenantAdmin->assignRole($orgAdminRole);
-    $tenantAdmin->tenants()->attach($tenant->id);
-
-    // Give permission to create user (otherwise it's 403 anyway)
-    // Using the Gate::before bypass won't work for tenant admin as they aren't Superadmin
-    // We need to give them 'create user' permission
-    $permission = Permission::firstOrCreate(['name' => 'create user', 'guard_name' => 'web', 'category' => 'user']);
-    $orgAdminRole->givePermissionTo($permission);
-
-    // Attempt to create a user with Superadmin role
-    $response = $this->actingAs($tenantAdmin)->post(route('users.store'), [
-        'first_name' => 'John',
-        'last_name' => 'Doe',
-        'email' => 'john@doe.com',
-        'phone_no' => '+233201234567', // Valid GH number for validation
-        'role' => $superadminRole->id,
-        'roles' => [$superadminRole->id],
-        'status' => 'active',
-        'tenant_id' => $tenant->id,
-    ]);
-
-    // Validation fails with custom message
-    $response->assertStatus(302); // Redirect back on validation error
-    $response->assertSessionHasErrors(['roles']);
+beforeEach(function (): void {
+    $this->seed(Database\Seeders\RoleSeeder::class);
+    $this->seed(Database\Seeders\PermissionsSeeder::class);
+    Mail::fake();
+    $this->tenant = Tenant::factory()->create();
+    $this->admin = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($this->admin->id);
+    setPermissionsTeamId($this->tenant->id);
+    $this->admin->assignRole('Org Admin');
 });
 
-test('tenant administrator can assign org member role', function () {
-    $orgAdminRole = Role::firstOrCreate(['name' => 'Org Admin', 'guard_name' => 'web']);
-    $orgMemberRole = Role::firstOrCreate(['name' => 'Org Member', 'guard_name' => 'web']);
+test('tenant administrator cannot assign superadmin role through central or tenant routes', function (): void {
+    $role = Role::query()->whereNull('tenant_id')->where('name', 'Superadmin')->firstOrFail();
+    $this->actingAs($this->admin)->post(route('users.store'), [
+        'first_name' => 'John', 'last_name' => 'Doe', 'email' => 'john@doe.com',
+        'phone_no' => '+233201234567', 'role' => $role->id, 'roles' => [$role->id],
+        'status' => 'active', 'tenant_id' => $this->tenant->id,
+    ])->assertForbidden();
+    $this->post($this->tenant->url('/users'), ['email' => 'john@doe.com', 'role' => $role->id])
+        ->assertSessionHasErrors('role');
+    expect(User::query()->where('email', 'john@doe.com')->exists())->toBeFalse()
+        ->and(OrganisationInvitation::query()->count())->toBe(0);
+});
 
-    $tenant = Tenant::create([
-        'name' => 'Test Tenant 2',
-        'email' => 'admin2@test.com',
-        'phone_number' => '1234567890',
-        'slug' => 'test-tenant-2',
-        'status' => TenantStatusEnum::ACTIVE,
-    ]);
-
-    $tenantAdmin = User::factory()->create(['email' => 't-admin2@test.com']);
-    $tenantAdmin->assignRole($orgAdminRole);
-    $tenantAdmin->tenants()->attach($tenant->id);
-
-    $permission = Permission::firstOrCreate(['name' => 'create user', 'guard_name' => 'web', 'category' => 'user']);
-    $orgAdminRole->givePermissionTo($permission);
-
-    $response = $this->actingAs($tenantAdmin)->post(route('users.store'), [
-        'first_name' => 'Jane',
-        'last_name' => 'Doe',
-        'email' => 'jane@doe.com',
-        'phone_no' => '+233201234567',
-        'role' => $orgMemberRole->id,
-        'roles' => [$orgMemberRole->id],
-        'status' => 'active',
-        'tenant_id' => $tenant->id,
-    ]);
-
-    $response->assertStatus(200);
-    $this->assertDatabaseHas('users', ['email' => 'jane@doe.com']);
-
-    $user = User::where('email', 'jane@doe.com')->first();
-    expect($user->hasRole('Org Member'))->toBeTrue();
+test('tenant administrator can assign an organisation member role through an accepted invitation', function (): void {
+    $role = Role::create(['name' => 'Org Member', 'guard_name' => 'web', 'tenant_id' => $this->tenant->id]);
+    $this->actingAs($this->admin)->post($this->tenant->url('/users'), ['email' => 'jane@doe.com', 'role' => $role->id])
+        ->assertRedirect();
+    expect(User::query()->where('email', 'jane@doe.com')->exists())->toBeFalse();
+    $invitation = OrganisationInvitation::query()->sole();
+    expect($invitation->role_id)->toBe($role->id)->and($invitation->tenant_id)->toBe($this->tenant->id);
+    $member = User::factory()->create(['email' => 'jane@doe.com']);
+    app(OrganisationInvitations::class)->accept(Crypt::decryptString($invitation->delivery_payload), $member);
+    setPermissionsTeamId($this->tenant->id);
+    expect($member->fresh()->tenants()->whereKey($this->tenant->id)->exists())->toBeTrue()
+        ->and($member->fresh()->hasRole('Org Member'))->toBeTrue();
 });

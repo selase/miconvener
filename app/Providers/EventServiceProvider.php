@@ -31,6 +31,7 @@ final class EventServiceProvider extends ServiceProvider
         ],
 
         Login::class => [
+            \App\Listeners\CaptureStaffSecurityVersion::class,
             UpdateLastLoginIp::class,
             LoginLogs::class,
             SetTenantIdInSession::class,

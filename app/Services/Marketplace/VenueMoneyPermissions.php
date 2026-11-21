@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Marketplace;
 
 use App\Models\User;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 
@@ -23,7 +24,8 @@ final class VenueMoneyPermissions
 
     public function allows(User $actor, string $tenantId, string $permission): bool
     {
-        $member = User::query()->whereKey($actor->id)->where('tenant_id', $tenantId)->exists() || $actor->tenants()->whereKey($tenantId)->exists();
+        $tenant = \App\Models\Tenant::query()->find($tenantId);
+        $member = $tenant !== null && app(OrganisationMemberships::class)->isActive($actor, $tenant);
         if (! $member) {
             return false;
         }

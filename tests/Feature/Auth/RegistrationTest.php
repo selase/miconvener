@@ -162,3 +162,14 @@ test('registration requires all fields', function () {
         ->post('/register', [])
         ->assertSessionHasErrors(['first_name', 'last_name', 'organization_name', 'email', 'password', 'plan']);
 });
+
+test('failed owner assignment never activates an ownerless new organisation', function (): void {
+    Illuminate\Support\Facades\Mail::fake();
+    App\Models\Role::query()->where('name', 'Org Superadmin')->delete();
+    $this->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)->post('/register', [
+        'first_name' => 'Ada', 'last_name' => 'Osei', 'organization_name' => 'Incomplete organisation',
+        'email' => 'incomplete@example.org', 'password' => 'Password1!', 'password_confirmation' => 'Password1!',
+        'plan' => 'free', 'slug' => 'incomplete-org',
+    ])->assertNotFound();
+    expect(App\Models\Tenant::query()->where('slug', 'incomplete-org')->firstOrFail()->status)->toBe(App\Enum\TenantStatusEnum::DEACTIVATED);
+});

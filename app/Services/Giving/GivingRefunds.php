@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Finance\CommercialTerms;
 use App\Services\Finance\LedgerService;
 use App\Services\Operations\OperationalSignals;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -244,7 +245,7 @@ final class GivingRefunds
 
     private function authorize(GivingSource $source, User $actor): void
     {
-        abort_unless($actor->tenant_id === $source->fund->tenant_id || $source->fund->tenant->users()->where('users.id', $actor->id)->exists(), 403);
+        abort_unless(app(OrganisationMemberships::class)->isActive($actor, $source->fund->tenant), 403);
         Gate::forUser($actor)->authorize('read finance');
         Gate::forUser($actor)->authorize('process refunds');
     }

@@ -6,10 +6,7 @@ import TeamMemberForm from './Form';
 
 export default function TeamFormModal({ mode, onClose, user, roles, statuses, events = [] }) {
     const { data, setData, post, put, processing, errors } = useForm({
-        first_name: user?.first_name ?? '',
-        last_name: user?.last_name ?? '',
         email: user?.email ?? '',
-        phone_no: user?.phone_no ?? '',
         role: user?.role_id ?? '',
         status: user?.status ?? statuses[0] ?? 'active',
         event_ids: user?.event_ids ?? [],
@@ -39,11 +36,12 @@ export default function TeamFormModal({ mode, onClose, user, roles, statuses, ev
         <Modal
             open
             onClose={onClose}
-            title={mode === 'edit' ? 'Edit team member' : 'Add team member'}
+            title={mode === 'edit' ? 'Edit team member' : 'Invite team member'}
             className="max-w-2xl"
         >
             <form onSubmit={submit} className="space-y-6">
                 <TeamMemberForm
+                    editing={mode === 'edit'}
                     data={data}
                     setData={setData}
                     errors={errors}
@@ -92,12 +90,13 @@ export default function TeamFormModal({ mode, onClose, user, roles, statuses, ev
 
                 {mode === 'create' && (
                     <p className="text-sm text-ink-secondary">
-                        We&apos;ll email this person a temporary password and sign-in instructions.
+                        We&apos;ll email a secure invitation. Their existing password and other
+                        organisations stay unchanged.
                     </p>
                 )}
 
                 <Button type="submit" disabled={processing}>
-                    {mode === 'edit' ? 'Save changes' : 'Add team member'}
+                    {mode === 'edit' ? 'Save changes' : 'Invite team member'}
                 </Button>
             </form>
         </Modal>

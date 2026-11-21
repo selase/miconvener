@@ -180,11 +180,15 @@ test('the template-era address sends people to the real homepage', function (): 
 test('the commission cap each plan advertises is the cap billing applies', function (): void {
     Artisan::call('db:seed', ['--class' => EventPackageSeeder::class]);
 
-    foreach (config('product-page.plans') as $plan) {
-        $package = Package::query()->where('slug', $plan['slug'])->first();
+    $plans = config('product-page.plans');
+    expect($plans)->not->toBeEmpty();
+    foreach ($plans as $plan) {
+        $package = Package::query()->where('slug', $plan['slug'])->firstOrFail();
         $advertised = collect($plan['features'])->first(fn (string $line): bool => str_contains($line, 'cap)'));
 
-        if ($package === null || $advertised === null) {
+        if ($advertised === null) {
+            expect($package->default_platform_fee_cap_amount)->toBeNull();
+
             continue;
         }
 

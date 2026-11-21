@@ -77,7 +77,7 @@ it('serves the tenant payout lifecycle through protected endpoints and preserves
     setPermissionsTeamId($tenant->id);
     App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
     $actor->givePermissionTo('manage store finance');
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $base = 'http://'.$host.'/store/payouts';
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'type' => TenantPayoutAccount::TYPE_MOBILE_MONEY, 'recipient_code' => 'RCP_HTTP_STORE', 'is_verified' => true]);
@@ -104,7 +104,7 @@ it('retains a commerce payout destination even when its transfer is parked or te
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
     $payout = app(StorePayouts::class)->reserve($tenant, $actor, ['amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid()]);
     $payout->update(['status' => $status]);
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
     $this->actingAs($actor)->deleteJson('http://'.$host.'/payout-accounts/'.$account->id, [], ['HTTP_HOST' => $host])->assertUnprocessable();
     expect($account->fresh())->not->toBeNull();
@@ -155,7 +155,7 @@ it('authorizes the unsent cancellation endpoint and keeps it usable with checkou
     setPermissionsTeamId($tenant->id);
     App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
     $actor->givePermissionTo('manage store finance');
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
     $payout = app(StorePayouts::class)->reserve($tenant, $actor, ['amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid()]);
     $tenant->features()->update(['enabled' => false]);

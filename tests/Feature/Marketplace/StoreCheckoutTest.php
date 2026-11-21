@@ -199,3 +199,15 @@ it('honours an existing stocked quote and buyer history after switching to enqui
         ->and(App\Models\StoreOrder::query()->count())->toBe(1)
         ->and(app(App\Services\Marketplace\StoreOrderAccess::class)->buyer($order, $session))->toBeTrue();
 });
+
+it('settles a payment callback after an unrelated staff credential was revoked', function (): void {
+    [, , , , $order, $attempt] = StoreCheckoutScenario::online();
+    $staff = App\Models\User::factory()->create();
+    App\Models\User::query()->whereKey($staff->id)->increment('security_version');
+    Http::fake(['*api.paystack.co/transaction/verify/*' => Http::response(['data' => ['id' => 989] + StoreCheckoutScenario::evidence($attempt)])]);
+    $this->actingAs($staff)->withSession(proofFor('buyer@example.test') + [App\Http\Middleware\StaffAccountSecurity::SESSION_KEY => ['user_id' => (string) $staff->id, 'version' => 0]])
+        ->get(route('store.checkout.callback', $attempt->reference))->assertRedirect('/my?return_to='.rawurlencode('/my/store-orders/'.$order->id));
+    expect($order->fresh()->state)->toBe('confirmed');
+    $this->assertGuest();
+    $this->getJson(route('store.orders.show', $order->id))->assertOk()->assertJsonPath('order.state', 'confirmed');
+});

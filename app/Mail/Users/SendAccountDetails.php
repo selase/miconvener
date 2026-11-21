@@ -35,13 +35,14 @@ final class SendAccountDetails extends Mailable
      */
     public function build()
     {
+        $this->password = '';
+
         return $this->markdown('emails.users.send-account-details', [
             'user' => $this->user,
             'email' => $this->email,
-            'password' => $this->password,
             'loginUrl' => $this->loginUrl ?? route('login'),
             'tenantName' => $this->tenantName,
         ])
-            ->subject('Congratulations!!!');
+            ->subject('Set up your account');
     }
 }

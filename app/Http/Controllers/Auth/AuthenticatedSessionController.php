@@ -30,16 +30,26 @@ final class AuthenticatedSessionController extends Controller
 
     /**
      * Handle an incoming authentication request.
-     *
-     * @return RedirectResponse
      */
-    public function store(LoginRequest $request)
+    public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
 
         $request->session()->regenerate();
 
-        $tenantId = session('active_tenant_id');
+        $invitation = $request->session()->get('organisation_invitation');
+        if (is_array($invitation) && is_string($invitation['id'] ?? null) && is_string($invitation['token'] ?? null)) {
+            try {
+                $token = \Illuminate\Support\Facades\Crypt::decryptString($invitation['token']);
+            } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+                $token = '';
+            }
+            if ($token !== '') {
+                $request->session()->forget('url.intended');
+
+                return redirect()->to($this->platformUrl('organisation-invitations.resume'));
+            }
+        }
 
         // Capture user before checking roles to avoid unnecessary queries
         $user = $request->user();
@@ -49,30 +59,35 @@ final class AuthenticatedSessionController extends Controller
 
         if ($isSuperAdmin && $request->getHost() === parse_url((string) config('app.url'), PHP_URL_HOST)) {
             $request->session()->forget('active_tenant_id');
-            $tenantId = null;
         }
 
-        if (! $tenantId && ! $isSuperAdmin) {
-            $tenantId = $user?->tenants()->value('tenants.id');
-        }
+        $tenant = app(\App\Services\Tenancy\TenantResolver::class)->resolve($request);
 
-        $tenant = $tenantId ? Tenant::query()->find($tenantId) : null;
+        if ($tenant === null && ! $isSuperAdmin) {
+            $tenant = $user?->tenants()->get()->first(fn (Tenant $candidate): bool => app(\App\Services\Tenancy\OrganisationMemberships::class)->isActive($user, $candidate));
+        }
 
         $subdomain = $tenant?->slug;
 
         if ($tenant && $subdomain !== null) {
-            $tenantDomain = str_replace('://', '://'.$subdomain.'.', config('app.url'));
+            $request->session()->put('active_tenant_id', $tenant->id);
 
-            return redirect()->intended($tenantDomain.RouteServiceProvider::HOME);
+            return $this->redirectWithin($request, $tenant->url(RouteServiceProvider::HOME));
         }
 
         // Platform staff who are not superadmins (finance, marketing) belong
         // to no organisation, so the generic dashboard is not theirs.
         if (! $isSuperAdmin && $landing = app(\App\Services\Platform\PlatformStaff::class)->landingRouteFor($user)) {
-            return redirect()->intended(route($landing));
+            return $this->redirectWithin($request, $this->platformUrl($landing));
         }
 
-        return redirect()->intended(RouteServiceProvider::HOME);
+        if ($isSuperAdmin) {
+            return $this->redirectWithin($request, mb_rtrim((string) config('app.url'), '/').RouteServiceProvider::HOME);
+        }
+
+        $request->session()->forget('url.intended');
+
+        return redirect()->to($this->platformUrl('workspaces.index'));
     }
 
     /**
@@ -87,5 +102,27 @@ final class AuthenticatedSessionController extends Controller
         $request->session()->regenerateToken();
 
         return Inertia::location(url('/login'));
+    }
+
+    private function platformUrl(string $route): string
+    {
+        return mb_rtrim((string) config('app.url'), '/').route($route, [], false);
+    }
+
+    private function redirectWithin(Request $request, string $destination): RedirectResponse
+    {
+        $intended = $request->session()->get('url.intended');
+        if (is_string($intended)) {
+            $expected = parse_url($destination);
+            $actual = parse_url($intended);
+            if (! is_array($actual) || isset($actual['user']) || isset($actual['pass'])
+                || ($actual['scheme'] ?? null) !== ($expected['scheme'] ?? null)
+                || ($actual['host'] ?? null) !== ($expected['host'] ?? null)
+                || ($actual['port'] ?? null) !== ($expected['port'] ?? null)) {
+                $request->session()->forget('url.intended');
+            }
+        }
+
+        return redirect()->intended($destination);
     }
 }

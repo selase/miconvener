@@ -33,6 +33,10 @@ final class PasswordResetLinkController extends Controller
      */
     public function store(Request $request)
     {
+        $email = $request->input('email');
+        if (is_string($email)) {
+            $request->merge(['email' => mb_strtolower(mb_trim($email))]);
+        }
         $request->validate([
             'email' => ['required', 'email'],
         ]);

@@ -31,6 +31,7 @@ final class StoreCheckoutScenario
         StoreCommercialAgreement::factory()->create(['shop_id' => $variant->shop_id, 'tenant_id' => $tenant->id,
             'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
         $actor = User::factory()->create(['tenant_id' => $tenant->id]);
+        $actor->tenants()->attach($tenant->id);
         setPermissionsTeamId($tenant->id);
         Permission::query()->firstOrCreate(['name' => 'manage store catalog', 'guard_name' => 'web'], ['category' => 'store']);
         $actor->givePermissionTo('manage store catalog');

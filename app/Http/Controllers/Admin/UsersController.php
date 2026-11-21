@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Libraries\Helper;
-use App\Mail\Users\SendAccountDetails;
+use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Contracts\View\Factory;
@@ -18,12 +18,17 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
-use Spatie\Permission\Models\Role;
+use Illuminate\Support\Str;
 
 final class UsersController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('can:access-superadmin-dashboard');
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -31,6 +36,7 @@ final class UsersController extends Controller
      */
     public function index(): Factory|View
     {
+        $this->authorize('access-superadmin-dashboard');
         $this->authorize('read user');
 
         $breadcrumbs = [
@@ -52,6 +58,7 @@ final class UsersController extends Controller
 
     public function getAllUsers(Request $request): JsonResponse
     {
+        $this->authorize('access-superadmin-dashboard');
         $this->authorize('read user');
 
         $columns = [
@@ -130,7 +137,7 @@ final class UsersController extends Controller
                                 </a>';
 
                     $action .= '<a href="javascript:void(0)" onclick="resendAccountPassword(\''.$user->uuid.'\')" class="btn btn-icon btn-active-light-info w-30px h-30px me-3"
-                                    data-kt-permissions-table-filter="delete_row" data-toggle="tooltip" data-placement="top"  title="Resend Account Password">
+                                    data-kt-permissions-table-filter="delete_row" data-toggle="tooltip" data-placement="top"  title="Send account recovery link">
                                     <i class="fas fa-key fs-4"></i>
                                 </a>';
                 }
@@ -197,6 +204,8 @@ final class UsersController extends Controller
      */
     public function create(): void
     {
+        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('create user');
         //
     }
 
@@ -208,43 +217,36 @@ final class UsersController extends Controller
      */
     public function store(StoreUserRequest $request)
     {
+        $this->authorize('access-superadmin-dashboard');
         $this->authorize('create user');
 
         $validatedData = $request->validated();
+        $this->validateRoleScope($validatedData['roles'], $request->input('tenant_id') ?: null);
 
-        $password = Helper::generateRandomPassword();
-
-        $user = User::query()->create([
-            'first_name' => $validatedData['first_name'],
-            'last_name' => $validatedData['last_name'],
-            'email' => $validatedData['email'],
-            'phone_no' => $validatedData['phone_no'],
-            'password' => bcrypt($password),
-            'status' => $validatedData['status'],
-            'photo' => $request->hasFile('photo') ? Helper::processUploadedFile($request, 'photo', Date::now()->format('YmdHis'), '/users/profile', User::uploadDisk()) : null,
-            'tenant_id' => $request->tenant_id ?? null,
-        ]);
-
-        if (! empty($request->tenant_id)) {
-            setPermissionsTeamId($request->tenant_id);
-            $user->tenants()->sync([$request->tenant_id]);
+        if ($tenantId = $request->input('tenant_id')) {
+            abort_unless(count($validatedData['roles']) === 1, 422, 'Choose one organisation role.');
+            app(\App\Services\Tenancy\OrganisationInvitations::class)->invite(
+                Tenant::query()->findOrFail($tenantId), $request->user(), $validatedData['email'],
+                Role::query()->findOrFail($validatedData['roles'][0]), []
+            );
+        } else {
+            \Illuminate\Support\Facades\DB::connection('landlord')->transaction(function () use ($validatedData, $request): void {
+                $user = User::query()->create([
+                    'first_name' => $validatedData['first_name'], 'last_name' => $validatedData['last_name'],
+                    'email' => $validatedData['email'], 'phone_no' => $validatedData['phone_no'],
+                    'password' => bcrypt(Str::random(64)), 'status' => $validatedData['status'],
+                    'photo' => $request->hasFile('photo') ? Helper::processUploadedFile($request, 'photo', Date::now()->format('YmdHis'), '/users/profile', User::uploadDisk()) : null,
+                ]);
+                $previous = getPermissionsTeamId();
+                try {
+                    setPermissionsTeamId(null);
+                    $user->syncRoles($validatedData['roles']);
+                } finally {
+                    setPermissionsTeamId($previous);
+                }
+                \Illuminate\Support\Facades\DB::connection('landlord')->afterCommit(fn () => Password::sendResetLink(['email' => $user->email]));
+            });
         }
-
-        // Assign user to role(s)
-        $user->syncRoles($validatedData['roles']);
-
-        $tenant = ! empty($request->tenant_id) ? Tenant::find($request->tenant_id) : null;
-        $loginUrl = $tenant ? $tenant->url('/login') : route('login');
-
-        // Send email to user
-        Mail::to($user->email)
-            ->queue(new SendAccountDetails(
-                $user->first_name,
-                $user->email,
-                $password,
-                $loginUrl,
-                $tenant?->name
-            ));
 
         return response()->json([
             'status' => 'success',
@@ -259,6 +261,7 @@ final class UsersController extends Controller
      */
     public function show(string $id): Factory|View
     {
+        $this->authorize('access-superadmin-dashboard');
         $this->authorize('read user');
 
         $breadcrumbs = [
@@ -274,7 +277,12 @@ final class UsersController extends Controller
 
     public function edit(User $user)
     {
-        $userRoles = $user->roles()->pluck('id')->toArray();
+        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('update user');
+        $userRoles = \Illuminate\Support\Facades\DB::connection('landlord')->table(config('permission.table_names.model_has_roles'))
+            ->where('model_type', User::class)->where('model_id', (string) $user->id)
+            ->when($user->tenant_id, fn ($query, $id) => $query->where('tenant_id', $id), fn ($query) => $query->whereNull('tenant_id'))
+            ->pluck('role_id')->all();
 
         return response()->json([
             'status' => 'success',
@@ -291,37 +299,81 @@ final class UsersController extends Controller
      */
     public function update(UpdateUserRequest $request, User $user)
     {
+        $this->authorize('access-superadmin-dashboard');
         $this->authorize('update user');
 
         $validatedData = $request->validated();
-
-        $user->first_name = $validatedData['first_name'];
-        $user->last_name = $validatedData['last_name'];
-        $user->email = $validatedData['email'];
-        $user->phone_no = $validatedData['phone_no'];
-        $user->status = $validatedData['status'];
-
-        if ($request->hasFile('photo')) {
-            // delete old photo
-            if ($user->photo) {
-                Helper::deleteFile($user->photo, User::uploadDisk());
+        $user->getConnection()->transaction(function () use ($request, $user, $validatedData): void {
+            $tenantIds = $user->allTenants()->pluck('tenants.id')->sort()->values()->all();
+            $tenants = Tenant::query()->whereIn('id', $tenantIds)->orderBy('id')->lockForUpdate()->get();
+            $user = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            abort_unless($tenantIds === $user->allTenants()->pluck('tenants.id')->sort()->values()->all(), 409, 'Organisation membership changed. Review this account again.');
+            $suspending = $validatedData['status'] === User::STATUS_INACTIVE && $user->status !== User::STATUS_INACTIVE;
+            if ($suspending) {
+                foreach ($tenants as $tenant) {
+                    if ($tenant->status !== \App\Enum\TenantStatusEnum::ACTIVE) {
+                        continue;
+                    }
+                    $hasOtherOwner = app(\App\Services\Tenancy\OrganisationMemberships::class)->inTenant($tenant, [], fn (): bool => $tenant->users()->with('roles')
+                        ->where('users.id', '!=', $user->id)->where(fn ($query) => $query->where('users.status', User::STATUS_ACTIVE)->orWhereNull('users.status'))
+                        ->get()->contains(fn (User $owner): bool => $owner->hasRole('Org Superadmin')));
+                    abort_unless($hasOtherOwner, 403, 'Assign another active owner or pause each affected organisation before suspending this account.');
+                }
+            }
+            $this->validateRoleScope($validatedData['roles'], $user->tenant_id);
+            $hasMembershipHistory = $user->tenant_id !== null || $user->allTenants()->exists();
+            if ($hasMembershipHistory) {
+                $held = \Illuminate\Support\Facades\DB::connection('landlord')->table(config('permission.table_names.model_has_roles'))
+                    ->where('model_type', User::class)->where('model_id', (string) $user->id)
+                    ->when($user->tenant_id, fn ($query, $id) => $query->where('tenant_id', $id), fn ($query) => $query->whereNull('tenant_id'))
+                    ->pluck('role_id')->map(fn ($id): string => (string) $id)->sort()->values()->all();
+                $requested = array_map('strval', $validatedData['roles']);
+                sort($requested);
+                abort_unless($held === $requested, 403, 'Manage organisation roles through that organisation’s Team page.');
             }
 
-            $prefix = Date::now()->format('YmdHis');
-            $photoPath = Helper::processUploadedFile($request, 'photo', $prefix, '/users/profile', User::uploadDisk());
-            $user->photo = $photoPath;
-        }
+            $emailChanged = $validatedData['email'] !== $user->email;
+            abort_if($emailChanged && ($user->tenant_id !== null || $user->allTenants()->exists()), 403, 'Email changes for organisation members require explicit account recovery.');
 
-        if ($user->tenant_id) {
-            setPermissionsTeamId($user->tenant_id);
-        }
+            if ($emailChanged || $suspending) {
+                Password::deleteToken($user);
+                if ($emailChanged) {
+                    $user->email_verified_at = null;
+                }
+                $user->security_version = (int) $user->security_version + 1;
+                $user->remember_token = Str::random(60);
+                $user->tokens()->delete();
+            }
 
-        $user->save();
+            $user->first_name = $validatedData['first_name'];
+            $user->last_name = $validatedData['last_name'];
+            $user->email = $validatedData['email'];
+            $user->phone_no = $validatedData['phone_no'];
+            $user->status = $validatedData['status'];
 
-        // update user role(s)
-        if (isset($validatedData['roles'])) {
-            $user->syncRoles($validatedData['roles']);
-        }
+            if ($request->hasFile('photo')) {
+                // delete old photo
+                if ($user->photo) {
+                    Helper::deleteFile($user->photo, User::uploadDisk());
+                }
+
+                $prefix = Date::now()->format('YmdHis');
+                $photoPath = Helper::processUploadedFile($request, 'photo', $prefix, '/users/profile', User::uploadDisk());
+                $user->photo = $photoPath;
+            }
+
+            $user->save();
+
+            if (! $hasMembershipHistory) {
+                $previous = getPermissionsTeamId();
+                try {
+                    setPermissionsTeamId(null);
+                    $user->syncRoles($validatedData['roles']);
+                } finally {
+                    setPermissionsTeamId($previous);
+                }
+            }
+        });
 
         return response()->json([
             'status' => 'success',
@@ -336,10 +388,31 @@ final class UsersController extends Controller
      */
     public function destroy(string $id)
     {
-        User::findByUuid($id)->delete();
+        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('delete user');
+        (new User)->getConnection()->transaction(function () use ($id): void {
+            $user = User::query()->where('uuid', $id)->lockForUpdate()->firstOrFail();
+            abort_if($user->tenant_id !== null || $user->allTenants()->exists(), 403, 'Remove organisation memberships before deleting this identity.');
+            abort_if(\App\Models\BadgeTemplateLicenceEvent::query()->where('actor_id', $user->id)->exists()
+                || \App\Models\BadgeTemplateUse::query()->where('actor_id', $user->id)->exists()
+                || \App\Models\BadgeTemplatePurchase::query()->where('terms_snapshot->requested_by', (string) $user->id)->exists(), 403, 'Retain this identity for its paid template audit history.');
+            $user->delete();
+        });
 
         return response()->json([
             'status' => __('locale.messages.deleted', ['name' => 'User']),
         ]);
+    }
+
+    /** @param array<int, mixed> $roles */
+    private function validateRoleScope(array $roles, ?string $tenantId): void
+    {
+        foreach ($roles as $roleId) {
+            $role = Role::query()->whereKey($roleId)->first();
+            $tenantSafe = $role && ($role->tenant_id === $tenantId || ($role->tenant_id === null && in_array($role->name, ['Org Superadmin', 'Org Admin', 'Event Staff', 'Event Organiser'], true)));
+            if (! $role || ($tenantId !== null ? ! $tenantSafe : $role->tenant_id !== null)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['roles' => 'The selected role is not valid for this workspace.']);
+            }
+        }
     }
 }

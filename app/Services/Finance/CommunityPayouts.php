@@ -11,6 +11,7 @@ use App\Models\TenantPayoutAccount;
 use App\Models\User;
 use App\Services\Dues\DuesBalance;
 use App\Services\Giving\GivingBalance;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -141,7 +142,7 @@ final class CommunityPayouts
 
     private function authorize(Tenant $tenant, User $actor): void
     {
-        abort_unless($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists(), 403);
+        abort_unless(app(OrganisationMemberships::class)->isActive($actor, $tenant), 403);
         Gate::forUser($actor)->authorize('manage payouts');
     }
 }

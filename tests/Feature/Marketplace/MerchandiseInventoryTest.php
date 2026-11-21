@@ -107,12 +107,13 @@ it('retains the immutable actor audit after an account is deleted', function ():
         ->and($movement->fresh()->actor)->toBeNull();
 });
 
-it('supports the existing primary-tenant ownership path without a duplicate team pivot', function (): void {
+it('denies stale primary-tenant ownership without an active team membership', function (): void {
     $tenant = $this->variant->shop->tenant;
     $tenant->features()->create(['feature_key' => 'commerce_catalog', 'enabled' => true]);
     $this->actor->tenants()->detach($tenant->id);
-    $movement = app(MerchandiseInventory::class)->adjust($this->variant, 1, 'Receipt', (string) Str::uuid(), $this->actor);
-    expect($movement->balance_after)->toBe(1);
+    expect(fn () => app(MerchandiseInventory::class)->adjust($this->variant, 1, 'Receipt', (string) Str::uuid(), $this->actor))->toThrow(AuthorizationException::class);
+    expect($this->variant->fresh()->on_hand)->toBe(0)
+        ->and(StoreStockMovement::query()->count())->toBe(0);
     $listing = App\Models\StoreListing::withoutGlobalScope(App\Scopes\MerchandiseVisibilityScope::class)->findOrFail($this->variant->listing_id);
-    expect(app(App\Services\Marketplace\MerchandiseAccess::class)->canManage($listing, $this->actor))->toBeTrue();
+    expect(app(App\Services\Marketplace\MerchandiseAccess::class)->canManage($listing, $this->actor))->toBeFalse();
 });

@@ -43,6 +43,9 @@ test('inviting a team member beyond the tenant\'s team-seat limit is rejected', 
         'role' => \Spatie\Permission\Models\Role::where('name', 'Org Superadmin')->first()?->id,
     ], ['HTTP_HOST' => $host]);
 
-    $response->assertSessionHasErrors();
+    $response->assertSessionHasErrors('email');
+    expect(\App\Models\OrganisationInvitation::query()->where('email', 'newmember@example.com')->exists())->toBeFalse();
+    expect($tenant->users()->count())->toBe(1);
+    Mail::assertNothingQueued();
     expect(User::where('email', 'newmember@example.com')->exists())->toBeFalse();
 });

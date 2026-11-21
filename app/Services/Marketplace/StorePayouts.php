@@ -16,6 +16,7 @@ use App\Services\Finance\PayoutRelease;
 use App\Services\Finance\PayoutSender;
 use App\Services\Finance\TransferFeeSchedule;
 use App\Services\Giving\GivingGateways;
+use App\Services\Tenancy\OrganisationMemberships;
 use App\Support\WithoutTelescope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
@@ -226,7 +227,7 @@ final class StorePayouts
 
     private function authorize(Tenant $seller, User $actor): void
     {
-        if (! User::query()->whereKey($actor->id)->where('tenant_id', $seller->id)->exists() && ! $actor->tenants()->whereKey($seller->id)->exists()) {
+        if (! app(OrganisationMemberships::class)->isActive($actor, $seller)) {
             throw new AuthorizationException;
         }
         $team = getPermissionsTeamId();

@@ -1,13 +1,10 @@
 <x-mail::message>
 # Hello {{ $data['user'] }},
 
-Your account has been given a brand-new password.
-To access the application, kindly use the information below.
+Use account recovery to choose a password securely. This email does not include a password.
 
-**Email:** {{ $data['email'] }} <br> **Password:** {{ $data['password'] }}
-
-<x-mail::button :url="$data['login_url'] ?? route('login')">
-Login
+<x-mail::button :url="rtrim(config('app.url'), '/').'/forgot-password'">
+Recover your account
 </x-mail::button>
 
 Thanks,<br>

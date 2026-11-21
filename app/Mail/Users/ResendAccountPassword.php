@@ -32,7 +32,7 @@ final class ResendAccountPassword extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Brand New Password',
+            subject: 'Recover your account',
         );
     }
 
@@ -41,9 +41,11 @@ final class ResendAccountPassword extends Mailable implements ShouldQueue
      */
     public function content(): Content
     {
+        unset($this->data['password']);
+
         return new Content(
             markdown: 'emails.users.resend-account-password',
-            with: ['data' => $this->data]
+            with: ['data' => array_diff_key($this->data, ['password' => true])]
         );
     }
 

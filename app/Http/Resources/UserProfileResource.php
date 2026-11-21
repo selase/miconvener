@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\TenantFeature;
+use App\Services\Tenancy\OrganisationMemberships;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,8 +17,19 @@ final class UserProfileResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $tenant = app(TenantContext::class)->getTenant()
-            ?? $this->resource->tenants()->first();
+        $tenant = app(TenantContext::class)->getTenant();
+        if ($tenant !== null && ! $this->resource->isGlobalSuperAdmin() && ! app(OrganisationMemberships::class)->isActive($this->resource, $tenant)) {
+            $tenant = null;
+        } elseif ($tenant === null) {
+            $tenant = $this->resource->tenants()->first();
+        }
+
+        $access = $tenant
+            ? app(OrganisationMemberships::class)->inTenant($tenant, [$this->resource], fn (): array => [
+                'roles' => $this->resource->getRoleNames()->all(),
+                'permissions' => $this->resource->getAllPermissions()->pluck('name')->all(),
+            ])
+            : ['roles' => [], 'permissions' => []];
 
         return [
             'id' => $this->id,
@@ -31,8 +43,8 @@ final class UserProfileResource extends JsonResource
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
             ] : null,
-            'roles' => $this->getRoleNames()->toArray(),
-            'permissions' => $this->getAllPermissions()->pluck('name')->toArray(),
+            'roles' => $access['roles'],
+            'permissions' => $access['permissions'],
             'features' => $tenant ? TenantFeature::where('tenant_id', $tenant->id)
                 ->where('enabled', true)
                 ->pluck('feature_key')

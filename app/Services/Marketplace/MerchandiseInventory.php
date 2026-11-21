@@ -9,6 +9,7 @@ use App\Models\StoreStockAllocation;
 use App\Models\StoreStockMovement;
 use App\Models\StoreVariant;
 use App\Models\User;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -29,7 +30,7 @@ final class MerchandiseInventory
             $locks->tenant($current->shop->tenant_id);
             $locks->variants([$variant->id]);
             $locked = StoreVariant::query()->with('shop')->lockForUpdate()->findOrFail($variant->id);
-            if ($locked->shop === null || (! User::query()->whereKey($actor->id)->where('tenant_id', $locked->shop->tenant_id)->exists() && ! $actor->tenants()->whereKey($locked->shop->tenant_id)->exists())) {
+            if ($locked->shop === null || ! app(OrganisationMemberships::class)->isActive($actor, $locked->shop->tenant)) {
                 throw new AuthorizationException;
             }
             $team = getPermissionsTeamId();

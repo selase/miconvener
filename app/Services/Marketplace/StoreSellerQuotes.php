@@ -19,6 +19,7 @@ use App\Scopes\TenantScope;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Finance\FeeCalculator;
 use App\Services\Finance\FeeTerms;
+use App\Services\Tenancy\OrganisationMemberships;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -29,7 +30,7 @@ final class StoreSellerQuotes
 {
     public function canManage(Tenant $tenant, User $actor, bool $pricing = false): bool
     {
-        if (! User::query()->whereKey($actor->id)->where('tenant_id', $tenant->id)->exists() && ! $actor->tenants()->whereKey($tenant->id)->exists()) {
+        if (! app(OrganisationMemberships::class)->isActive($actor, $tenant)) {
             return false;
         }
         $team = getPermissionsTeamId();

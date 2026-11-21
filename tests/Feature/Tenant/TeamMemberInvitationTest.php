@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenant;
 
-use App\Mail\Users\SendAccountDetails;
+use App\Mail\Users\OrganisationInvitationMail;
+use App\Models\OrganisationInvitation;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Tenancy\OrganisationInvitations;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -19,7 +22,7 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 });
 
-test('adding a team member sends an email with dynamic tenant-resolved login url and sets permissions correctly', function () {
+test('inviting a team member defers identity and scoped permissions until verified acceptance', function () {
     Mail::fake();
 
     $tenant = Tenant::factory()->create(['name' => 'Acme Corp', 'slug' => 'acme', 'isolation_mode' => 'shared']);
@@ -46,26 +49,25 @@ test('adding a team member sends an email with dynamic tenant-resolved login url
 
     $response->assertRedirect(route('tenant.users.index', ['subdomain' => 'acme']));
 
-    // 1. Verify user was created and attached to tenant
-    $newMember = User::where('email', 'john.doe@example.com')->firstOrFail();
-    expect($newMember->tenant_id)->toBe($tenant->id);
-    expect($tenant->users()->where('users.id', $newMember->id)->exists())->toBeTrue();
+    $invitation = OrganisationInvitation::query()->where('email', 'john.doe@example.com')->sole();
+    expect($invitation->tenant_id)->toBe($tenant->id)
+        ->and($invitation->role_id)->toBe($role->id)
+        ->and($invitation->status)->toBe('pending')
+        ->and($invitation->delivery_status)->toBe('pending')
+        ->and($invitation->invited_by)->toBe((int) $admin->id)
+        ->and(User::where('email', $invitation->email)->exists())->toBeFalse()
+        ->and($tenant->users()->count())->toBe(1);
+    $token = Crypt::decryptString($invitation->delivery_payload);
+    expect($invitation->token_hash)->toBe(hash('sha256', $token));
+    $mail = new OrganisationInvitationMail($invitation->id, $invitation->revision);
+    expect($mail->afterCommit)->toBeTrue();
+    expect($mail->render())->toContain('Acme Corp', mb_rtrim((string) config('app.url'), '/').'/organisation-invitations/'.$invitation->id.'#'.$token);
 
-    // 2. Verify email was queued with tenant-resolved login URL
-    Mail::assertQueued(SendAccountDetails::class, function (SendAccountDetails $mail) use ($tenant) {
-        $expectedLoginUrl = $tenant->url('/login');
-
-        expect($mail->hasTo('john.doe@example.com'))->toBeTrue();
-        expect($mail->loginUrl)->toBe($expectedLoginUrl);
-        expect($mail->loginUrl)->toContain('acme.');
-        expect($mail->tenantName)->toBe('Acme Corp');
-
-        $rendered = $mail->render();
-        expect($rendered)->toContain('href="'.$expectedLoginUrl.'"');
-        expect($rendered)->toContain('Acme Corp on '.config('app.name'));
-
-        return true;
-    });
+    $newMember = User::factory()->create(['email' => $invitation->email, 'email_verified_at' => now()]);
+    $membership = app(OrganisationInvitations::class)->accept($token, $newMember);
+    expect($membership->status)->toBe('active')
+        ->and($invitation->fresh()->status)->toBe('accepted')
+        ->and($tenant->users()->where('users.id', $newMember->id)->exists())->toBeTrue();
 
     // 3. Verify permissions are properly scoped to the tenant
     setPermissionsTeamId($tenant->id);
@@ -92,7 +94,7 @@ test('adding a team member sends an email with dynamic tenant-resolved login url
     expect($otherMember->hasPermissionTo('create event'))->toBeFalse();
 });
 
-test('adding a team member resolves custom domain login url if tenant has active custom domain', function () {
+test('an organisation with an active custom domain still creates a pending consent invitation', function () {
     Mail::fake();
 
     $tenant = Tenant::factory()->create([
@@ -124,13 +126,18 @@ test('adding a team member resolves custom domain login url if tenant has active
         ], ['HTTP_HOST' => $subdomainHost])
         ->assertRedirect();
 
-    Mail::assertQueued(SendAccountDetails::class, function (SendAccountDetails $mail) {
-        expect($mail->loginUrl)->toBe('https://events.customcorp.com/login');
-        $rendered = $mail->render();
-        expect($rendered)->toContain('href="https://events.customcorp.com/login"');
+    $invitation = OrganisationInvitation::query()->where('email', 'alice@example.com')->sole();
+    expect($invitation->tenant_id)->toBe($tenant->id)
+        ->and($invitation->status)->toBe('pending')
+        ->and($invitation->delivery_status)->toBe('pending')
+        ->and($invitation->role_id)->toBe($role->id)
+        ->and($invitation->delivery_payload)->not->toBeNull()
+        ->and(User::where('email', $invitation->email)->exists())->toBeFalse()
+        ->and($tenant->users()->count())->toBe(1);
+    $mail = new OrganisationInvitationMail($invitation->id, $invitation->revision);
+    expect($mail->afterCommit)->toBeTrue();
+    expect($mail->render())->toContain('Custom Tenant', mb_rtrim((string) config('app.url'), '/').'/organisation-invitations/'.$invitation->id.'#'.Crypt::decryptString($invitation->delivery_payload));
 
-        return true;
-    });
 });
 
 test('org admin cannot see or assign either superadmin role', function () {
@@ -164,6 +171,7 @@ test('org admin cannot see or assign either superadmin role', function () {
         ->assertSessionHasErrors('role');
 
     expect(User::where('email', 'escalated@example.com')->exists())->toBeFalse();
+    expect(OrganisationInvitation::query()->where('email', 'escalated@example.com')->exists())->toBeFalse();
     Mail::assertNothingQueued();
 });
 
@@ -175,6 +183,9 @@ test('org admin cannot edit or remove an org superadmin', function () {
     $owner->assignRole('Org Superadmin');
     $admin->assignRole('Org Admin');
     $tenant->users()->attach([$owner->id, $admin->id]);
+    $secondOwner = User::factory()->create(['tenant_id' => $tenant->id]);
+    $secondOwner->assignRole('Org Superadmin');
+    $tenant->users()->attach($secondOwner->id);
 
     $host = 'protected-owner.'.mb_ltrim((string) config('session.domain'), '.');
     $orgAdminRole = Role::whereNull('tenant_id')->where('name', 'Org Admin')->firstOrFail();
@@ -195,13 +206,12 @@ test('org admin cannot edit or remove an org superadmin', function () {
         ->assertForbidden();
 
     expect($owner->fresh()->hasRole('Org Superadmin'))->toBeTrue();
+    expect($tenant->users()->whereKey($owner->id)->firstOrFail()->pivot->status)->toBe('active');
 });
 
 test('the final active org superadmin cannot be demoted or removed', function () {
     $tenant = Tenant::factory()->create(['slug' => 'last-owner', 'isolation_mode' => 'shared']);
-    // An explicit valid number: the factory's phone fails the Phone rule, so
-    // this request used to stop at validation and never reach the owner check.
-    // The status matters too -- the guard only counts *active* owners.
+    // The owner guard requires both an active identity and active membership.
     $owner = User::factory()->create([
         'tenant_id' => $tenant->id,
         'phone_no' => '+233201234570',
@@ -228,12 +238,13 @@ test('the final active org superadmin cannot be demoted or removed', function ()
     $this->actingAs($owner)
         ->delete("http://{$host}/users/{$owner->uuid}", [], ['HTTP_HOST' => $host])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('role');
 
     expect($owner->fresh()->hasRole('Org Superadmin'))->toBeTrue();
+    expect($tenant->users()->whereKey($owner->id)->firstOrFail()->pivot->status)->toBe('active');
 });
 
-test('a team member can be added with an international phone number typed with 00 or a plus, and a bad number is refused with a message', function (string $typed, ?string $stored) {
+test('inviting a team member does not provision or validate global phone identity', function (string $typed) {
     Mail::fake();
 
     $tenant = Tenant::factory()->create(['name' => 'Acme Corp', 'slug' => 'acme', 'isolation_mode' => 'shared']);
@@ -249,18 +260,33 @@ test('a team member can be added with an international phone number typed with 0
         'phone_no' => $typed, 'role' => $role->id, 'status' => 'active',
     ], ['HTTP_HOST' => $host]);
 
-    if ($stored === null) {
-        $response->assertSessionHasErrors('phone_no');
-        expect(User::where('email', 'richard@example.com')->exists())->toBeFalse();
-
-        return;
-    }
     $response->assertSessionHasNoErrors();
-    expect((string) User::where('email', 'richard@example.com')->firstOrFail()->phone_no)->toBe($stored);
+    expect(User::where('email', 'richard@example.com')->exists())->toBeFalse();
+    $invitation = OrganisationInvitation::query()->where('email', 'richard@example.com')->sole();
+    expect($invitation->status)->toBe('pending')->and($invitation->role_id)->toBe($role->id);
 })->with([
-    'US with 00 prefix' => ['0013018201664', '+13018201664'],
-    'US with plus and spaces' => ['+1 301 820 1664', '+13018201664'],
-    'UK' => ['+44 7911 123456', '+447911123456'],
-    'Ghana local' => ['0201234567', '+233201234567'],
-    'not a number' => ['hello', null],
+    'US with 00 prefix' => ['0013018201664'],
+    'US with plus and spaces' => ['+1 301 820 1664'],
+    'UK' => ['+44 7911 123456'],
+    'Ghana local' => ['0201234567'],
+    'not a number' => ['hello'],
 ]);
+
+test('team role selections reject arrays on create and update', function () {
+    Mail::fake();
+    $tenant = Tenant::factory()->create(['slug' => 'role-input', 'isolation_mode' => 'shared']);
+    $admin = User::factory()->create(['tenant_id' => $tenant->id]);
+    $subject = User::factory()->create(['tenant_id' => $tenant->id]);
+    $tenant->users()->attach([$admin->id, $subject->id]);
+    setPermissionsTeamId($tenant->id);
+    $admin->assignRole('Org Superadmin');
+    $subject->assignRole('Org Admin');
+    $host = 'role-input.'.mb_ltrim((string) config('session.domain'), '.');
+    $this->actingAs($admin)->postJson("http://{$host}/users", [
+        'email' => 'invalid-role@example.com', 'role' => [1],
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('role');
+    $this->putJson("http://{$host}/users/{$subject->uuid}", [
+        'role' => [1], 'status' => 'active',
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('role');
+    Mail::assertNothingOutgoing();
+});

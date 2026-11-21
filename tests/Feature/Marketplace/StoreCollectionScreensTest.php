@@ -10,7 +10,7 @@ use Tests\Support\StoreCheckoutScenario;
 
 it('gives collection-only staff a private workspace without finance or buyer-address list data', function () {
     [$tenant,,$actor,,$order] = StoreCheckoutScenario::collectionReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $actor->revokePermissionTo('manage store catalog');
     $host = $tenant->slug.'.miconvener.test';
     $this->actingAs($actor)->getJson('http://'.$host.'/store/collections', ['HTTP_HOST' => $host])->assertOk()->assertHeader('Cache-Control', 'no-store, private')
@@ -21,7 +21,7 @@ it('gives collection-only staff a private workspace without finance or buyer-add
 
 it('matches without consuming and requires explicit full-handover confirmation at the HTTP boundary', function () {
     [$tenant,,$actor,$session,$order] = StoreCheckoutScenario::collectionReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $proof = app(StoreCollectionPasses::class)->issue($order, $session, (string) Str::uuid());
     $host = $tenant->slug.'.miconvener.test';
     $base = 'http://'.$host.'/store/collections/'.$order->id;
@@ -39,7 +39,7 @@ it('matches without consuming and requires explicit full-handover confirmation a
 
 it('keeps history readable while paused and denies new pass validation', function () {
     [$tenant,,$actor,$session,$order] = StoreCheckoutScenario::collectionReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $proof = app(StoreCollectionPasses::class)->issue($order, $session, (string) Str::uuid());
     $tenant->features()->where('feature_key', 'commerce_collection')->update(['enabled' => false]);
     $host = $tenant->slug.'.miconvener.test';
@@ -49,7 +49,7 @@ it('keeps history readable while paused and denies new pass validation', functio
 
 it('reveals delivery destination only in an authorised order detail and validates physical-return consent', function () {
     [$tenant,,$actor,,$order] = StoreCheckoutScenario::deliveryReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.miconvener.test';
     $base = 'http://'.$host.'/store/collections';
     $headers = ['HTTP_HOST' => $host];
@@ -63,7 +63,7 @@ it('reveals delivery destination only in an authorised order detail and validate
 
 it('clears access when collection permission is revoked and denies foreign order ids', function () {
     [$tenant,,$actor,,$order] = StoreCheckoutScenario::collectionReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.miconvener.test';
     $this->actingAs($actor)->getJson('http://'.$host.'/store/collections/'.Str::uuid(), ['HTTP_HOST' => $host])->assertNotFound();
     $actor->revokePermissionTo('manage store collection');
@@ -81,7 +81,7 @@ it('shows an explicit handover action only to the original buyer after readiness
 
 it('records readiness reversal and failed-delivery actions through their guarded native routes', function (): void {
     [$tenant, , $actor, , $order] = StoreCheckoutScenario::collectionReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.miconvener.test';
     $headers = ['HTTP_HOST' => $host];
     $base = 'http://'.$host.'/store/collections/'.$order->id;
@@ -91,7 +91,7 @@ it('records readiness reversal and failed-delivery actions through their guarded
 
 it('records an unsuccessful delivery attempt without implying return or receipt', function (): void {
     [$other, , $deliveryActor, , $delivery] = StoreCheckoutScenario::deliveryReady();
-    $deliveryActor->tenants()->attach($other->id);
+    $deliveryActor->tenants()->syncWithoutDetaching([$other->id]);
     $host = $other->slug.'.miconvener.test';
     $headers = ['HTTP_HOST' => $host];
     $base = 'http://'.$host.'/store/collections/'.$delivery->id;
@@ -112,7 +112,7 @@ it('labels cancelled and reviewed orders honestly rather than calling them in pr
 
 it('opens a direct native order URL with a protected selected-order loader rather than an empty workspace', function (): void {
     [$tenant, , $actor, , $order] = StoreCheckoutScenario::collectionReady();
-    $actor->tenants()->attach($tenant->id);
+    $actor->tenants()->syncWithoutDetaching([$tenant->id]);
     $host = $tenant->slug.'.miconvener.test';
     $this->actingAs($actor)->get('http://'.$host.'/store/collections/'.$order->id, ['HTTP_HOST' => $host])
         ->assertOk()->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->component('Tenant/Store/Collections/Index')->where('orderId', $order->id)->missing('order.destination'));

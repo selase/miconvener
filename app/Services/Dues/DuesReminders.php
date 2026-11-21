@@ -22,6 +22,7 @@ use App\Services\Notifications\NotificationGatewayService;
 use App\Services\Sms\SmsAllowance;
 use App\Services\Sms\SmsMessage;
 use App\Services\Sms\SmsResult;
+use App\Services\Tenancy\OrganisationMemberships;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -104,7 +105,7 @@ final class DuesReminders
     public function authorizeArrears(Tenant $tenant, int $userId): void
     {
         $user = User::query()->findOrFail($userId);
-        abort_unless($user->tenant_id === $tenant->id || $tenant->users()->where('users.id', $userId)->exists(), 403);
+        abort_unless(app(OrganisationMemberships::class)->isActive($user, $tenant), 403);
         $team = getPermissionsTeamId();
         try {
             setPermissionsTeamId($tenant->id);

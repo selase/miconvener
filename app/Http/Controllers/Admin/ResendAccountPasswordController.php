@@ -5,41 +5,23 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Libraries\Helper;
-use App\Mail\Users\ResendAccountPassword;
-use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 
 final class ResendAccountPasswordController extends Controller
 {
-    /**
-     * Handle the incoming request.
-     *
-     * @return Response
-     */
-    public function __invoke(Request $request, User $user)
+    public function __invoke(Request $request, User $user): JsonResponse
     {
-        $newPassword = Helper::generateRandomPassword();
+        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('update user');
 
-        $user->update(['password' => bcrypt($newPassword)]);
-
-        $tenant = $user->tenant_id ? Tenant::find($user->tenant_id) : null;
-        $loginUrl = $tenant ? $tenant->url('/login') : route('login');
-
-        Mail::to($user)
-            ->queue(new ResendAccountPassword([
-                'user' => $user->displayName(),
-                'email' => $user->email,
-                'password' => $newPassword,
-                'login_url' => $loginUrl,
-            ]));
+        $status = Password::sendResetLink(['email' => $user->email]);
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'A new password was generated and resent to the user successfully.',
-        ]);
+            'status' => $status === Password::RESET_LINK_SENT ? 'success' : 'error',
+            'message' => __($status),
+        ], $status === Password::RESET_LINK_SENT ? 200 : ($status === Password::RESET_THROTTLED ? 429 : 422));
     }
 }

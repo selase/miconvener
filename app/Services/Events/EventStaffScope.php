@@ -91,6 +91,11 @@ final class EventStaffScope
 
     public static function canAccessEvent(User $user, Event $event): bool
     {
+        $current = User::query()->find($user->id);
+        $tenant = \App\Models\Tenant::query()->find($event->tenant_id);
+        if ($current === null || $tenant === null || (! $current->isGlobalSuperAdmin() && ! app(\App\Services\Tenancy\OrganisationMemberships::class)->isActive($current, $tenant))) {
+            return false;
+        }
         $ids = self::restrictedEventIds($user, (string) $event->tenant_id);
 
         return $ids === null || in_array((string) $event->id, $ids, true);

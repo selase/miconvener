@@ -58,6 +58,7 @@ beforeEach(function (): void {
     }
     Permission::query()->firstOrCreate(['name' => 'manage venue', 'guard_name' => 'web'], ['category' => 'venue']);
     $this->host = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->host->tenants()->attach($this->tenant->id);
     setPermissionsTeamId($this->tenant->id);
     $this->host->givePermissionTo('manage venue');
     app(TenantContext::class)->setTenant($this->tenant);

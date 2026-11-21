@@ -11,6 +11,10 @@ use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function (): void {
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-11-01 09:00:00 UTC'));
+});
+
 function createMcpTestShop(array $attributes = []): Shop
 {
     return Shop::create(array_merge([

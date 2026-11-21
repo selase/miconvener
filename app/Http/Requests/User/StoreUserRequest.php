@@ -36,7 +36,7 @@ final class StoreUserRequest extends FormRequest
         return [
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', Rule::unique('users', 'email')],
+            'email' => ['required', 'email', Rule::when(! $this->filled('tenant_id'), [Rule::unique('users', 'email')])],
             'phone_no' => ['required', (new Phone)->international()->country('GH')],
             'role' => ['nullable', 'exists:roles,id'],
             'roles' => [
@@ -54,7 +54,7 @@ final class StoreUserRequest extends FormRequest
                         }
 
                         // Check if role belongs to this tenant or is global
-                        $tenantId = app(\App\Services\Tenancy\TenantContext::class)->activeTenantId();
+                        $tenantId = $this->user()->isGlobalSuperAdmin() ? $this->input('tenant_id') : app(\App\Services\Tenancy\TenantContext::class)->activeTenantId();
                         if ($role->tenant_id !== null && $role->tenant_id !== $tenantId) {
                             $fail('You do not have permission to assign this role.');
                         }
@@ -67,7 +67,7 @@ final class StoreUserRequest extends FormRequest
             ],
             'status' => ['required', 'string'],
             'photo' => ['nullable', 'image', 'mimes:png,jpg,gif,svg', 'max:2048'],
-            'tenant_id' => ['nullable', 'string'],
+            'tenant_id' => ['nullable', 'uuid', 'exists:landlord.tenants,id'],
         ];
     }
 }

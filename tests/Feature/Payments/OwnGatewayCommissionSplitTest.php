@@ -275,6 +275,7 @@ test('checkout records the subaccount in the charge metadata so the sale can be 
 
 test('a split charge whose payload does not name the subaccount is logged as a warning, never rejected', function () {
     Log::spy();
+    Log::shouldReceive('sharedContext')->andReturn([]);
     splitGateway();
 
     paystackSuccessWebhook(pendingTicket())->assertOk();
@@ -284,6 +285,7 @@ test('a split charge whose payload does not name the subaccount is logged as a w
 
 test('a split charge is accepted quietly when the payload names the subaccount in either shape', function () {
     Log::spy();
+    Log::shouldReceive('sharedContext')->andReturn([]);
     splitGateway();
 
     paystackSuccessWebhook(pendingTicket(), ['subaccount' => ['subaccount_code' => 'ACCT_abc123']])->assertOk();
@@ -294,6 +296,7 @@ test('a split charge is accepted quietly when the payload names the subaccount i
 
 test('a charge that was never split raises no warning', function () {
     Log::spy();
+    Log::shouldReceive('sharedContext')->andReturn([]);
     splitGateway();
 
     paystackSuccessWebhook(pendingTicket(), ['metadata' => ['event_registration_id' => pendingTicket()->id, 'type' => 'event_ticket']])->assertOk();
@@ -450,6 +453,7 @@ test('the public event page offers only the payment methods that will work', fun
 
 test('the amount the subaccount really received is what is booked as received', function () {
     Log::spy();
+    Log::shouldReceive('sharedContext')->andReturn([]);
     splitGateway();
     $registration = pendingTicket();
 
@@ -463,6 +467,7 @@ test('the amount the subaccount really received is what is booked as received', 
 
 test('a split that paid the platform less than asked leaves the difference owed and is logged', function () {
     Log::spy();
+    Log::shouldReceive('sharedContext')->andReturn([]);
     splitGateway();
     $registration = pendingTicket();
 
