@@ -354,7 +354,7 @@ describe('public event presentation', { timeout: 30000 }, () => {
             );
             const register = registration.getByRole('button', { name: 'Register', exact: true });
             expect(register.disabled).toBe(true);
-            fireEvent.submit(register.closest('form'));
+            fireEvent.submit(register.form);
             expect(submitted).not.toHaveBeenCalled();
 
             fireEvent.change(registration.getByRole('textbox', { name: 'Access code' }), {
@@ -364,7 +364,7 @@ describe('public event presentation', { timeout: 30000 }, () => {
             const unlocked = await registration.findByRole('radio', { name: /PISP invitation/ });
             expect(unlocked.checked).toBe(true);
             expect(register.disabled).toBe(false);
-            fireEvent.submit(register.closest('form'));
+            fireEvent.submit(register.form);
             expect(submitted).toHaveBeenCalledWith(
                 expect.any(String),
                 expect.objectContaining({ ticket_type_id: 'invite', access_code: 'PISP-EXAMPLE' })
@@ -403,7 +403,7 @@ describe('public event presentation', { timeout: 30000 }, () => {
         fireEvent.click(screen.getByRole('radio', { name: /Full workshop/ }));
         fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
         const waitlist = screen.getByRole('button', { name: 'Join waitlist' });
-        fireEvent.submit(waitlist.closest('form'));
+        fireEvent.submit(waitlist.form);
         expect(submitted).toHaveBeenCalledWith(
             expect.any(String),
             expect.objectContaining({ ticket_type_id: 'full' })
@@ -449,6 +449,130 @@ describe('public event presentation', { timeout: 30000 }, () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
         expect(screen.getByLabelText('Seating preference').value).toBe('Front');
+    });
+
+    it('renders section headings, email questions, length limits and a single consent label', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    form_fields: [
+                        {
+                            id: 'about',
+                            field_key: 'about_you',
+                            field_type: 'heading',
+                            label: 'About you',
+                            help_text: 'Tell us who you are.',
+                        },
+                        {
+                            id: 'school-email',
+                            field_key: 'school_email',
+                            field_type: 'email',
+                            label: 'School email',
+                            max_length: 255,
+                        },
+                        {
+                            id: 'motivation',
+                            field_key: 'motivation',
+                            field_type: 'textarea',
+                            label: 'Why should you be invited?',
+                            is_required: true,
+                            min_length: 100,
+                            max_length: 5000,
+                        },
+                        {
+                            id: 'consent',
+                            field_key: 'consent',
+                            field_type: 'checkbox',
+                            label: 'I consent to programme selection.',
+                            is_required: true,
+                        },
+                    ],
+                }}
+                org={org}
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+
+        expect(screen.getByRole('heading', { name: 'About you' })).toBeTruthy();
+        expect(screen.getByText('Tell us who you are.')).toBeTruthy();
+        expect(screen.getByLabelText('School email').getAttribute('type')).toBe('email');
+
+        const motivation = screen.getByLabelText(/Why should you be invited/);
+        expect(motivation.getAttribute('minLength')).toBe('100');
+        expect(screen.getByText('0 of at least 100 characters')).toBeTruthy();
+        fireEvent.change(motivation, { target: { value: 'a'.repeat(100) } });
+        expect(screen.getByText('100 / 5000 characters')).toBeTruthy();
+
+        expect(screen.getAllByText('I consent to programme selection.')).toHaveLength(1);
+        expect(screen.getByLabelText(/I consent to programme selection/).type).toBe('checkbox');
+    });
+
+    it('shows every question when one is required and says payment follows approval', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    ticket_price: 60000,
+                    requires_approval: true,
+                    registration_settings: {
+                        phone: 'required',
+                        dietary_requirements: 'hidden',
+                        accessibility_needs: 'hidden',
+                    },
+                    form_fields: [
+                        { id: 'h', field_key: 'about', field_type: 'heading', label: 'About you' },
+                        { id: 'a', field_key: 'a', field_type: 'text', label: 'First question' },
+                        {
+                            id: 'b',
+                            field_key: 'b',
+                            field_type: 'text',
+                            label: 'Required question',
+                            is_required: true,
+                        },
+                    ],
+                }}
+                org={org}
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+
+        expect(screen.queryByText(/Show all registration questions/)).toBeNull();
+        expect(screen.getByRole('button', { name: 'Submit application' })).toBeTruthy();
+        expect(screen.getByText(/we will email you a link to pay GHS 600.00/)).toBeTruthy();
+    });
+
+    it('counts a word-limited answer in words', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    form_fields: [
+                        {
+                            id: 'motivation',
+                            field_key: 'motivation',
+                            field_type: 'textarea',
+                            label: 'Why should you be invited?',
+                            is_required: true,
+                            min_length: 150,
+                            max_length: null,
+                            length_unit: 'words',
+                            max_characters: 5000,
+                        },
+                    ],
+                }}
+                org={org}
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        const motivation = screen.getByLabelText(/Why should you be invited/);
+
+        expect(motivation.getAttribute('minLength')).toBeNull();
+        expect(motivation.getAttribute('maxLength')).toBe('5000');
+        fireEvent.change(motivation, { target: { value: 'you should  invite\nme' } });
+        expect(screen.getByText('4 of at least 150 words')).toBeTruthy();
+        fireEvent.change(motivation, { target: { value: 'word '.repeat(150) } });
+        expect(screen.getByText('150 words')).toBeTruthy();
     });
 
     it('keeps the event finish time visible even without a programme', () => {

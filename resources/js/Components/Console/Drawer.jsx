@@ -25,12 +25,15 @@ export default function Drawer({ open, onClose, children }) {
     return (
         <>
             {/* Backdrop — overlay/sheet mode only, below the xl breakpoint */}
-            <div className="fixed inset-0 z-20 bg-black/30 xl:hidden" onClick={onClose} />
+            <div
+                className="fixed inset-0 z-20 bg-scrim backdrop-blur-[2px] xl:hidden"
+                onClick={onClose}
+            />
 
             <aside
                 className={`
-                    fixed inset-y-0 right-0 z-30 w-full max-w-120 overflow-y-auto border-l border-border
-                    bg-surface p-6 shadow-float transition-transform duration-200 ease-out
+                    fixed inset-y-0 right-0 z-30 w-full max-w-120 overflow-y-auto border-l border-border-strong
+                    bg-surface-raised p-6 xl:border-border xl:bg-surface shadow-float transition-transform duration-200 ease-out
                     xl:relative xl:z-10 xl:w-120 xl:max-w-none xl:shrink-0 xl:shadow-none xl:transition-none
                 `}
             >

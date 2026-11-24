@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Events;
 
 use App\Models\Event;
+use App\Models\EventFormField;
 use App\Models\EventTicketType;
 use Illuminate\Validation\ValidationException;
 
@@ -25,6 +26,10 @@ final class RegistrationPricingService
         $errors = [];
 
         foreach ($fields as $field) {
+            if ($field->isHeading()) {
+                continue;
+            }
+
             $key = $field->field_key;
             $value = $rawAnswers[$key] ?? null;
 
@@ -34,33 +39,31 @@ final class RegistrationPricingService
                 continue;
             }
 
-            if ($field->is_required && (is_null($value) || $value === '' || (is_array($value) && empty($value)))) {
-                $errors['form_answers.'.$key] = ["The {$field->label} field is required."];
+            if ($field->isTextType() && is_string($value)) {
+                $value = mb_trim($value);
+            }
+
+            // An unticked box arrives as false; treat it as unanswered.
+            if ($field->field_type === EventFormField::TYPE_CHECKBOX && ! filter_var($value, FILTER_VALIDATE_BOOL)) {
+                $value = null;
+            }
+
+            if (is_null($value) || $value === '' || (is_array($value) && empty($value))) {
+                if ($field->is_required) {
+                    $errors['form_answers.'.$key] = ["The {$field->label} field is required."];
+                }
 
                 continue;
             }
 
-            if (! is_null($value) && $value !== '') {
-                // If field has predefined options, validate that value is among allowed options
-                if (! empty($field->options) && is_array($field->options)) {
-                    $allowedValues = array_map(fn ($opt) => (string) ($opt['value'] ?? ''), $field->options);
+            $error = $this->answerError($field, $value);
+            if ($error !== null) {
+                $errors['form_answers.'.$key] = [$error];
 
-                    if (is_array($value)) {
-                        foreach ($value as $valItem) {
-                            if (! in_array((string) $valItem, $allowedValues, true)) {
-                                $errors['form_answers.'.$key] = ["The selected {$field->label} is invalid."];
-                                break;
-                            }
-                        }
-                    } elseif (! in_array((string) $value, $allowedValues, true)) {
-                        $errors['form_answers.'.$key] = ["The selected {$field->label} is invalid."];
-
-                        continue;
-                    }
-                }
-
-                $cleanedAnswers[$key] = $value;
+                continue;
             }
+
+            $cleanedAnswers[$key] = $field->field_type === EventFormField::TYPE_CHECKBOX ? true : $value;
         }
 
         if (! empty($errors)) {
@@ -137,5 +140,58 @@ final class RegistrationPricingService
                 'total' => $finalAmount,
             ],
         ];
+    }
+
+    /**
+     * The reason a non-empty answer is unacceptable for its field, or null.
+     */
+    private function answerError(EventFormField $field, mixed $value): ?string
+    {
+        if (in_array($field->field_type, EventFormField::CHOICE_TYPES, true)) {
+            $allowedValues = array_map(fn ($opt): string => (string) ($opt['value'] ?? ''), (array) $field->options);
+            $chosen = is_array($value) ? $value : [$value];
+
+            foreach ($chosen as $item) {
+                if (! is_scalar($item) || ! in_array((string) $item, $allowedValues, true)) {
+                    return "The selected {$field->label} is invalid.";
+                }
+            }
+
+            return null;
+        }
+
+        if ($field->field_type === EventFormField::TYPE_NUMBER) {
+            return is_numeric($value) ? null : "The {$field->label} must be a number.";
+        }
+
+        if (! $field->isTextType()) {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            return "The {$field->label} must be text.";
+        }
+
+        if ($field->field_type === EventFormField::TYPE_EMAIL && filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
+            return "The {$field->label} must be a valid email address.";
+        }
+
+        $length = $field->measure($value);
+        $unit = $field->countsWords() ? 'words' : 'characters';
+
+        if ($field->min_length !== null && $length < $field->min_length) {
+            return "The {$field->label} must be at least {$field->min_length} {$unit}.";
+        }
+
+        if ($field->countsWords() && $field->max_length !== null && $length > $field->max_length) {
+            return "The {$field->label} must not be longer than {$field->max_length} words.";
+        }
+
+        $characterLimit = $field->characterLimit();
+        if ($characterLimit !== null && mb_strlen($value) > $characterLimit) {
+            return "The {$field->label} must not be longer than {$characterLimit} characters.";
+        }
+
+        return null;
     }
 }

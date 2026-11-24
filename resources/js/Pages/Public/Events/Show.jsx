@@ -773,6 +773,28 @@ function LivePollSection({ event }) {
     );
 }
 
+/**
+ * The counter shown under a free-text answer, in the unit the organiser chose,
+ * or null when a counter would only be noise.
+ */
+function answerLength(field, value) {
+    if (!['text', 'textarea', 'email'].includes(field.field_type)) {
+        return null;
+    }
+    const text = typeof value === 'string' ? value.trim() : '';
+    const words = field.length_unit === 'words';
+    const count = words ? text.split(/\s+/).filter(Boolean).length : text.length;
+    if (!field.min_length && !(field.field_type === 'textarea' && count > 0)) {
+        return null;
+    }
+    const unit = words ? 'words' : 'characters';
+    if (field.min_length && count < field.min_length) {
+        return { short: true, label: `${count} of at least ${field.min_length} ${unit}` };
+    }
+    const max = words ? field.max_length : (field.max_length ?? field.max_characters);
+    return { short: false, label: max ? `${count} / ${max} ${unit}` : `${count} ${unit}` };
+}
+
 function isConditionSatisfied(field, answers) {
     if (!field.conditional_logic || !field.conditional_logic.depends_on_field) {
         return true;
@@ -784,6 +806,15 @@ function isConditionSatisfied(field, answers) {
     if (op === 'not_equals') {
         return String(parentVal ?? '') !== String(expectedVal ?? '');
     }
+    if (op === 'is_empty' || op === 'is_not_empty') {
+        const empty =
+            parentVal === undefined ||
+            parentVal === null ||
+            parentVal === '' ||
+            parentVal === false ||
+            (Array.isArray(parentVal) && parentVal.length === 0);
+        return op === 'is_empty' ? empty : !empty;
+    }
     if (op === 'in') {
         const list = Array.isArray(expectedVal) ? expectedVal : [expectedVal];
         return list.map(String).includes(String(parentVal ?? ''));
@@ -793,6 +824,7 @@ function isConditionSatisfied(field, answers) {
 
 function RegistrationPanel({ event }) {
     const titleId = useId();
+    const registrationFormId = `${titleId}-registration-form`;
     const [showRegistration, setShowRegistration] = useState(false);
     const { flash } = usePage().props;
     const settings = event.registration_settings || {
@@ -848,8 +880,11 @@ function RegistrationPanel({ event }) {
     const [showExtras, setShowExtras] = useState(false);
     const [fieldsExpanded, setFieldsExpanded] = useState(false);
 
+    const answerableFields = formFields.filter((field) => field.field_type !== 'heading');
+    // Never fold away a question the attendee must answer.
+    const hasRequiredCustomField = answerableFields.some((field) => field.is_required);
     const totalExtraCount = useMemo(() => {
-        let count = formFields.length;
+        let count = answerableFields.length;
         if (settings.phone !== 'hidden') count += 1;
         if (
             settings.dietary_requirements !== 'hidden' ||
@@ -1259,6 +1294,41 @@ function RegistrationPanel({ event }) {
                 onClose={() => setShowRegistration(false)}
                 title="Complete your registration"
                 className="max-w-lg"
+                fullScreenOnMobile
+                footer={
+                    <>
+                        <Button
+                            type="submit"
+                            form={registrationFormId}
+                            disabled={
+                                processing ||
+                                needsAccessCode ||
+                                (event.member_benefits?.members_only && !hasMemberAccess)
+                            }
+                            variant="primary"
+                            className="w-full justify-center"
+                        >
+                            {selectedTicketType?.is_sold_out
+                                ? 'Join waitlist'
+                                : event.requires_approval
+                                  ? 'Submit application'
+                                  : calculatedPricing.total > 0
+                                    ? `Continue to payment (${formatMoney(calculatedPricing.total, event.currency)})`
+                                    : appliedPromo?.discount_type === 'complimentary'
+                                      ? 'Complete Free Registration'
+                                      : 'Register'}
+                        </Button>
+                        <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-secondary">
+                            {event.requires_approval
+                                ? calculatedPricing.total > 0
+                                    ? `Applications are reviewed before admission. If you are accepted, we will email you a link to pay ${formatMoney(calculatedPricing.total, event.currency)}.`
+                                    : 'Applications are reviewed before admission. We will email you once a decision is made.'
+                                : calculatedPricing.total === 0
+                                  ? 'No payment is required. Follow the confirmation instructions sent to your email.'
+                                  : 'Card and mobile money accepted where connected. Your entry code arrives by email the moment payment clears.'}
+                        </p>
+                    </>
+                }
             >
                 {flash?.error && (
                     <div className="mt-3 bg-danger-bg px-3.5 py-2.5 text-[13px] text-danger-fg">
@@ -1286,7 +1356,7 @@ function RegistrationPanel({ event }) {
                             {errors.membership}
                         </p>
                     )}
-                    <form onSubmit={submit} className="mt-4 space-y-4">
+                    <form id={registrationFormId} onSubmit={submit} className="space-y-4">
                         {(hasTicketTypes || needsAccessCode) && (
                             <div className="space-y-2">
                                 <div className="flex flex-col gap-px bg-border">
@@ -1464,7 +1534,9 @@ function RegistrationPanel({ event }) {
                             <div className="space-y-3">
                                 <div
                                     className={`transition-all duration-300 ${
-                                        !fieldsExpanded && totalExtraCount >= 2
+                                        !fieldsExpanded &&
+                                        !hasRequiredCustomField &&
+                                        totalExtraCount >= 2
                                             ? 'max-h-60 overflow-hidden relative'
                                             : ''
                                     }`}
@@ -1494,30 +1566,55 @@ function RegistrationPanel({ event }) {
                                         const val = data.form_answers[field.field_key] ?? '';
                                         const fieldId = `${titleId}-${field.field_key}`;
 
+                                        if (field.field_type === 'heading') {
+                                            return (
+                                                <div
+                                                    key={field.id}
+                                                    className="border-t border-border pt-5 mt-5"
+                                                >
+                                                    <h4 className="text-[14px] font-semibold text-ink">
+                                                        {field.label}
+                                                    </h4>
+                                                    {field.help_text && (
+                                                        <p className="mt-0.5 text-[12px] text-ink-secondary">
+                                                            {field.help_text}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        const length = answerLength(field, val);
+
                                         return (
                                             <div
                                                 key={field.id}
                                                 className="border-t border-border/60 pt-3 mt-3"
                                             >
-                                                <label
-                                                    id={`${fieldId}-label`}
-                                                    htmlFor={
-                                                        field.field_type === 'radio'
-                                                            ? undefined
-                                                            : fieldId
-                                                    }
-                                                    className="block text-[13px] font-medium text-ink"
-                                                >
-                                                    {field.label}{' '}
-                                                    {field.is_required && (
-                                                        <span className="text-danger-fg">*</span>
-                                                    )}
-                                                </label>
-                                                {field.help_text && (
-                                                    <p className="mt-0.5 text-[11.5px] text-ink-secondary">
-                                                        {field.help_text}
-                                                    </p>
+                                                {field.field_type !== 'checkbox' && (
+                                                    <label
+                                                        id={`${fieldId}-label`}
+                                                        htmlFor={
+                                                            field.field_type === 'radio'
+                                                                ? undefined
+                                                                : fieldId
+                                                        }
+                                                        className="block text-[13px] font-medium text-ink"
+                                                    >
+                                                        {field.label}{' '}
+                                                        {field.is_required && (
+                                                            <span className="text-danger-fg">
+                                                                *
+                                                            </span>
+                                                        )}
+                                                    </label>
                                                 )}
+                                                {field.help_text &&
+                                                    field.field_type !== 'checkbox' && (
+                                                        <p className="mt-0.5 text-[11.5px] text-ink-secondary">
+                                                            {field.help_text}
+                                                        </p>
+                                                    )}
 
                                                 {field.field_type === 'select' && (
                                                     <select
@@ -1594,10 +1691,18 @@ function RegistrationPanel({ event }) {
                                                     </div>
                                                 )}
 
-                                                {field.field_type === 'text' && (
+                                                {['text', 'email'].includes(field.field_type) && (
                                                     <input
                                                         id={fieldId}
-                                                        type="text"
+                                                        type={field.field_type}
+                                                        minLength={
+                                                            field.length_unit === 'words'
+                                                                ? undefined
+                                                                : field.min_length || undefined
+                                                        }
+                                                        maxLength={
+                                                            field.max_characters || undefined
+                                                        }
                                                         value={val}
                                                         onChange={(e) =>
                                                             handleAnswerChange(
@@ -1613,7 +1718,15 @@ function RegistrationPanel({ event }) {
                                                 {field.field_type === 'textarea' && (
                                                     <textarea
                                                         id={fieldId}
-                                                        rows={2}
+                                                        rows={field.min_length ? 4 : 2}
+                                                        minLength={
+                                                            field.length_unit === 'words'
+                                                                ? undefined
+                                                                : field.min_length || undefined
+                                                        }
+                                                        maxLength={
+                                                            field.max_characters || undefined
+                                                        }
                                                         value={val}
                                                         onChange={(e) =>
                                                             handleAnswerChange(
@@ -1643,10 +1756,11 @@ function RegistrationPanel({ event }) {
                                                 )}
 
                                                 {field.field_type === 'checkbox' && (
-                                                    <label className="mt-2 flex items-center gap-2 cursor-pointer text-[13px] text-ink">
+                                                    <label className="flex items-start gap-2 cursor-pointer text-[13px] text-ink">
                                                         <input
                                                             id={fieldId}
                                                             type="checkbox"
+                                                            className="mt-0.5"
                                                             checked={Boolean(val)}
                                                             onChange={(e) =>
                                                                 handleAnswerChange(
@@ -1656,8 +1770,32 @@ function RegistrationPanel({ event }) {
                                                             }
                                                             required={field.is_required}
                                                         />
-                                                        <span>{field.label}</span>
+                                                        <span>
+                                                            {field.label}{' '}
+                                                            {field.is_required && (
+                                                                <span className="text-danger-fg">
+                                                                    *
+                                                                </span>
+                                                            )}
+                                                            {field.help_text && (
+                                                                <span className="mt-0.5 block text-[11.5px] text-ink-secondary">
+                                                                    {field.help_text}
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                     </label>
+                                                )}
+
+                                                {length && (
+                                                    <p
+                                                        className={`mt-1 text-right font-mono text-[11px] ${
+                                                            length.short
+                                                                ? 'text-ink-secondary'
+                                                                : 'text-ink-tertiary'
+                                                        }`}
+                                                    >
+                                                        {length.label}
+                                                    </p>
                                                 )}
 
                                                 {fieldError && (
@@ -1729,12 +1867,14 @@ function RegistrationPanel({ event }) {
                                         </div>
                                     )}
 
-                                    {!fieldsExpanded && totalExtraCount >= 2 && (
-                                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface to-transparent" />
-                                    )}
+                                    {!fieldsExpanded &&
+                                        !hasRequiredCustomField &&
+                                        totalExtraCount >= 2 && (
+                                            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface to-transparent" />
+                                        )}
                                 </div>
 
-                                {totalExtraCount >= 2 && (
+                                {!hasRequiredCustomField && totalExtraCount >= 2 && (
                                     <button
                                         type="button"
                                         onClick={() => setFieldsExpanded(!fieldsExpanded)}
@@ -1867,33 +2007,8 @@ function RegistrationPanel({ event }) {
                                 </div>
                             </div>
                         )}
-
-                        <Button
-                            type="submit"
-                            disabled={
-                                processing ||
-                                needsAccessCode ||
-                                (event.member_benefits?.members_only && !hasMemberAccess)
-                            }
-                            variant="primary"
-                            className="w-full justify-center"
-                        >
-                            {selectedTicketType?.is_sold_out
-                                ? 'Join waitlist'
-                                : calculatedPricing.total > 0
-                                  ? `Continue to payment (${formatMoney(calculatedPricing.total, event.currency)})`
-                                  : appliedPromo?.discount_type === 'complimentary'
-                                    ? 'Complete Free Registration'
-                                    : 'Register'}
-                        </Button>
                     </form>
                 </div>
-
-                <p className="mt-3.5 text-[11.5px] leading-relaxed text-ink-secondary">
-                    {calculatedPricing.total === 0
-                        ? 'No payment is required. Follow the confirmation instructions sent to your email.'
-                        : 'Card and mobile money accepted where connected. Your entry code arrives by email the moment payment clears.'}
-                </p>
             </Modal>
         </>
     );

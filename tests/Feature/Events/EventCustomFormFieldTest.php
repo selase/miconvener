@@ -347,3 +347,320 @@ test('registration export includes title, first_name, last_name, and custom form
     expect($customContent)->toContain('Aidoo');
     expect($customContent)->toContain('Korle Bu Teaching Hospital');
 });
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function bootcampField(Event $event, array $attributes): EventFormField
+{
+    static $sort = 0;
+
+    return EventFormField::create([
+        'tenant_id' => $event->tenant_id,
+        'event_id' => $event->id,
+        'is_required' => false,
+        'sort_order' => ++$sort,
+        ...$attributes,
+    ]);
+}
+
+/**
+ * @param  array<string, mixed>  $answers
+ */
+function registerWithAnswers(Event $event, string $host, string $email, array $answers): \Illuminate\Testing\TestResponse
+{
+    return test()->post("http://{$host}/e/{$event->slug}/register", [
+        'title' => 'Ms',
+        'first_name' => 'Esi',
+        'last_name' => 'Owusu',
+        'email' => $email,
+        'form_answers' => $answers,
+    ], ['HTTP_HOST' => $host]);
+}
+
+test('builder saves length limits for text questions and clears them for other types', function () {
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'Why should you be invited?',
+        'field_key' => 'motivation',
+        'field_type' => 'textarea',
+        'is_required' => true,
+        'min_length' => 100,
+        'max_length' => 2000,
+    ], ['HTTP_HOST' => $host])->assertSuccessful();
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'Do you have a laptop?',
+        'field_key' => 'has_computer',
+        'field_type' => 'radio',
+        'is_required' => true,
+        'min_length' => 10,
+        'options' => [['label' => 'Yes', 'value' => '1'], ['label' => 'No', 'value' => '0']],
+    ], ['HTTP_HOST' => $host])->assertSuccessful();
+
+    $motivation = EventFormField::where('event_id', $event->id)->where('field_key', 'motivation')->sole();
+    expect($motivation->min_length)->toBe(100)->and($motivation->max_length)->toBe(2000);
+
+    $laptop = EventFormField::where('event_id', $event->id)->where('field_key', 'has_computer')->sole();
+    expect($laptop->min_length)->toBeNull()->and($laptop->max_length)->toBeNull();
+});
+
+test('builder rejects a maximum shorter than the minimum and choice questions without choices', function () {
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'Goals',
+        'field_type' => 'textarea',
+        'is_required' => true,
+        'min_length' => 50,
+        'max_length' => 20,
+    ], ['HTTP_HOST' => $host])->assertJsonValidationErrors('max_length');
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'School',
+        'field_type' => 'select',
+        'is_required' => true,
+        'options' => [],
+    ], ['HTTP_HOST' => $host])->assertJsonValidationErrors('options');
+});
+
+test('a section heading is never required, carries no choices and is not exported', function () {
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'About you',
+        'field_key' => 'about_you',
+        'field_type' => 'heading',
+        'is_required' => true,
+        'options' => [['label' => 'Stray', 'value' => 'stray']],
+    ], ['HTTP_HOST' => $host])->assertSuccessful();
+
+    $heading = EventFormField::where('event_id', $event->id)->where('field_key', 'about_you')->sole();
+    expect($heading->is_required)->toBeFalse()->and($heading->options)->toBeNull();
+
+    $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/reports", ['HTTP_HOST' => $host])
+        ->assertSuccessful()
+        ->assertJsonMissing(['key' => 'form_about_you']);
+
+    $csv = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/reports/registrations", ['HTTP_HOST' => $host])->streamedContent();
+
+    expect($csv)->not->toContain('About you');
+});
+
+test('public registration enforces minimum and maximum answer lengths', function () {
+    Mail::fake();
+    [$tenant] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    bootcampField($event, [
+        'label' => 'Why should you be invited?',
+        'field_key' => 'motivation',
+        'field_type' => 'textarea',
+        'is_required' => true,
+        'min_length' => 100,
+    ]);
+    bootcampField($event, [
+        'label' => 'Programme of study',
+        'field_key' => 'course_of_study',
+        'field_type' => 'text',
+        'is_required' => true,
+    ]);
+
+    registerWithAnswers($event, $host, 'short@example.com', [
+        'motivation' => str_repeat('a', 99),
+        'course_of_study' => str_repeat('b', 256),
+    ])->assertSessionHasErrors([
+        'form_answers.motivation' => 'The Why should you be invited? must be at least 100 characters.',
+        'form_answers.course_of_study' => 'The Programme of study must not be longer than 255 characters.',
+    ]);
+
+    registerWithAnswers($event, $host, 'padded@example.com', [
+        'motivation' => '   '.str_repeat('a', 98).'   ',
+        'course_of_study' => 'Computer Science',
+    ])->assertSessionHasErrors('form_answers.motivation');
+
+    registerWithAnswers($event, $host, 'ok@example.com', [
+        'motivation' => str_repeat('a', 100),
+        'course_of_study' => '  Computer Science  ',
+    ])->assertSessionHasNoErrors();
+
+    expect(EventRegistration::where('email', 'ok@example.com')->sole()->form_answers)->toBe([
+        'motivation' => str_repeat('a', 100),
+        'course_of_study' => 'Computer Science',
+    ]);
+});
+
+test('public registration checks email questions and ignores section headings', function () {
+    Mail::fake();
+    [$tenant] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    bootcampField($event, ['label' => 'About you', 'field_key' => 'about_you', 'field_type' => 'heading']);
+    bootcampField($event, ['label' => 'School email', 'field_key' => 'school_email', 'field_type' => 'email']);
+
+    registerWithAnswers($event, $host, 'bad@example.com', ['school_email' => 'not-an-email'])
+        ->assertSessionHasErrors(['form_answers.school_email' => 'The School email must be a valid email address.']);
+
+    registerWithAnswers($event, $host, 'good@example.com', [
+        'about_you' => 'smuggled',
+        'school_email' => 'esi@st.ug.edu.gh',
+    ])->assertSessionHasNoErrors();
+
+    expect(EventRegistration::where('email', 'good@example.com')->sole()->form_answers)
+        ->toBe(['school_email' => 'esi@st.ug.edu.gh']);
+});
+
+test('a required checkbox must be ticked and is stored as true', function () {
+    Mail::fake();
+    [$tenant] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    bootcampField($event, [
+        'label' => 'I consent to the use of this information for programme selection.',
+        'field_key' => 'consent',
+        'field_type' => 'checkbox',
+        'is_required' => true,
+    ]);
+
+    registerWithAnswers($event, $host, 'unticked@example.com', ['consent' => false])
+        ->assertSessionHasErrors('form_answers.consent');
+
+    registerWithAnswers($event, $host, 'ticked@example.com', ['consent' => '1'])
+        ->assertSessionHasNoErrors();
+
+    expect(EventRegistration::where('email', 'ticked@example.com')->sole()->form_answers)->toBe(['consent' => true]);
+});
+
+test('public event page exposes the effective length limits for each question', function () {
+    [$tenant] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    bootcampField($event, ['label' => 'Goals', 'field_key' => 'goals', 'field_type' => 'textarea', 'min_length' => 30]);
+    bootcampField($event, ['label' => 'Level', 'field_key' => 'level', 'field_type' => 'select', 'options' => [['label' => 'Level 100', 'value' => 'level-100']]]);
+
+    $this->get("http://{$host}/e/{$event->slug}", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page
+            ->where('event.form_fields.0.min_length', 30)
+            ->where('event.form_fields.0.max_length', null)
+            ->where('event.form_fields.0.max_characters', 5000)
+            ->where('event.form_fields.0.length_unit', 'characters')
+            ->where('event.form_fields.1.min_length', null)
+            ->where('event.form_fields.1.max_characters', null)
+            ->where('event.requires_approval', false));
+});
+
+test('registration export shows option labels instead of stored values', function () {
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    bootcampField($event, [
+        'label' => 'Current level',
+        'field_key' => 'academic_level',
+        'field_type' => 'select',
+        'options' => [['label' => 'Level 400 / Final year', 'value' => 'level-400']],
+    ]);
+
+    EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'form_answers' => ['academic_level' => 'level-400'],
+    ]);
+
+    $csv = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/reports/registrations", ['HTTP_HOST' => $host])->streamedContent();
+
+    expect($csv)->toContain('Level 400 / Final year')->not->toContain('level-400');
+});
+
+test('an answered condition counts a zero choice as an answer', function () {
+    Mail::fake();
+    [$tenant] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    bootcampField($event, [
+        'label' => 'Do you have a final-year project?',
+        'field_key' => 'has_final_year_project',
+        'field_type' => 'radio',
+        'options' => [['label' => 'Yes', 'value' => '1'], ['label' => 'No', 'value' => '0']],
+    ]);
+    bootcampField($event, [
+        'label' => 'Tell us why',
+        'field_key' => 'project_reason',
+        'field_type' => 'text',
+        'is_required' => true,
+        'conditional_logic' => ['depends_on_field' => 'has_final_year_project', 'operator' => 'is_not_empty'],
+    ]);
+
+    registerWithAnswers($event, $host, 'zero@example.com', ['has_final_year_project' => '0'])
+        ->assertSessionHasErrors('form_answers.project_reason');
+
+    registerWithAnswers($event, $host, 'blank@example.com', [])
+        ->assertSessionHasNoErrors();
+});
+
+test('a long answer can be counted in words and still has a character cap', function () {
+    Mail::fake();
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'Why should you be invited?',
+        'field_key' => 'motivation',
+        'field_type' => 'textarea',
+        'is_required' => true,
+        'min_length' => 150,
+        'max_length' => 300,
+        'length_unit' => 'words',
+    ], ['HTTP_HOST' => $host])->assertSuccessful();
+
+    expect(EventFormField::where('event_id', $event->id)->sole()->length_unit)->toBe('words');
+
+    registerWithAnswers($event, $host, 'short@example.com', ['motivation' => mb_trim(str_repeat('word ', 149))])
+        ->assertSessionHasErrors(['form_answers.motivation' => 'The Why should you be invited? must be at least 150 words.']);
+
+    registerWithAnswers($event, $host, 'long@example.com', ['motivation' => mb_trim(str_repeat('word ', 301))])
+        ->assertSessionHasErrors(['form_answers.motivation' => 'The Why should you be invited? must not be longer than 300 words.']);
+
+    registerWithAnswers($event, $host, 'huge@example.com', ['motivation' => mb_trim(str_repeat(str_repeat('a', 40).' ', 160))])
+        ->assertSessionHasErrors(['form_answers.motivation' => 'The Why should you be invited? must not be longer than 5000 characters.']);
+
+    registerWithAnswers($event, $host, 'ok@example.com', ['motivation' => mb_trim(str_repeat("word\n", 150))])
+        ->assertSessionHasNoErrors();
+});
+
+test('word counting is only offered on long answers and is capped', function () {
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'Course',
+        'field_key' => 'course',
+        'field_type' => 'text',
+        'is_required' => false,
+        'length_unit' => 'words',
+    ], ['HTTP_HOST' => $host])->assertSuccessful();
+
+    expect(EventFormField::where('field_key', 'course')->sole()->length_unit)->toBe('characters');
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/form-fields", [
+        'label' => 'Essay',
+        'field_type' => 'textarea',
+        'is_required' => false,
+        'min_length' => 900,
+        'length_unit' => 'words',
+    ], ['HTTP_HOST' => $host])->assertJsonValidationErrors('min_length');
+});
