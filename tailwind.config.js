@@ -24,7 +24,9 @@ export default {
                     DEFAULT: 'var(--color-surface)',
                     sunken: 'var(--color-surface-sunken)',
                     hover: 'var(--color-surface-hover)',
+                    raised: 'var(--color-surface-raised)',
                 },
+                scrim: 'var(--color-scrim)',
                 ink: {
                     DEFAULT: 'var(--color-text)',
                     secondary: 'var(--color-text-secondary)',

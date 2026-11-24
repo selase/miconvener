@@ -51,3 +51,25 @@ it('offers an opt-in mobile workspace and skips the hidden mobile pane when trap
     unmount();
     vi.unstubAllGlobals();
 });
+
+it('pins its footer outside the scrolling body and locks page scroll until every dialog closes', () => {
+    const outer = render(
+        <Modal open title="Register" onClose={() => {}} footer={<button>Submit</button>}>
+            <input aria-label="Name" />
+        </Modal>
+    );
+    const body = screen.getByLabelText('Name').parentElement;
+    expect(body.className).toContain('overflow-y-auto');
+    expect(body.contains(screen.getByRole('button', { name: 'Submit' }))).toBe(false);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    const inner = render(
+        <Modal open title="Confirm" onClose={() => {}}>
+            <p>Sure?</p>
+        </Modal>
+    );
+    inner.unmount();
+    expect(document.body.style.overflow).toBe('hidden');
+    outer.unmount();
+    expect(document.body.style.overflow).toBe('');
+});

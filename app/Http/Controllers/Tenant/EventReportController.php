@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventDoorScan;
+use App\Models\EventFormField;
 use App\Models\EventForumThread;
 use App\Models\EventPollResponse;
 use App\Models\EventRegistration;
@@ -14,6 +15,7 @@ use App\Services\Tenancy\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -65,7 +67,7 @@ final class EventReportController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        $formFields = $eventModel->formFields()->ordered()->get();
+        $formFields = $eventModel->formFields()->ordered()->get()->reject(fn (EventFormField $f): bool => $f->isHeading());
         $customColumns = $formFields->map(fn ($f): array => [
             'key' => 'form_'.$f->field_key,
             'label' => $f->label,
@@ -96,7 +98,7 @@ final class EventReportController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        $formFields = $eventModel->formFields()->ordered()->get();
+        $formFields = $eventModel->formFields()->ordered()->get()->reject(fn (EventFormField $f): bool => $f->isHeading())->keyBy('field_key');
         $customKeyToLabel = $formFields->mapWithKeys(fn ($f): array => ['form_'.$f->field_key => $f->label])->all();
         $allPossibleColumns = array_merge(self::REGISTRATION_COLUMNS, self::OPTIONAL_COLUMNS, $customKeyToLabel);
         if (\App\Services\Events\EventStaffScope::isEventOrganiser($request->user(), (string) $tenant->id)) {
@@ -116,15 +118,15 @@ final class EventReportController extends Controller
 
         $filename = "{$eventModel->slug}-registrations.csv";
 
-        return response()->streamDownload(function () use ($eventModel, $columns, $allPossibleColumns, $seatLabels): void {
+        return response()->streamDownload(function () use ($eventModel, $columns, $allPossibleColumns, $seatLabels, $formFields): void {
             $handle = fopen('php://output', 'wb');
             fputcsv($handle, array_map(fn (string $key): string => $allPossibleColumns[$key] ?? $key, $columns));
 
-            $eventModel->registrations()->with('ticketType:id,name')->orderBy('created_at')->chunk(200, function ($registrations) use ($handle, $columns, $seatLabels): void {
+            $eventModel->registrations()->with('ticketType:id,name')->orderBy('created_at')->chunk(200, function ($registrations) use ($handle, $columns, $seatLabels, $formFields): void {
                 foreach ($registrations as $registration) {
                     fputcsv($handle, array_map(
-                        function (string $key) use ($registration, $seatLabels): mixed {
-                            $value = $this->resolveRegistrationColumn($key, $registration, $seatLabels->get($registration->id)?->seat_label);
+                        function (string $key) use ($registration, $seatLabels, $formFields): mixed {
+                            $value = $this->resolveRegistrationColumn($key, $registration, $seatLabels->get($registration->id)?->seat_label, $formFields);
 
                             return in_array($key, ['amount', 'platform_fee', 'external_amount'], true) ? $value : \App\Support\CsvCell::safe($value);
                         },
@@ -471,7 +473,7 @@ final class EventReportController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string|null>  $values
+     * @param  Collection<int, string|null>  $values
      */
     private function writeGroupedCounts($handle, $values): void
     {
@@ -484,19 +486,24 @@ final class EventReportController extends Controller
             });
     }
 
-    private function resolveRegistrationColumn(string $key, EventRegistration $registration, ?string $seatLabel): string
+    /**
+     * @param  Collection<string, EventFormField>  $formFields  keyed by field_key
+     */
+    private function resolveRegistrationColumn(string $key, EventRegistration $registration, ?string $seatLabel, Collection $formFields): string
     {
         if (str_starts_with($key, 'form_')) {
             $fieldKey = mb_substr($key, 5);
             $answer = $registration->form_answers[$fieldKey] ?? null;
+            $field = $formFields->get($fieldKey);
+            $label = fn (mixed $item): string => $field ? $field->optionLabelFor((string) $item) : (string) $item;
             if (is_array($answer)) {
-                return implode(', ', array_map(fn ($item): string => (string) $item, $answer));
+                return implode(', ', array_map($label, $answer));
             }
             if (is_bool($answer)) {
                 return $answer ? 'Yes' : 'No';
             }
 
-            return (string) ($answer ?? '');
+            return $answer === null ? '' : $label($answer);
         }
 
         return (string) match ($key) {

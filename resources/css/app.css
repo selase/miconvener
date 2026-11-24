@@ -8,6 +8,9 @@
     --color-surface: #fbfbfc;
     --color-surface-sunken: #f1f3f4;
     --color-surface-hover: #f1f3f4;
+    /* Dialogs and sheets sit on this, above the page and its scrim. */
+    --color-surface-raised: #ffffff;
+    --color-scrim: rgba(17, 22, 24, 0.55);
     --color-text: #111618;
     --color-text-secondary: #5a656a;
     --color-text-tertiary: #8b979c;
@@ -33,6 +36,8 @@
     --color-surface: #0c0e10;
     --color-surface-sunken: #111417;
     --color-surface-hover: #161b1e;
+    --color-surface-raised: #14181b;
+    --color-scrim: rgba(0, 0, 0, 0.72);
     --color-text: #e8ecee;
     --color-text-secondary: #8a959b;
     --color-text-tertiary: #5c666b;
@@ -51,6 +56,19 @@
     --color-danger-bg: rgba(224, 104, 90, 0.12);
     --color-neutral-fg: #8a959b;
     --color-neutral-bg: #161b1e;
+}
+
+@keyframes scrim-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes dialog-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.99);
+    }
 }
 
 /* Console (Inertia) surface only — scoped so the legacy Blade/Metronic pages are unaffected */

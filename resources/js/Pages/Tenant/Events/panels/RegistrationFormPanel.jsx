@@ -26,9 +26,44 @@ const FIELD_TYPES = [
     { value: 'radio', label: 'Radio Buttons' },
     { value: 'text', label: 'Single-line Text' },
     { value: 'textarea', label: 'Multi-line Text' },
-    { value: 'checkbox', label: 'Checkbox' },
+    { value: 'email', label: 'Email Address' },
+    { value: 'checkbox', label: 'Tick Box (e.g. consent)' },
     { value: 'number', label: 'Number' },
+    { value: 'heading', label: 'Section Heading' },
 ];
+
+const CHOICE_TYPES = ['select', 'radio'];
+const TEXT_TYPES = ['text', 'textarea', 'email'];
+const DEFAULT_MAX_LENGTHS = { text: 255, textarea: 5000, email: 255 };
+
+const CONDITION_OPERATORS = [
+    { value: 'equals', label: 'is' },
+    { value: 'not_equals', label: 'is not' },
+    { value: 'is_not_empty', label: 'is answered' },
+    { value: 'is_empty', label: 'is not answered' },
+];
+const VALUELESS_OPERATORS = ['is_empty', 'is_not_empty'];
+
+function describeCondition(logic) {
+    const operator = CONDITION_OPERATORS.find((o) => o.value === (logic.operator || 'equals'));
+    const suffix = VALUELESS_OPERATORS.includes(logic.operator) ? '' : ` "${logic.value}"`;
+    return `${operator?.label ?? logic.operator}${suffix}`;
+}
+
+function previewConditionMet(logic, answers) {
+    const actual = answers[logic.depends_on];
+    const empty = actual === undefined || actual === null || actual === '' || actual === false;
+    switch (logic.operator) {
+        case 'is_empty':
+            return empty;
+        case 'is_not_empty':
+            return !empty;
+        case 'not_equals':
+            return String(actual ?? '') !== String(logic.value ?? '');
+        default:
+            return String(actual ?? '') === String(logic.value ?? '');
+    }
+}
 
 export default function RegistrationFormPanel({ event, onChange, canManageEventMoney = true }) {
     const [loading, setLoading] = useState(true);
@@ -65,6 +100,9 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
             field_type: 'select',
             help_text: '',
             is_required: false,
+            min_length: '',
+            max_length: '',
+            length_unit: 'characters',
             options: [
                 { label: '', value: '', price: '' },
                 { label: '', value: '', price: '' },
@@ -137,6 +175,9 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
             field_type: field.field_type || 'select',
             help_text: field.help_text || '',
             is_required: Boolean(field.is_required),
+            min_length: field.min_length ? String(field.min_length) : '',
+            max_length: field.max_length ? String(field.max_length) : '',
+            length_unit: field.length_unit || 'characters',
             options:
                 field.options && field.options.length > 0
                     ? field.options.map((o) => ({
@@ -212,8 +253,17 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
             field_key: fieldForm.field_key || slugify(fieldForm.label),
             field_type: fieldForm.field_type,
             help_text: fieldForm.help_text,
-            is_required: fieldForm.is_required,
-            options: ['select', 'radio', 'checkbox'].includes(fieldForm.field_type)
+            is_required: fieldForm.field_type === 'heading' ? false : fieldForm.is_required,
+            min_length:
+                TEXT_TYPES.includes(fieldForm.field_type) && fieldForm.min_length !== ''
+                    ? Number(fieldForm.min_length)
+                    : null,
+            max_length:
+                TEXT_TYPES.includes(fieldForm.field_type) && fieldForm.max_length !== ''
+                    ? Number(fieldForm.max_length)
+                    : null,
+            length_unit: fieldForm.field_type === 'textarea' ? fieldForm.length_unit : 'characters',
+            options: CHOICE_TYPES.includes(fieldForm.field_type)
                 ? fieldForm.options
                       .filter((o) => o.label.trim() !== '')
                       .map((o) => ({
@@ -301,6 +351,11 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
             ['select', 'radio'].includes(f.field_type) &&
             (!editingField || f.id !== editingField.id)
     );
+
+    const unitLabel =
+        fieldForm.field_type === 'textarea' && fieldForm.length_unit === 'words'
+            ? 'words'
+            : 'characters';
 
     const selectedParent = eligibleParentFields.find(
         (f) => f.field_key === fieldForm.conditional_logic.depends_on
@@ -516,10 +571,12 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                                         <code className="text-[11px] bg-canvas px-1.5 py-0.5 rounded text-ink-secondary border border-border">
                                             {field.field_key}
                                         </code>
-                                        <span className="text-[11px] border border-border px-2 py-0.2 rounded text-ink-secondary capitalize">
-                                            {field.field_type}
+                                        <span className="text-[11px] border border-border px-2 py-0.2 rounded text-ink-secondary">
+                                            {FIELD_TYPES.find((t) => t.value === field.field_type)
+                                                ?.label ?? field.field_type}
                                         </span>
-                                        {field.is_required ? (
+                                        {field.field_type ===
+                                        'heading' ? null : field.is_required ? (
                                             <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.2 rounded">
                                                 Required
                                             </span>
@@ -550,6 +607,18 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                                         </div>
                                     )}
 
+                                    {(field.min_length || field.max_length) && (
+                                        <p className="pt-1 text-[11px] text-ink-secondary">
+                                            {field.min_length
+                                                ? `At least ${field.min_length} ${field.length_unit || 'characters'}`
+                                                : ''}
+                                            {field.min_length && field.max_length ? ', ' : ''}
+                                            {field.max_length
+                                                ? `${field.min_length ? 'at' : 'At'} most ${field.max_length} ${field.length_unit || 'characters'}`
+                                                : ''}
+                                        </p>
+                                    )}
+
                                     {/* Conditional Logic Display */}
                                     {field.conditional_logic &&
                                         field.conditional_logic.depends_on && (
@@ -560,7 +629,7 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                                                     <strong>
                                                         {field.conditional_logic.depends_on}
                                                     </strong>{' '}
-                                                    = "{field.conditional_logic.value}"
+                                                    {describeCondition(field.conditional_logic)}
                                                 </span>
                                             </div>
                                         )}
@@ -656,11 +725,29 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                             {fields.map((field) => {
                                 // Evaluate conditional rule
                                 if (field.conditional_logic && field.conditional_logic.depends_on) {
-                                    const parentVal =
-                                        previewAnswers[field.conditional_logic.depends_on];
-                                    if (parentVal !== field.conditional_logic.value) {
+                                    if (
+                                        !previewConditionMet(
+                                            field.conditional_logic,
+                                            previewAnswers
+                                        )
+                                    ) {
                                         return null; // Hidden
                                     }
+                                }
+
+                                if (field.field_type === 'heading') {
+                                    return (
+                                        <div key={field.id} className="pt-2">
+                                            <p className="text-sm font-semibold text-ink">
+                                                {field.label}
+                                            </p>
+                                            {field.help_text && (
+                                                <p className="text-[11px] text-ink-secondary">
+                                                    {field.help_text}
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
                                 }
 
                                 return (
@@ -716,11 +803,27 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                                                     </label>
                                                 ))}
                                             </div>
+                                        ) : field.field_type === 'checkbox' ? (
+                                            <label className="flex items-center gap-2 text-xs text-ink">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(
+                                                        previewAnswers[field.field_key]
+                                                    )}
+                                                    onChange={(e) =>
+                                                        setPreviewAnswers((prev) => ({
+                                                            ...prev,
+                                                            [field.field_key]: e.target.checked,
+                                                        }))
+                                                    }
+                                                />
+                                                <span>Ticked</span>
+                                            </label>
                                         ) : (
                                             <input
                                                 type={
-                                                    field.field_type === 'number'
-                                                        ? 'number'
+                                                    ['number', 'email'].includes(field.field_type)
+                                                        ? field.field_type
                                                         : 'text'
                                                 }
                                                 placeholder={`Enter ${field.label.toLowerCase()}`}
@@ -804,20 +907,27 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                             </Select>
 
                             <div className="pt-6">
-                                <label className="flex items-center gap-2 cursor-pointer text-sm text-ink">
-                                    <input
-                                        type="checkbox"
-                                        checked={fieldForm.is_required}
-                                        onChange={(e) =>
-                                            setFieldForm((prev) => ({
-                                                ...prev,
-                                                is_required: e.target.checked,
-                                            }))
-                                        }
-                                        className="rounded border-border text-accent focus:ring-accent"
-                                    />
-                                    <span>Required Field (Attendee must answer)</span>
-                                </label>
+                                {fieldForm.field_type === 'heading' ? (
+                                    <p className="text-xs text-ink-secondary">
+                                        A heading starts a new section of the form. Attendees do not
+                                        answer it.
+                                    </p>
+                                ) : (
+                                    <label className="flex items-center gap-2 cursor-pointer text-sm text-ink">
+                                        <input
+                                            type="checkbox"
+                                            checked={fieldForm.is_required}
+                                            onChange={(e) =>
+                                                setFieldForm((prev) => ({
+                                                    ...prev,
+                                                    is_required: e.target.checked,
+                                                }))
+                                            }
+                                            className="rounded border-border text-accent focus:ring-accent"
+                                        />
+                                        <span>Required Field (Attendee must answer)</span>
+                                    </label>
+                                )}
                             </div>
                         </div>
 
@@ -830,8 +940,65 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                             }
                         />
 
-                        {/* Options & Pricing (for select, radio, checkbox) */}
-                        {['select', 'radio', 'checkbox'].includes(fieldForm.field_type) && (
+                        {TEXT_TYPES.includes(fieldForm.field_type) && (
+                            <div
+                                className={`grid grid-cols-1 gap-4 ${fieldForm.field_type === 'textarea' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
+                            >
+                                {fieldForm.field_type === 'textarea' && (
+                                    <Select
+                                        label="Count length in"
+                                        value={fieldForm.length_unit}
+                                        onChange={(e) =>
+                                            setFieldForm((prev) => ({
+                                                ...prev,
+                                                length_unit: e.target.value,
+                                            }))
+                                        }
+                                    >
+                                        <option value="characters">Characters</option>
+                                        <option value="words">Words</option>
+                                    </Select>
+                                )}
+                                <Input
+                                    label={`Minimum ${unitLabel} (optional)`}
+                                    type="number"
+                                    min="1"
+                                    placeholder={
+                                        fieldForm.length_unit === 'words' ? 'e.g. 150' : 'e.g. 100'
+                                    }
+                                    value={fieldForm.min_length}
+                                    onChange={(e) =>
+                                        setFieldForm((prev) => ({
+                                            ...prev,
+                                            min_length: e.target.value,
+                                        }))
+                                    }
+                                    error={fieldErrors.min_length?.[0]}
+                                />
+                                <Input
+                                    label={`Maximum ${unitLabel} (optional)`}
+                                    type="number"
+                                    min="1"
+                                    max={fieldForm.length_unit === 'words' ? '800' : '5000'}
+                                    placeholder={
+                                        fieldForm.length_unit === 'words'
+                                            ? 'No limit'
+                                            : `Default ${DEFAULT_MAX_LENGTHS[fieldForm.field_type]}`
+                                    }
+                                    value={fieldForm.max_length}
+                                    onChange={(e) =>
+                                        setFieldForm((prev) => ({
+                                            ...prev,
+                                            max_length: e.target.value,
+                                        }))
+                                    }
+                                    error={fieldErrors.max_length?.[0]}
+                                />
+                            </div>
+                        )}
+
+                        {/* Options & Pricing (for select and radio) */}
+                        {CHOICE_TYPES.includes(fieldForm.field_type) && (
                             <div className="border border-border rounded-lg p-4 bg-canvas space-y-3">
                                 <div className="flex items-center justify-between">
                                     <label className="text-xs font-semibold text-ink uppercase tracking-wider">
@@ -841,6 +1008,11 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                                         Add Choice
                                     </Button>
                                 </div>
+                                {fieldErrors.options?.[0] && (
+                                    <p className="text-[11px] text-danger-fg">
+                                        {fieldErrors.options[0]}
+                                    </p>
+                                )}
                                 <p className="text-[11px] text-ink-secondary">
                                     Add your choices. If an option affects pricing (e.g. Doctor =
                                     100, Nurse = 80), specify the amount in {event.currency}.
@@ -932,7 +1104,7 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
                                             Attendance Mode) first to use conditional logic.
                                         </p>
                                     ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                             <div>
                                                 <label className="text-[11px] text-ink-secondary block mb-1">
                                                     Parent Question
@@ -964,49 +1136,95 @@ export default function RegistrationFormPanel({ event, onChange, canManageEventM
 
                                             <div>
                                                 <label className="text-[11px] text-ink-secondary block mb-1">
-                                                    When answer equals
+                                                    Condition
                                                 </label>
-                                                {selectedParent?.options ? (
-                                                    <select
-                                                        value={fieldForm.conditional_logic.value}
-                                                        onChange={(e) =>
-                                                            setFieldForm((prev) => ({
-                                                                ...prev,
-                                                                conditional_logic: {
-                                                                    ...prev.conditional_logic,
-                                                                    value: e.target.value,
-                                                                },
-                                                            }))
-                                                        }
-                                                        className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
-                                                    >
-                                                        <option value="">
-                                                            -- Select Choice --
+                                                <select
+                                                    value={
+                                                        fieldForm.conditional_logic.operator ||
+                                                        'equals'
+                                                    }
+                                                    onChange={(e) =>
+                                                        setFieldForm((prev) => ({
+                                                            ...prev,
+                                                            conditional_logic: {
+                                                                ...prev.conditional_logic,
+                                                                operator: e.target.value,
+                                                                value: VALUELESS_OPERATORS.includes(
+                                                                    e.target.value
+                                                                )
+                                                                    ? ''
+                                                                    : prev.conditional_logic.value,
+                                                            },
+                                                        }))
+                                                    }
+                                                    className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
+                                                >
+                                                    {CONDITION_OPERATORS.map((o) => (
+                                                        <option key={o.value} value={o.value}>
+                                                            {o.label}
                                                         </option>
-                                                        {selectedParent.options.map((opt, oIdx) => (
-                                                            <option key={oIdx} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <input
-                                                        type="text"
-                                                        placeholder="e.g. in_person"
-                                                        value={fieldForm.conditional_logic.value}
-                                                        onChange={(e) =>
-                                                            setFieldForm((prev) => ({
-                                                                ...prev,
-                                                                conditional_logic: {
-                                                                    ...prev.conditional_logic,
-                                                                    value: e.target.value,
-                                                                },
-                                                            }))
-                                                        }
-                                                        className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
-                                                    />
-                                                )}
+                                                    ))}
+                                                </select>
                                             </div>
+
+                                            {!VALUELESS_OPERATORS.includes(
+                                                fieldForm.conditional_logic.operator
+                                            ) && (
+                                                <div>
+                                                    <label className="text-[11px] text-ink-secondary block mb-1">
+                                                        Answer
+                                                    </label>
+                                                    {selectedParent?.options ? (
+                                                        <select
+                                                            value={
+                                                                fieldForm.conditional_logic.value
+                                                            }
+                                                            onChange={(e) =>
+                                                                setFieldForm((prev) => ({
+                                                                    ...prev,
+                                                                    conditional_logic: {
+                                                                        ...prev.conditional_logic,
+                                                                        value: e.target.value,
+                                                                    },
+                                                                }))
+                                                            }
+                                                            className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
+                                                        >
+                                                            <option value="">
+                                                                -- Select Choice --
+                                                            </option>
+                                                            {selectedParent.options.map(
+                                                                (opt, oIdx) => (
+                                                                    <option
+                                                                        key={oIdx}
+                                                                        value={opt.value}
+                                                                    >
+                                                                        {opt.label}
+                                                                    </option>
+                                                                )
+                                                            )}
+                                                        </select>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. in_person"
+                                                            value={
+                                                                fieldForm.conditional_logic.value
+                                                            }
+                                                            onChange={(e) =>
+                                                                setFieldForm((prev) => ({
+                                                                    ...prev,
+                                                                    conditional_logic: {
+                                                                        ...prev.conditional_logic,
+                                                                        value: e.target.value,
+                                                                    },
+                                                                }))
+                                                            }
+                                                            className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
+                                                        />
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

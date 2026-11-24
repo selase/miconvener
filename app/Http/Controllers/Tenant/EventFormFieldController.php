@@ -190,6 +190,9 @@ final class EventFormFieldController extends Controller
             'field_type' => ['required', Rule::in(EventFormField::TYPES)],
             'help_text' => ['nullable', 'string', 'max:255'],
             'is_required' => ['required', 'boolean'],
+            'min_length' => ['nullable', 'integer', 'min:1', 'max:'.EventFormField::MAX_LENGTH_CEILING],
+            'max_length' => ['nullable', 'integer', 'min:1', 'max:'.EventFormField::MAX_LENGTH_CEILING, 'gte:min_length'],
+            'length_unit' => ['nullable', Rule::in(EventFormField::LENGTH_UNITS)],
             'options' => ['nullable', 'array'],
             'options.*.label' => ['required_with:options', 'string', 'max:255'],
             'options.*.value' => ['required_with:options', 'string', 'max:255'],
@@ -201,6 +204,39 @@ final class EventFormFieldController extends Controller
             'conditional_logic.operator' => ['required_with:conditional_logic', Rule::in(['equals', 'not_equals', 'is_empty', 'is_not_empty'])],
             'conditional_logic.value' => ['nullable', 'string'],
         ]);
+
+        $type = $validated['field_type'];
+
+        if (! in_array($type, EventFormField::TEXT_TYPES, true)) {
+            $validated['min_length'] = null;
+            $validated['max_length'] = null;
+        }
+
+        $validated['length_unit'] = $type === EventFormField::TYPE_TEXTAREA
+            ? ($validated['length_unit'] ?? EventFormField::UNIT_CHARACTERS)
+            : EventFormField::UNIT_CHARACTERS;
+
+        if ($validated['length_unit'] === EventFormField::UNIT_WORDS) {
+            foreach (['min_length', 'max_length'] as $limit) {
+                if (($validated[$limit] ?? 0) > EventFormField::MAX_WORDS_CEILING) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $limit => ['A word limit cannot be more than '.EventFormField::MAX_WORDS_CEILING.' words.'],
+                    ]);
+                }
+            }
+        }
+
+        if (! in_array($type, EventFormField::CHOICE_TYPES, true)) {
+            $validated['options'] = null;
+        } elseif (empty($validated['options'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'options' => ['Add at least one choice.'],
+            ]);
+        }
+
+        if ($type === EventFormField::TYPE_HEADING) {
+            $validated['is_required'] = false;
+        }
 
         if (! empty($validated['conditional_logic'])) {
             $depends = $validated['conditional_logic']['depends_on_field']
