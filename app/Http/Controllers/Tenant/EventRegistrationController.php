@@ -51,6 +51,20 @@ final class EventRegistrationController extends Controller
      */
     private const string REFUND_ALREADY_REVERSED_MARKER = 'already_reversed';
 
+    /**
+     * One registration's answers, grouped as the form presented them, for the
+     * reviewer deciding whether to approve it.
+     */
+    public function application(string $subdomain, string $event, string $registration): JsonResponse
+    {
+        $this->authorize('read event');
+        $eventModel = $this->findEvent($this->getTenant()->id, $event);
+        $registrationModel = $eventModel->registrations()->with('ticketType:id,name')->where('id', $registration)->firstOrFail();
+
+        return response()->json(app(\App\Services\Events\RegistrationApplication::class)->describe($registrationModel))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
     public function approve(string $subdomain, string $event, string $registration): JsonResponse
     {
         $this->authorize('update event');

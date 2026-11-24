@@ -664,3 +664,51 @@ test('word counting is only offered on long answers and is capped', function () 
         'length_unit' => 'words',
     ], ['HTTP_HOST' => $host])->assertJsonValidationErrors('min_length');
 });
+
+test('a reviewer sees an application in its sections, with labels, hidden and blank questions left out and removed questions kept', function () {
+    [$tenant, $user] = eventHost('medconf');
+    $host = eventSubdomainHost('medconf');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id, 'requires_approval' => true]);
+
+    bootcampField($event, ['label' => 'About you', 'field_key' => 'about_you', 'field_type' => 'heading']);
+    bootcampField($event, ['label' => 'Current level', 'field_key' => 'academic_level', 'field_type' => 'select', 'options' => [['label' => 'Level 400 / Final year', 'value' => 'level-400']]]);
+    bootcampField($event, ['label' => 'School email', 'field_key' => 'school_email', 'field_type' => 'email']);
+    bootcampField($event, ['label' => 'Project and goals', 'field_key' => 'project_and_goals', 'field_type' => 'heading']);
+    bootcampField($event, ['label' => 'Final-year project?', 'field_key' => 'has_project', 'field_type' => 'radio', 'options' => [['label' => 'Yes', 'value' => '1'], ['label' => 'No', 'value' => '0']]]);
+    bootcampField($event, ['label' => 'Project area', 'field_key' => 'project_area', 'field_type' => 'text', 'conditional_logic' => ['depends_on_field' => 'has_project', 'operator' => 'equals', 'value' => '1']]);
+    bootcampField($event, ['label' => 'Consent', 'field_key' => 'consent', 'field_type' => 'checkbox']);
+
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_PENDING_APPROVAL,
+        'form_answers' => ['academic_level' => 'level-400', 'has_project' => '0', 'consent' => true, 'old_question' => 'kept'],
+    ]);
+
+    $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/application", ['HTTP_HOST' => $host])
+        ->assertSuccessful()
+        ->assertJsonPath('applicant.status', EventRegistration::STATUS_PENDING_APPROVAL)
+        ->assertJsonPath('sections.0.title', 'About you')
+        ->assertJsonPath('sections.0.answers', [
+            ['label' => 'Current level', 'value' => 'Level 400 / Final year'],
+        ])
+        ->assertJsonPath('sections.1.title', 'Project and goals')
+        ->assertJsonPath('sections.1.answers', [
+            ['label' => 'Final-year project?', 'value' => 'No'],
+            ['label' => 'Consent', 'value' => 'Yes'],
+        ])
+        ->assertJsonPath('sections.2.title', 'Answers to questions since removed')
+        ->assertJsonPath('sections.2.answers', [['label' => 'Old Question', 'value' => 'kept']]);
+});
+
+test('an application cannot be read through another organisation', function () {
+    [$tenant] = eventHost('medconf');
+    [, $otherUser] = eventHost('othercon');
+    $otherHost = eventSubdomainHost('othercon');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+
+    $this->actingAs($otherUser)
+        ->getJson("http://{$otherHost}/events/{$event->id}/registrations/{$registration->id}/application", ['HTTP_HOST' => $otherHost])
+        ->assertNotFound();
+});

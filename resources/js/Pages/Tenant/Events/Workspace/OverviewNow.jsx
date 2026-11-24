@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
 import { Check, X, ScanLine } from 'lucide-react';
 import Button from '@/Components/Console/Button';
 import csrfFetch from '@/lib/csrfFetch';
 import { sectionHref } from './sections';
+import ApplicationReviewModal from '../ApplicationReviewModal';
 
 /**
  * What the overview leads with, given where the event is in its life.
@@ -59,6 +61,7 @@ function ChecklistRow({ item, eventId }) {
 }
 
 function ApprovalQueue({ event, waiting }) {
+    const [reviewing, setReviewing] = useState(null);
     const act = async (registration, action, body = {}) => {
         await csrfFetch(
             route(`tenant.events.registrations.${action}`, {
@@ -81,7 +84,14 @@ function ApprovalQueue({ event, waiting }) {
                     className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 first:border-t-0"
                 >
                     <div className="min-w-0">
-                        <div className="text-[13px] font-medium text-ink">{person.full_name}</div>
+                        <button
+                            type="button"
+                            onClick={() => setReviewing(person)}
+                            className="text-left text-[13px] font-medium text-ink underline decoration-border-strong underline-offset-4 hover:decoration-accent"
+                            title="View application"
+                        >
+                            {person.full_name}
+                        </button>
                         <div className="truncate text-xs text-ink-secondary">
                             {[
                                 person.ticket_type_name,
@@ -119,6 +129,14 @@ function ApprovalQueue({ event, waiting }) {
                     </div>
                 </div>
             ))}
+            {reviewing && (
+                <ApplicationReviewModal
+                    event={event}
+                    registration={{ ...reviewing, status: 'pending_approval' }}
+                    onClose={() => setReviewing(null)}
+                    onDecided={() => router.reload()}
+                />
+            )}
         </Card>
     );
 }

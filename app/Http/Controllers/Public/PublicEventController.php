@@ -345,7 +345,7 @@ final class PublicEventController extends Controller
                 'id' => $t->id,
                 'name' => $t->name,
                 'description' => $t->description,
-                'price' => $t->price,
+                'price' => $eventModel->pricesHiddenFromPublic() ? null : $t->price,
                 'is_free' => $t->isFree(),
                 'is_sold_out' => app(\App\Services\Events\AdmissionClaims::class)->isFull($eventModel, $t),
                 'is_invite_only' => true,
@@ -360,6 +360,25 @@ final class PublicEventController extends Controller
             'message' => 'Access code accepted.',
             'ticket_types' => $unlocked,
         ]);
+    }
+
+    /**
+     * Question choices with any price adjustment removed, for an event that
+     * withholds prices until approval.
+     *
+     * @param  array<int, array<string, mixed>>|null  $options
+     * @return array<int, array<string, mixed>>|null
+     */
+    private static function withoutPrices(?array $options): ?array
+    {
+        if ($options === null) {
+            return null;
+        }
+
+        return array_map(
+            fn (array $option): array => array_diff_key($option, ['price' => true, 'is_override' => true]),
+            $options,
+        );
     }
 
     private function registerLocked(Request $request, string $subdomain, string $event): SymfonyResponse
@@ -724,11 +743,12 @@ final class PublicEventController extends Controller
     private function toPublicPayload(Event $event, bool $revealDetails = true): array
     {
         $withhold = $event->isPrivate() && ! $revealDetails;
+        $pricesHidden = $event->pricesHiddenFromPublic();
 
         return [
             'hosts' => $withhold ? [] : app(\App\Services\Events\EventHosts::class)->payload($event),
             'public_attendee_profiles_url' => ! $withhold && app(\App\Services\Events\Profiles\ProfileRollout::class)->allows($event) ? route('attendee.profiles.index', ['event' => $event->id], false) : null,
-            'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only, 'prompt' => $event->members_only || $event->showsCommunityPrompts()],
+            'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only, 'prompt' => $event->members_only || ($event->offersMemberPrice() && $event->showsCommunityPrompts())],
             'name' => $event->name,
             'slug' => $event->slug,
             'description' => $event->description,
@@ -738,7 +758,8 @@ final class PublicEventController extends Controller
             'location_type' => $event->location_type,
             'address' => $event->address,
             'virtual_link' => $event->virtual_link,
-            'ticket_price' => $event->ticket_price,
+            'ticket_price' => $pricesHidden ? null : $event->ticket_price,
+            'prices_hidden' => $pricesHidden,
             'currency' => $event->currency,
             'fee_bearer' => $event->effectiveFeeBearer(),
             /*
@@ -777,14 +798,14 @@ final class PublicEventController extends Controller
                 'max_length' => $f->isTextType() ? $f->max_length : null,
                 'length_unit' => $f->countsWords() ? EventFormField::UNIT_WORDS : EventFormField::UNIT_CHARACTERS,
                 'max_characters' => $f->characterLimit(),
-                'options' => $f->options,
+                'options' => $pricesHidden ? self::withoutPrices($f->options) : $f->options,
                 'conditional_logic' => $f->conditional_logic,
             ])->values(),
             'ticket_types' => $event->ticketTypes()->active()->get()->map(fn (EventTicketType $t): array => [
                 'id' => $t->id,
                 'name' => $t->name,
                 'description' => $t->description,
-                'price' => $t->price,
+                'price' => $pricesHidden ? null : $t->price,
                 'is_free' => $t->isFree(),
                 'is_sold_out' => app(\App\Services\Events\AdmissionClaims::class)->isFull($event, $t),
                 'is_invite_only' => $t->isInviteOnly(),

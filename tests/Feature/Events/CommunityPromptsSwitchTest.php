@@ -39,6 +39,7 @@ test('an event with the option switched off shows none of them, whatever the org
 });
 
 test('the registration form drops the membership check when the option is off, unless the event is for members only', function (): void {
+    $this->event->update(['ticket_price' => 10000, 'member_ticket_price' => 5000]);
     ($this->page)()->assertInertia(fn (Assert $page) => $page->where('event.member_benefits.prompt', true));
 
     $this->event->update(['show_community_prompts' => false]);
@@ -82,4 +83,11 @@ test('the organiser console reports the current option for the event', function 
 
     $this->actingAs($this->admin)->get("http://{$this->host}/events/{$this->event->id}", ['HTTP_HOST' => $this->host])->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('event.show_community_prompts', false));
+});
+
+test('the registration form skips the membership check when members pay the same as everyone else', function (): void {
+    ($this->page)()->assertInertia(fn (Assert $page) => $page->where('event.member_benefits.prompt', false));
+
+    \App\Models\EventTicketType::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'price' => 10000, 'member_price' => 6000, 'is_active' => true]);
+    ($this->page)()->assertInertia(fn (Assert $page) => $page->where('event.member_benefits.prompt', true));
 });

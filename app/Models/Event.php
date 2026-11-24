@@ -144,6 +144,7 @@ final class Event extends Model
         'contact_email',
         'capacity',
         'requires_approval',
+        'hide_prices_until_approved',
         'ticket_price',
         'members_only',
         'member_ticket_price',
@@ -201,6 +202,7 @@ final class Event extends Model
         'purge_at' => 'datetime',
         'capacity' => 'integer',
         'requires_approval' => 'boolean',
+        'hide_prices_until_approved' => 'boolean',
         'allows_self_check_in' => 'boolean',
         'ticket_price' => 'integer',
         'members_only' => 'boolean',
@@ -348,6 +350,17 @@ final class Event extends Model
     public function showsCommunityPrompts(): bool
     {
         return (bool) $this->show_community_prompts;
+    }
+
+    /**
+     * Whether members pay something different here: an event member price or
+     * a member price on any active ticket type. Without one, verifying a
+     * membership at registration changes nothing.
+     */
+    public function offersMemberPrice(): bool
+    {
+        return $this->member_ticket_price !== null
+            || $this->ticketTypes()->active()->whereNotNull('member_price')->exists();
     }
 
     public function isPrivate(): bool
@@ -788,6 +801,16 @@ final class Event extends Model
             ?? config('services.platform.default_fee_cap_amount');
 
         return $cap === null ? null : (int) $cap;
+    }
+
+    /**
+     * Whether the public page withholds prices. Only an event that reviews
+     * every registration may do so: applicants learn the fee with their
+     * approval, so nobody is ever asked to pay an amount they never saw.
+     */
+    public function pricesHiddenFromPublic(): bool
+    {
+        return (bool) $this->requires_approval && (bool) $this->hide_prices_until_approved;
     }
 
     /**

@@ -575,6 +575,53 @@ describe('public event presentation', { timeout: 30000 }, () => {
         expect(screen.getByText('150 words')).toBeTruthy();
     });
 
+    it('shows options without any amount when prices are hidden until approval', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    ticket_price: null,
+                    requires_approval: true,
+                    prices_hidden: true,
+                    ticket_types: [
+                        {
+                            id: 'm',
+                            name: 'Mentorship',
+                            description: 'Mentor-led Saturday labs.',
+                            price: null,
+                            is_free: false,
+                            is_sold_out: false,
+                            is_invite_only: false,
+                        },
+                        {
+                            id: 't',
+                            name: 'Mentorship + Thesis support',
+                            description: 'Plus thesis clinics.',
+                            price: null,
+                            is_free: false,
+                            is_sold_out: false,
+                            is_invite_only: false,
+                        },
+                    ],
+                }}
+                org={org}
+            />
+        );
+
+        expect(screen.getAllByText('Mentor-led Saturday labs.').length).toBeGreaterThan(0);
+        expect(screen.queryByText(/GHS/)).toBeNull();
+        expect(screen.queryByText('Free')).toBeNull();
+        expect(screen.queryByText('Total')).toBeNull();
+        expect(screen.getByText(/Fees are shared with applicants/)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        const dialog = screen.getByRole('dialog', { name: 'Complete your registration' });
+        expect(within(dialog).queryByText(/GHS/)).toBeNull();
+        expect(within(dialog).queryByText('Free')).toBeNull();
+        expect(within(dialog).getByRole('button', { name: 'Submit application' })).toBeTruthy();
+        expect(within(dialog).getByText(/email you the fee for the option you chose/)).toBeTruthy();
+    });
+
     it('keeps the event finish time visible even without a programme', () => {
         render(<Show event={{ ...event, sessions: [] }} org={org} />);
         const endTime = new Date(event.ends_at).toLocaleTimeString(undefined, {
