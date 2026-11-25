@@ -12,7 +12,7 @@ final class EventOrganiserAccess
     /** @var array<string, list<string>> */
     private const array ACTIONS = [
         'EventController' => ['index', 'show', 'section', 'door', 'exportGuests', 'update', 'updateVisibility', 'updateCommunityPrompts', 'updateRegistrationVisibility', 'updatePublicBranding'],
-        'EventRegistrationController' => ['approve', 'reject', 'update', 'cancel'],
+        'EventRegistrationController' => ['application', 'approve', 'reject', 'update', 'cancel'],
         'EventReportController' => ['index', 'exportRegistrations', 'exportCheckins', 'exportForum', 'exportPolls', 'exportAttendeeDirectory', 'exportSessionAttendance', 'exportDietaryAccessibility', 'exportCertificates', 'exportAbstractBook'],
         'EventTicketTypeController' => ['updateBadgeTier'],
         'EventAbstractController' => ['assignReviewer', 'bulkDecision', 'index', 'recordDecision', 'removeReviewer', 'show'],

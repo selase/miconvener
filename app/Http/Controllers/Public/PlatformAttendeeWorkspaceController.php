@@ -1319,7 +1319,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'location_type' => $event->location_type,
             'address' => $event->address,
             'virtual_link' => $event->virtual_link,
-            'ticket_price' => $event->ticket_price,
+            'ticket_price' => $event->pricesHiddenFromPublic() ? null : $event->ticket_price,
             'currency' => $event->currency,
             'hero_image_url' => Helper::storageUrl($event->hero_image_path),
             'sessions' => ! $withhold && $event->relationLoaded('sessions') ? $event->sessions->map(function ($s) use ($registration): array {

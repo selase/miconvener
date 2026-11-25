@@ -859,6 +859,8 @@ function RegistrationPanel({ event }) {
     }, [event.ticket_types, unlockedTicketTypes]);
 
     const hasTicketTypes = availableTicketTypes.length > 0;
+    // The organiser withholds prices until approval; amounts arrive with the payment link.
+    const pricesHidden = Boolean(event.prices_hidden);
     const needsAccessCode =
         !hasTicketTypes && event.ticket_types?.some((ticket) => ticket.is_invite_only);
 
@@ -1229,17 +1231,24 @@ function RegistrationPanel({ event }) {
                                 />
                                 <span className="min-w-0 flex-1">
                                     <span className="block font-medium">{ticket.name}</span>
+                                    {ticket.description && (
+                                        <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-secondary">
+                                            {ticket.description}
+                                        </span>
+                                    )}
                                     {ticket.is_sold_out && (
                                         <span className="mt-1 block text-[11px] text-ink-secondary">
                                             Full — join the waitlist
                                         </span>
                                     )}
                                 </span>
-                                <span className="shrink-0 font-mono text-[11px]">
-                                    {ticket.is_sold_out
-                                        ? 'Waitlist'
-                                        : formatMoney(ticket.price, event.currency)}
-                                </span>
+                                {(ticket.is_sold_out || !pricesHidden) && (
+                                    <span className="shrink-0 font-mono text-[11px]">
+                                        {ticket.is_sold_out
+                                            ? 'Waitlist'
+                                            : formatMoney(ticket.price, event.currency)}
+                                    </span>
+                                )}
                             </label>
                         ))}
                     </fieldset>
@@ -1255,13 +1264,19 @@ function RegistrationPanel({ event }) {
                 >
                     Have a promo or access code?
                 </button>
-                <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
-                    <span className="text-sm text-ink-secondary">Total</span>
-                    <strong className="text-xl font-medium tracking-tight">
-                        {formatMoney(calculatedPricing.total, event.currency)}
-                    </strong>
-                </div>
-                {calculatedPricing.serviceFee > 0 && (
+                {pricesHidden ? (
+                    <p className="mt-4 border-t border-border pt-4 text-xs leading-relaxed text-ink-secondary">
+                        Fees are shared with applicants who are offered a place.
+                    </p>
+                ) : (
+                    <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
+                        <span className="text-sm text-ink-secondary">Total</span>
+                        <strong className="text-xl font-medium tracking-tight">
+                            {formatMoney(calculatedPricing.total, event.currency)}
+                        </strong>
+                    </div>
+                )}
+                {!pricesHidden && calculatedPricing.serviceFee > 0 && (
                     <p className="mt-1 text-[11px] text-ink-secondary">
                         Includes {formatMoney(calculatedPricing.serviceFee, event.currency)} service
                         fee.
@@ -1319,13 +1334,15 @@ function RegistrationPanel({ event }) {
                                       : 'Register'}
                         </Button>
                         <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-secondary">
-                            {event.requires_approval
-                                ? calculatedPricing.total > 0
-                                    ? `Applications are reviewed before admission. If you are accepted, we will email you a link to pay ${formatMoney(calculatedPricing.total, event.currency)}.`
-                                    : 'Applications are reviewed before admission. We will email you once a decision is made.'
-                                : calculatedPricing.total === 0
-                                  ? 'No payment is required. Follow the confirmation instructions sent to your email.'
-                                  : 'Card and mobile money accepted where connected. Your entry code arrives by email the moment payment clears.'}
+                            {pricesHidden
+                                ? 'Applications are reviewed before admission. If you are offered a place, we will email you the fee for the option you chose and a link to pay.'
+                                : event.requires_approval
+                                  ? calculatedPricing.total > 0
+                                      ? `Applications are reviewed before admission. If you are accepted, we will email you a link to pay ${formatMoney(calculatedPricing.total, event.currency)}.`
+                                      : 'Applications are reviewed before admission. We will email you once a decision is made.'
+                                  : calculatedPricing.total === 0
+                                    ? 'No payment is required. Follow the confirmation instructions sent to your email.'
+                                    : 'Card and mobile money accepted where connected. Your entry code arrives by email the moment payment clears.'}
                         </p>
                     </>
                 }
@@ -1389,6 +1406,11 @@ function RegistrationPanel({ event }) {
                                                             </span>
                                                         )}
                                                     </span>
+                                                    {ticketType.description && (
+                                                        <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-secondary">
+                                                            {ticketType.description}
+                                                        </span>
+                                                    )}
                                                     {ticketType.is_sold_out && (
                                                         <span className="block text-[11.5px] text-ink-secondary">
                                                             Full — join the waitlist
@@ -1401,7 +1423,12 @@ function RegistrationPanel({ event }) {
                                             >
                                                 {ticketType.is_sold_out
                                                     ? 'Waitlist'
-                                                    : formatMoney(ticketType.price, event.currency)}
+                                                    : pricesHidden
+                                                      ? null
+                                                      : formatMoney(
+                                                            ticketType.price,
+                                                            event.currency
+                                                        )}
                                             </em>
                                         </label>
                                     ))}
@@ -1970,7 +1997,7 @@ function RegistrationPanel({ event }) {
                         </div>
 
                         {/* Dynamic Price Summary Box */}
-                        {calculatedPricing.hasAdjustments && (
+                        {!pricesHidden && calculatedPricing.hasAdjustments && (
                             <div className=" border border-accent/20 bg-accent-soft/30 p-3 text-xs space-y-1.5">
                                 <div className="flex justify-between font-medium text-ink">
                                     <span>Base Ticket:</span>

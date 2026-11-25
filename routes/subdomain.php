@@ -195,6 +195,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/attendee-imports/preview', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'preview'])->name('tenant.events.attendee-imports.preview');
     Route::get('events/{event}/attendee-imports/{import}/export', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'export'])->name('tenant.events.attendee-imports.export');
     Route::get('events/{event}/attendee-imports/{import}', [App\Http\Controllers\Tenant\EventAttendeeImportController::class, 'show'])->name('tenant.events.attendee-imports.show');
+    Route::get('events/{event}/registrations/{registration}/application', [EventRegistrationController::class, 'application'])->name('tenant.events.registrations.application');
     Route::post('events/{event}/registrations/{registration}/approve', [EventRegistrationController::class, 'approve'])->name('tenant.events.registrations.approve');
     Route::post('events/{event}/registrations/{registration}/reject', [EventRegistrationController::class, 'reject'])->name('tenant.events.registrations.reject');
     Route::post('events/{event}/registrations/{registration}/approve-offline', [EventRegistrationController::class, 'approveOfflinePayment'])->name('tenant.events.registrations.approve-offline');

@@ -15,6 +15,7 @@ import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table
 import { Download, Check, X, Pencil, FileText, Clock } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 import EditRegistrationModal from './EditRegistrationModal';
+import ApplicationReviewModal from './ApplicationReviewModal';
 import OfflineVerificationModal from './OfflineVerificationModal';
 import EventFormModal from './EventFormModal';
 import EventWorkspace from './Workspace/EventWorkspace';
@@ -288,6 +289,7 @@ export function GuestsTab({ event, registrations, canManageEventMoney = true }) 
     const reload = () => router.reload({ only: ['registrations'] });
     const [editing, setEditing] = useState(null);
     const [verifyingOffline, setVerifyingOffline] = useState(null);
+    const [reviewing, setReviewing] = useState(null);
     const [activeFilter, setActiveFilter] = useState('all');
 
     const pendingOfflineCount = useMemo(() => {
@@ -418,7 +420,14 @@ export function GuestsTab({ event, registrations, canManageEventMoney = true }) 
                         {filteredRegistrations.map((registration) => (
                             <Tr key={registration.id}>
                                 <Td>
-                                    {registration.full_name}
+                                    <button
+                                        type="button"
+                                        onClick={() => setReviewing(registration)}
+                                        className="text-left font-medium text-ink underline decoration-border-strong underline-offset-4 hover:decoration-accent"
+                                        title="View application"
+                                    >
+                                        {registration.full_name}
+                                    </button>
                                     {registration.member_verification_url && (
                                         <a
                                             href={registration.member_verification_url}
@@ -600,6 +609,14 @@ export function GuestsTab({ event, registrations, canManageEventMoney = true }) 
                         setEditing(null);
                         reload();
                     }}
+                />
+            )}
+            {reviewing && (
+                <ApplicationReviewModal
+                    event={event}
+                    registration={reviewing}
+                    onClose={() => setReviewing(null)}
+                    onDecided={reload}
                 />
             )}
             {verifyingOffline && (

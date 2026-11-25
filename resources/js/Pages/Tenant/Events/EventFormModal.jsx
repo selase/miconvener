@@ -60,6 +60,7 @@ export default function EventFormModal({ mode, event, onClose }) {
         contact_email: event?.contact_email ?? '',
         capacity: event?.capacity ?? '',
         requires_approval: event?.requires_approval ?? false,
+        hide_prices_until_approved: event?.hide_prices_until_approved ?? false,
         ...(canUseMemberBenefits
             ? {
                   members_only: event?.members_only ?? false,
@@ -152,6 +153,8 @@ export default function EventFormModal({ mode, event, onClose }) {
                 ...formData,
                 capacity: formData.capacity === '' ? null : formData.capacity,
                 requires_approval: formData.requires_approval ? '1' : '0',
+                hide_prices_until_approved:
+                    formData.requires_approval && formData.hide_prices_until_approved ? '1' : '0',
                 ...(canUseMemberBenefits
                     ? {
                           members_only: formData.members_only ? '1' : '0',
@@ -606,6 +609,25 @@ export default function EventFormModal({ mode, event, onClose }) {
                     />
                     Registrations need my approval before they're confirmed
                 </label>
+                {data.requires_approval && (
+                    <label className="ml-6 flex items-start gap-2.5 text-sm text-ink">
+                        <input
+                            type="checkbox"
+                            checked={data.hide_prices_until_approved}
+                            onChange={(e) =>
+                                setData('hide_prices_until_approved', e.target.checked)
+                            }
+                            className="mt-0.5 h-4 w-4"
+                        />
+                        <span>
+                            Hide prices until an application is approved
+                            <span className="block text-xs text-ink-secondary">
+                                Applicants still choose an option. They see its price with the
+                                payment link you send when you approve them.
+                            </span>
+                        </span>
+                    </label>
+                )}
 
                 {canManageMoney && (
                     <div className="rounded-xl border border-border/80 bg-surface-muted/40 p-4 space-y-3.5">
